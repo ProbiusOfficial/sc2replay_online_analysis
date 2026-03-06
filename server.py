@@ -19,7 +19,7 @@ EXCLUDE_UNIT_TYPES = {
     "Larva",  # 虫族幼虫，非玩家建造
 }
 
-app = FastAPI(title="SC2 录像建造顺序查看器")
+app = FastAPI(title="StarCraft II Replay Analysis - Online")
 
 
 def extract_build_order(replay):

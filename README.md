@@ -1,4 +1,4 @@
-# SC2 录像建造顺序查看器（在线分析）
+# StarCraft II Replay Analysis - Online（在线分析）
 
 基于 sc2reader 的网页版星际争霸 II 录像建造顺序查看工具。拖入 `.SC2Replay` 文件即可查看双方建造顺序。
 
