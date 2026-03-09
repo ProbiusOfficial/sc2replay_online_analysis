@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StarCraft II Replay Analysis - Online</title>
+  <link rel="icon" type="image/png" href="./assets/StarCraft.svg">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap');
 
@@ -117,6 +118,67 @@
       align-items: center;
       gap: 0.25rem;
       cursor: pointer;
+    }
+
+    .chat-toggle-row {
+      margin: 0.5rem 0 0.25rem;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .chat-toggle-btn {
+      background: transparent;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent-blue);
+      padding: 0.25rem 0.75rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .chat-toggle-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent-blue);
+    }
+
+    .chat-panel {
+      display: none;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      max-height: 240px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .chat-item {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .chat-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .chat-time {
+      color: var(--text-muted);
+    }
+
+    .chat-player {
+      color: var(--accent-green);
+    }
+
+    .chat-target {
+      color: var(--text-muted);
+    }
+
+    .chat-text {
+      color: var(--text);
     }
 
     .build-item.upgrade .unit {
@@ -298,6 +360,10 @@
           显示原始英文名称
         </label>
       </div>
+      <div class="chat-toggle-row">
+        <button id="chatToggle" class="chat-toggle-btn" type="button">查看对局聊天</button>
+      </div>
+      <div class="chat-panel" id="chatPanel"></div>
       <div class="build-orders" id="buildOrders"></div>
     </div>
   </div>
@@ -313,14 +379,18 @@
     const result = document.getElementById('result');
     const gameInfo = document.getElementById('gameInfo');
     const buildOrders = document.getElementById('buildOrders');
+    const chatPanel = document.getElementById('chatPanel');
+    const chatToggle = document.getElementById('chatToggle');
     const initStatus = document.getElementById('initStatus');
     const initProgress = document.getElementById('initProgress');
 
     let pyodide = null;
     let lastData = null;
+    let lastFileMeta = null; // 录像文件的基础信息（名称、大小）
     let timeMode = 'start';
     let showUpgrades = true;
     let showOriginal = false;
+    let chatVisible = false;
     let translationData = null; // data.json 中的翻译与时间数据
 
     // SC2 默认「更快（Faster）」游戏时间与实际显示时间存在约 1.4 倍系数（仅用于单位事件的游戏秒）
@@ -340,6 +410,43 @@
       const m = Math.floor(displaySeconds / 60);
       const s = displaySeconds % 60;
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // 把 Unix 时间戳格式化为本地时间字符串
+    function formatRealWorldTime(timestamp) {
+      if (!timestamp && timestamp !== 0) return '';
+      const d = new Date(timestamp * 1000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${y}-${m}-${day} ${hh}:${mm}`;
+    }
+
+    // 格式化文件大小
+    function formatFileSize(bytes) {
+      if (bytes === undefined || bytes === null) return '';
+      const thresh = 1024;
+      if (bytes < thresh) return `${bytes} B`;
+      const units = ['KB', 'MB', 'GB', 'TB'];
+      let u = -1;
+      let size = bytes;
+      do {
+        size /= thresh;
+        ++u;
+      } while (size >= thresh && u < units.length - 1);
+      return `${size.toFixed(1)} ${units[u]}`;
+    }
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function showError(msg) {
@@ -377,6 +484,7 @@ import sc2reader
 from sc2reader.exceptions import ReadError
 from sc2reader.events.tracker import UpgradeCompleteEvent
 from sc2reader.events.game import CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent
+from sc2reader.events.message import ChatEvent
 
 EXCLUDE_UNIT_TYPES = {"BanelingCocoon", "BroodLordCocoon", "Larva"}
 EXCLUDE_UPGRADES = {"SprayZerg", "SprayTerran", "SprayProtoss"}
@@ -386,10 +494,24 @@ ABILITY_UNIT_MAP = {
 }
 
 def extract_build_order(replay):
+    # 开始时间（现实世界时间戳，秒）
+    start_time = getattr(replay, "start_time", None)
+    start_time_ts = None
+    if start_time is not None:
+        try:
+            start_time_ts = int(start_time.timestamp())
+        except Exception:
+            start_time_ts = None
+
     result = {
         "map_name": getattr(replay, "map_name", "Unknown"),
         "game_length": getattr(getattr(replay, "game_length", None), "seconds", 0),
+        "client_version": getattr(replay, "release_string", None),
+        "region": getattr(replay, "region", None) or getattr(replay, "gateway", None),
+        "start_time": start_time_ts,
+        "winner": None,
         "teams": [],
+        "chat": [],
     }
 
     # 收集每个玩家的升级事件（使用 UpgradeCompleteEvent）
@@ -477,6 +599,48 @@ def extract_build_order(replay):
                 "unit": unit_name,
             })
 
+    # 收集对局聊天记录
+    chat_log = []
+    for ev in getattr(replay, "events", []):
+        if not isinstance(ev, ChatEvent):
+            continue
+
+        frame = getattr(ev, "frame", None)
+        sec = getattr(ev, "second", None)
+        if sec is None and frame is not None:
+            sec = frame >> 4
+        if sec is None:
+            continue
+
+        player = getattr(ev, "player", None)
+        name = getattr(player, "name", None) if player is not None else None
+        pid = getattr(ev, "pid", None)
+        target = getattr(ev, "target", None)
+        text = getattr(ev, "text", "")
+
+        chat_log.append({
+            "time": int(sec),
+            "player": name or "",
+            "pid": pid,
+            "target": target,
+            "text": text,
+        })
+
+    result["chat"] = chat_log
+
+    # 计算获胜方（可能多队并列获胜，例如多人合作）
+    try:
+        winners = []
+        for team in getattr(replay, "teams", []):
+            if getattr(team, "result", None) == "Win":
+                names = [p.name or "Unknown" for p in getattr(team, "players", [])]
+                if names:
+                    winners.append(" & ".join(names))
+        if winners:
+            result["winner"] = " / ".join(winners)
+    except Exception:
+        pass
+
     for team in replay.teams:
         team_data = {"players": []}
         for player in team.players:
@@ -504,8 +668,6 @@ def extract_build_order(replay):
                 if _type is not None:
                     is_building = bool(getattr(_type, "is_building", False))
                 build_order.append({
-                    "start_time": start_time_sec,
-                    "finish_time": finish_time_sec,
                     "start_time": start_time_sec,
                     "finish_time": finish_time_sec,
                     "supply": max(0, int(supply)),
@@ -559,7 +721,24 @@ def parse_replay(path):
         }
       });
 
+      if (chatToggle) {
+        chatToggle.addEventListener('click', () => {
+          if (!lastData || !Array.isArray(lastData.chat) || lastData.chat.length === 0) {
+            return;
+          }
+          chatVisible = !chatVisible;
+          chatPanel.style.display = chatVisible ? 'block' : 'none';
+          chatToggle.textContent = chatVisible ? '隐藏对局聊天' : '查看对局聊天';
+        });
+      }
+
       try {
+        // 记录文件基础信息（目前用于显示录像大小）
+        lastFileMeta = {
+          name: file.name,
+          size: file.size,
+        };
+
         const buffer = await file.arrayBuffer();
         const data = new Uint8Array(buffer);
 
@@ -573,8 +752,6 @@ json.dumps(result)
 `;
         const resultJson = await pyodide.runPythonAsync(parseCode);
         const data2 = JSON.parse(resultJson);
-
-        lastData = data2;
 
         lastData = data2;
 
@@ -642,13 +819,81 @@ json.dumps(result)
       return zh || name;
     }
 
+    function renderChat(data) {
+      if (!chatPanel || !chatToggle) return;
+
+      const chats = Array.isArray(data.chat) ? [...data.chat] : [];
+
+      if (!chats.length) {
+        chatVisible = false;
+        chatPanel.style.display = 'none';
+        chatPanel.innerHTML = '';
+        chatToggle.style.display = 'none';
+        chatToggle.textContent = '查看对局聊天';
+        return;
+      }
+
+      chats.sort((a, b) => {
+        const ta = typeof a.time === 'number' ? a.time : (typeof a.second === 'number' ? a.second : 0);
+        const tb = typeof b.time === 'number' ? b.time : (typeof b.second === 'number' ? b.second : 0);
+        return ta - tb;
+      });
+
+      const rows = chats.map((msg) => {
+        const tRaw = typeof msg.time === 'number' ? msg.time : (typeof msg.second === 'number' ? msg.second : 0);
+        const tStr = formatGameTime(tRaw);
+        const sender = msg.player || (msg.pid != null ? `P${msg.pid}` : '未知玩家');
+        const target = msg.target || '所有人';
+        const text = escapeHtml(msg.text || '');
+        return `
+          <div class="chat-item">
+            <span class="chat-time">[${tStr}]</span>
+            <span class="chat-player">${escapeHtml(sender)}</span>
+            <span class="chat-target">(${escapeHtml(target)})</span>
+            <span class="chat-text">${text}</span>
+          </div>
+        `;
+      }).join('');
+
+      chatPanel.innerHTML = rows;
+      chatToggle.style.display = 'inline-flex';
+      chatVisible = false;
+      chatPanel.style.display = 'none';
+      chatToggle.textContent = '查看对局聊天';
+    }
+
     function displayResult(data) {
       const gameLen = data.game_length || 0;
-      gameInfo.innerHTML = `
-        <span><strong>地图</strong> ${data.map_name || 'Unknown'}</span>
-        <span><strong>时长</strong> ${formatRealTime(gameLen)}</span>
-        <span><strong>时长</strong> ${formatRealTime(gameLen)}</span>
-      `;
+      const clientVersion = data.client_version || '';
+      const region = data.region || '';
+      const startTs = data.start_time || null;
+      const winner = data.winner || '';
+      const startStr = startTs ? formatRealWorldTime(startTs) : '';
+      const fileSizeStr = lastFileMeta ? formatFileSize(lastFileMeta.size) : '';
+
+      const infoParts = [];
+      infoParts.push(`<span><strong>地图</strong> ${data.map_name || 'Unknown'}</span>`);
+      infoParts.push(`<span><strong>时长</strong> ${formatRealTime(gameLen)}</span>`);
+      if (clientVersion) {
+        infoParts.push(`<span><strong>客户端版本</strong> ${clientVersion}</span>`);
+      }
+      if (region) {
+        infoParts.push(`<span><strong>服务器区域</strong> ${region}</span>`);
+      }
+      if (startStr) {
+        infoParts.push(`<span><strong>开始时间</strong> ${startStr}</span>`);
+      }
+      if (winner) {
+        infoParts.push(`<span><strong>胜者</strong> ${winner}</span>`);
+      }
+      if (fileSizeStr) {
+        infoParts.push(`<span><strong>录像大小</strong> ${fileSizeStr}</span>`);
+      }
+
+      gameInfo.innerHTML = infoParts.join('');
+
+      // 渲染聊天按钮和内容（如果有的话）
+      renderChat(data);
 
       let html = '';
       const teamClasses = ['team1', 'team2'];
