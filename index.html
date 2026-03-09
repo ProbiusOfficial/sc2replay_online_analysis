@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -92,6 +92,47 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1.5rem;
+    }
+
+    .time-mode-toggle {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .time-mode-toggle select {
+      background: var(--bg-card);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.25rem 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .time-mode-toggle label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      cursor: pointer;
+    }
+
+    .build-item.upgrade .unit {
+      color: var(--accent-red);
+    }
+
+    .build-item.upgrade .time {
+      color: var(--accent-red);
+    }
+
+    .build-item.chrono .unit {
+      color: var(--accent-blue);
+    }
+
+    .build-item.chrono .time {
+      color: var(--accent-blue);
     }
 
     @media (max-width: 768px) {
@@ -237,6 +278,21 @@
 
     <div class="result" id="result">
       <div class="game-info" id="gameInfo"></div>
+      <div class="time-mode-toggle">
+        <span>时间显示：</span>
+        <select id="timeModeSelect">
+          <option value="start">开始建造时间</option>
+          <option value="finish">完成建造时间</option>
+        </select>
+        <label>
+          <input type="checkbox" id="showUpgrades" checked />
+          在时间轴中显示科技升级
+        </label>
+        <label>
+          <input type="checkbox" id="showChrono" checked />
+          在时间轴中显示星空加速
+        </label>
+      </div>
       <div class="build-orders" id="buildOrders"></div>
     </div>
   </div>
@@ -256,10 +312,27 @@
     const initProgress = document.getElementById('initProgress');
 
     let pyodide = null;
+    let lastData = null;
+    let timeMode = 'start';
+    let showUpgrades = true;
+    let showChrono = true;
 
-    function formatTime(seconds) {
-      const m = Math.floor(seconds / 60);
-      const s = seconds % 60;
+    // SC2 默认「更快（Faster）」游戏时间与实际显示时间存在约 1.4 倍系数（仅用于单位事件的游戏秒）
+    const GAME_TIME_FACTOR = 1.4;
+
+    // 直接使用真实秒数（例如 replay.game_length.seconds）
+    function formatRealTime(seconds) {
+      const safe = Math.max(0, Math.round(seconds));
+      const m = Math.floor(safe / 60);
+      const s = safe % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // 把游戏内部秒（frame/16）折算成接近游戏内计时的秒数
+    function formatGameTime(gameSeconds) {
+      const displaySeconds = Math.max(0, Math.round(gameSeconds / GAME_TIME_FACTOR));
+      const m = Math.floor(displaySeconds / 60);
+      const s = displaySeconds % 60;
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
 
@@ -282,8 +355,11 @@
 import json
 import sc2reader
 from sc2reader.exceptions import ReadError
+from sc2reader.events.tracker import UpgradeCompleteEvent
+from sc2reader.events.game import TargetUnitCommandEvent, CommandEvent
 
 EXCLUDE_UNIT_TYPES = {"BanelingCocoon", "BroodLordCocoon", "Larva"}
+EXCLUDE_UPGRADES = {"SprayZerg", "SprayTerran", "SprayProtoss"}
 
 def extract_build_order(replay):
     result = {
@@ -291,6 +367,73 @@ def extract_build_order(replay):
         "game_length": getattr(getattr(replay, "game_length", None), "seconds", 0),
         "teams": [],
     }
+
+    # 收集每个玩家的升级事件（使用 UpgradeCompleteEvent）
+    upgrade_events_by_pid = {}
+    for ev in getattr(replay, "tracker_events", []):
+        if isinstance(ev, UpgradeCompleteEvent):
+            if ev.upgrade_type_name in EXCLUDE_UPGRADES:
+                continue
+            player = getattr(ev, "player", None)
+            if player is None:
+                continue
+            sec = getattr(ev, "second", None)
+            if sec is None:
+                frame = getattr(ev, "frame", None)
+                if frame is None:
+                    continue
+                sec = frame >> 4
+            pid = getattr(player, "pid", None)
+            if pid is None:
+                continue
+            upgrade_events_by_pid.setdefault(pid, []).append({
+                "time": int(sec),
+                "name": ev.upgrade_type_name,
+            })
+
+    # 收集每个玩家的星空加速（ChronoBoost / NexusChronoBoost / TimeWarp / NexusMassRecall）事件（使用 TargetUnitCommandEvent）
+    chrono_events_by_pid = {}
+    for ev in getattr(replay, "events", []):
+        if isinstance(ev, TargetUnitCommandEvent):
+            # 优先使用 ability_name（由数据表解码），否则回退到 ability.name
+            ability_name = getattr(ev, "ability_name", None)
+            if not ability_name:
+                ability_obj = getattr(ev, "ability", None)
+                ability_name = getattr(ability_obj, "name", None)
+            if not ability_name:
+                continue
+            name_lc = ability_name.lower()
+            # 兼容不同版本：ChronoBoost / NexusChronoBoost / TimeWarp / NexusMassRecall 等
+            if (
+                ("chronoboost" not in name_lc)
+                and ("timewarp" not in name_lc)
+                and ("nexusmassrecall" not in name_lc)
+            ):
+                continue
+            player = getattr(ev, "player", None)
+            if player is None:
+                continue
+            sec = getattr(ev, "second", None)
+            if sec is None:
+                frame = getattr(ev, "frame", None)
+                if frame is None:
+                    continue
+                sec = frame >> 4
+            pid = getattr(player, "pid", None)
+            if pid is None:
+                continue
+            target_name = None
+            try:
+                target = getattr(ev, "target", None) or getattr(ev, "target_unit", None)
+                target_name = getattr(target, "name", None)
+            except Exception:
+                target_name = None
+            chrono_events_by_pid.setdefault(pid, []).append({
+                "time": int(sec),
+                "target": target_name,
+                "ability_name": ability_name,
+            })
+
     for team in replay.teams:
         team_data = {"players": []}
         for player in team.players:
@@ -311,9 +454,11 @@ def extract_build_order(replay):
             for _, unit, name in units:
                 unit_supply = unit.supply if unit.supply is not None else 0
                 supply += unit_supply
-                time_sec = unit.finished_at >> 4
+                finish_time_sec = unit.finished_at >> 4
+                start_time_sec = (unit.started_at >> 4) if getattr(unit, "started_at", None) is not None else finish_time_sec
                 build_order.append({
-                    "time": time_sec,
+                    "start_time": start_time_sec,
+                    "finish_time": finish_time_sec,
                     "supply": max(0, int(supply)),
                     "unit": name,
                 })
@@ -322,6 +467,8 @@ def extract_build_order(replay):
                 "name": player.name or "Unknown",
                 "race": race_char,
                 "build_order": build_order,
+                "upgrades": upgrade_events_by_pid.get(player.pid, []),
+                "chronos": chrono_events_by_pid.get(player.pid, []),
             })
         result["teams"].append(team_data)
     return result
@@ -335,6 +482,31 @@ def parse_replay(path):
       hideError();
       loading.classList.add('visible');
       result.classList.remove('visible');
+
+      const timeModeSelect = document.getElementById('timeModeSelect');
+      const showUpgradesCheckbox = document.getElementById('showUpgrades');
+      const showChronoCheckbox = document.getElementById('showChrono');
+
+      timeModeSelect.addEventListener('change', (e) => {
+        timeMode = e.target.value || 'start';
+        if (lastData) {
+          displayResult(lastData);
+        }
+      });
+
+      showUpgradesCheckbox.addEventListener('change', (e) => {
+        showUpgrades = !!e.target.checked;
+        if (lastData) {
+          displayResult(lastData);
+        }
+      });
+
+      showChronoCheckbox.addEventListener('change', (e) => {
+        showChrono = !!e.target.checked;
+        if (lastData) {
+          displayResult(lastData);
+        }
+      });
 
       try {
         const buffer = await file.arrayBuffer();
@@ -351,6 +523,8 @@ json.dumps(result)
         const resultJson = await pyodide.runPythonAsync(parseCode);
         const data2 = JSON.parse(resultJson);
 
+        lastData = data2;
+
         pyodide.FS.unlink('/tmp/replay.SC2Replay');
 
         displayResult(data2);
@@ -366,7 +540,7 @@ json.dumps(result)
       const gameLen = data.game_length || 0;
       gameInfo.innerHTML = `
         <span><strong>地图</strong> ${data.map_name || 'Unknown'}</span>
-        <span><strong>时长</strong> ${formatTime(gameLen)}</span>
+        <span><strong>时长</strong> ${formatRealTime(gameLen)}</span>
       `;
 
       let html = '';
@@ -374,6 +548,51 @@ json.dumps(result)
       data.teams.forEach((team, i) => {
         team.players.forEach((player) => {
           const race = (player.race || '?')[0].toUpperCase();
+          const items = [...(player.build_order || [])];
+
+          if (showUpgrades && Array.isArray(player.upgrades)) {
+            player.upgrades.forEach((upg) => {
+              const t = typeof upg.time === 'number' ? upg.time : 0;
+              items.push({
+                start_time: t,
+                finish_time: t,
+                supply: null,
+                unit: `升级完成：${upg.name}`,
+                _kind: 'upgrade',
+              });
+            });
+          }
+
+          if (showChrono && Array.isArray(player.chronos)) {
+            player.chronos.forEach((cb) => {
+              const t = typeof cb.time === 'number' ? cb.time : 0;
+              const targetLabel = cb.target ? ` → ${cb.target}` : '';
+              items.push({
+                start_time: t,
+                finish_time: t,
+                supply: null,
+                unit: `星空加速${targetLabel}`,
+                _kind: 'chrono',
+              });
+            });
+          }
+
+          items.sort((a, b) => {
+            const aStart = typeof a.start_time === 'number' ? a.start_time : a.time;
+            const aFinish = typeof a.finish_time === 'number' ? a.finish_time : a.time;
+            const bStart = typeof b.start_time === 'number' ? b.start_time : b.time;
+            const bFinish = typeof b.finish_time === 'number' ? b.finish_time : b.time;
+            const ta = timeMode === 'finish' ? aFinish : aStart;
+            const tb = timeMode === 'finish' ? bFinish : bStart;
+            if (ta !== tb) return ta - tb;
+            if (a.supply !== undefined && b.supply !== undefined && a.supply !== b.supply) {
+              return a.supply - b.supply;
+            }
+            const au = a.unit || '';
+            const bu = b.unit || '';
+            return au.localeCompare(bu, 'en');
+          });
+
           html += `
             <div class="player-panel">
               <div class="player-header ${teamClasses[i]}">
@@ -381,13 +600,18 @@ json.dumps(result)
                 <span>${player.name || 'Unknown'}</span>
               </div>
               <div class="build-list">
-                ${(player.build_order || []).map((item) => `
-                  <div class="build-item">
-                    <span class="time">${formatTime(item.time)}</span>
-                    <span class="supply">${item.supply}</span>
-                    <span class="unit">${item.unit}</span>
-                  </div>
-                `).join('')}
+                ${items.map((item) => {
+                  const start = typeof item.start_time === 'number' ? item.start_time : item.time;
+                  const finish = typeof item.finish_time === 'number' ? item.finish_time : item.time;
+                  const chosen = timeMode === 'finish' ? finish : start;
+                  return `
+                    <div class="build-item ${item._kind === 'upgrade' ? 'upgrade' : ''} ${item._kind === 'chrono' ? 'chrono' : ''}">
+                      <span class="time">${formatGameTime(chosen)}</span>
+                      <span class="supply">${item.supply ?? ''}</span>
+                      <span class="unit">${item.unit}</span>
+                    </div>
+                  `;
+                }).join('')}
               </div>
             </div>
           `;
