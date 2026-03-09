@@ -1,0 +1,1192 @@
+{
+  "unit": {
+    "SCV": {
+      "zh": "SCV",
+      "time": 12
+    },
+    "MULE": {
+      "zh": "矿骡",
+      "time": 0
+    },
+    "Marine": {
+      "zh": "枪兵",
+      "time": 18
+    },
+    "Reaper": {
+      "zh": "死神",
+      "time": 32
+    },
+    "Marauder": {
+      "zh": "光头",
+      "time": 21
+    },
+    "Ghost": {
+      "zh": "幽灵",
+      "time": 29
+    },
+    "Hellion": {
+      "zh": "火车",
+      "time": 21
+    },
+    "WidowMine": {
+      "zh": "地雷",
+      "time": 21
+    },
+    "WidowMineBurrowed": {
+      "zh": "地雷",
+      "time": 21
+    },
+    "Cyclone": {
+      "zh": "导弹车",
+      "time": 32
+    },
+    "SiegeTank": {
+      "zh": "坦克",
+      "time": 32
+    },
+    "SiegeTankSieged": {
+      "zh": "坦克",
+      "time": 32
+    },
+    "BattleHellion": {
+      "zh": "火车侠",
+      "time": 21
+    },
+    "Thor": {
+      "zh": "雷神",
+      "time": 43
+    },
+    "ThorAP": {
+      "zh": "雷神",
+      "time": 43
+    },
+    "Viking": {
+      "zh": "维京",
+      "time": 30
+    },
+    "Medivac": {
+      "zh": "运输机",
+      "time": 30
+    },
+    "Liberator": {
+      "zh": "解放者",
+      "time": 43
+    },
+    "LiberatorAG": {
+      "zh": "解放者",
+      "time": 43
+    },
+    "Raven": {
+      "zh": "渡鸦",
+      "time": 34
+    },
+    "Banshee": {
+      "zh": "女妖",
+      "time": 43
+    },
+    "Battlecruiser": {
+      "zh": "战列巡航舰",
+      "time": 64
+    },
+    "Probe": {
+      "zh": "探姬",
+      "time": 12
+    },
+    "Adept": {
+      "zh": "使徒",
+      "time": 30
+    },
+    "Sentry": {
+      "zh": "哨兵",
+      "time": 23
+    },
+    "Zealot": {
+      "zh": "狂热者",
+      "time": 27
+    },
+    "Stalker": {
+      "zh": "追猎",
+      "time": 30
+    },
+    "HighTemplar": {
+      "zh": "闪电",
+      "time": 39
+    },
+    "DarkTemplar": {
+      "zh": "隐刀",
+      "time": 39
+    },
+    "Archon": {
+      "zh": "白球",
+      "time": 8.57
+    },
+    "Observer": {
+      "zh": "观察者[ob]",
+      "time": 21
+    },
+    "ObserverSiegeMode": {
+      "zh": "观察者[ob]",
+      "time": 21
+    },
+    "WarpPrism": {
+      "zh": "棱镜",
+      "time": 36
+    },
+    "Immortal": {
+      "zh": "不朽",
+      "time": 39
+    },
+    "Colossus": {
+      "zh": "巨像",
+      "time": 54
+    },
+    "Disruptor": {
+      "zh": "自爆球",
+      "time": 36
+    },
+    "Phoenix": {
+      "zh": "凤凰",
+      "time": 25
+    },
+    "VoidRay": {
+      "zh": "虚空辉光舰",
+      "time": 43
+    },
+    "Oracle": {
+      "zh": "先知",
+      "time": 37
+    },
+    "Tempest": {
+      "zh": "风暴",
+      "time": 43
+    },
+    "Carrier": {
+      "zh": "航母",
+      "time": 64
+    },
+    "Mothership": {
+      "zh": "母舰[妈妈船]",
+      "time": 79
+    },
+    "Drone": {
+      "zh": "工蜂",
+      "time": 12
+    },
+    "DroneBurrowed": {
+      "zh": "农民",
+      "time": 12
+    },
+    "Zergling": {
+      "zh": "跳虫",
+      "time": 17
+    },
+    "ZerglingBurrowed": {
+      "zh": "跳虫",
+      "time": 17
+    },
+    "Baneling": {
+      "zh": "跳虫",
+      "time": 17
+    },
+    "BanelingBurrowed": {
+      "zh": "跳虫",
+      "time": 17
+    },
+    "Roach": {
+      "zh": "蟑螂",
+      "time": 19
+    },
+    "Ravager": {
+      "zh": "蟑螂",
+      "time": 19
+    },
+    "RoachBurrowed": {
+      "zh": "蟑螂",
+      "time": 19
+    },
+    "RavagerBurrowed": {
+      "zh": "蟑螂",
+      "time": 19
+    },
+    "RavagerCocoon": {
+      "zh": "蟑螂",
+      "time": 19
+    },
+    "Queen": {
+      "zh": "女王",
+      "time": 36
+    },
+    "QueenBurrowed": {
+      "zh": "女王",
+      "time": 36
+    },
+    "Hydralisk": {
+      "zh": "刺蛇",
+      "time": 24
+    },
+    "HydraliskBurrowed": {
+      "zh": "刺蛇",
+      "time": 24
+    },
+    "Lurker": {
+      "zh": "刺蛇",
+      "time": 24
+    },
+    "LurkerBurrowed": {
+      "zh": "刺蛇",
+      "time": 24
+    },
+    "Infestor": {
+      "zh": "感染虫",
+      "time": 36
+    },
+    "InfestorBurrowed": {
+      "zh": "感染虫",
+      "time": 36
+    },
+    "Ultralisk": {
+      "zh": "大牛",
+      "time": 39
+    },
+    "UltraliskBurrowed": {
+      "zh": "大牛",
+      "time": 39
+    },
+    "SwarmHost": {
+      "zh": "宿主",
+      "time": 29
+    },
+    "SwarmHostBurrowed": {
+      "zh": "宿主",
+      "time": 29
+    },
+    "Overlord": {
+      "zh": "王虫",
+      "time": 18
+    },
+    "Overseer": {
+      "zh": "王虫",
+      "time": 18
+    },
+    "OverseerSiegeMode": {
+      "zh": "王虫",
+      "time": 18
+    },
+    "OverlordTransport": {
+      "zh": "王虫",
+      "time": 18
+    },
+    "Egg": {
+      "zh": "夭折的卵",
+      "time": 0
+    },
+    "Corruptor": {
+      "zh": "腐化",
+      "time": 29
+    },
+    "BroodLord": {
+      "zh": "腐化",
+      "time": 29
+    },
+    "Changeling": {
+      "zh": "拟态虫",
+      "time": 0
+    },
+    "ChangelingMarine": {
+      "zh": "拟态枪兵",
+      "time": 0
+    },
+    "ChangelingZealot": {
+      "zh": "拟态狂热者",
+      "time": 0
+    },
+    "ChangelingZergling": {
+      "zh": "拟态跳虫",
+      "time": 0
+    },
+    "CreepTumorQueen": {
+      "zh": "夭折的菌毯",
+      "time": 0
+    },
+    "Mutalisk": {
+      "zh": "飞龙",
+      "time": 24
+    },
+    "Viper": {
+      "zh": "飞蛇",
+      "time": 29
+    },
+    "LocustMPFlying": {
+      "zh": "宿主小虫子起飞",
+      "time": 0
+    }
+  },
+  "upgrade": {
+    "zerglingmovementspeed": {
+      "zh": "狗速",
+      "time": 79
+    },
+    "zerglingattackspeed": {
+      "zh": "狂狗",
+      "time": 93
+    },
+    "Burrow": {
+      "zh": "埋地",
+      "time": 71
+    },
+    "overlordspeed": {
+      "zh": "王虫速度",
+      "time": 43
+    },
+    "ZergMeleeWeaponsLevel1": {
+      "zh": "近战一攻",
+      "time": 114
+    },
+    "ZergMeleeWeaponsLevel2": {
+      "zh": "近战两攻",
+      "time": 136
+    },
+    "ZergMeleeWeaponsLevel3": {
+      "zh": "近战三攻",
+      "time": 157
+    },
+    "ZergMissileWeaponsLevel1": {
+      "zh": "远程一攻",
+      "time": 114
+    },
+    "ZergMissileWeaponsLevel2": {
+      "zh": "远程两攻",
+      "time": 136
+    },
+    "ZergMissileWeaponsLevel3": {
+      "zh": "远程三攻",
+      "time": 157
+    },
+    "ZergGroundArmorsLevel1": {
+      "zh": "地面一甲",
+      "time": 114
+    },
+    "ZergGroundArmorsLevel2": {
+      "zh": "地面两甲",
+      "time": 136
+    },
+    "ZergGroundArmorsLevel3": {
+      "zh": "地面三甲",
+      "time": 157
+    },
+    "ZergFlyerWeaponsLevel1": {
+      "zh": "空军一攻",
+      "time": 114
+    },
+    "ZergFlyerWeaponsLevel2": {
+      "zh": "空军两攻",
+      "time": 136
+    },
+    "ZergFlyerWeaponsLevel3": {
+      "zh": "空军三攻",
+      "time": 157
+    },
+    "ZergFlyerArmorsLevel1": {
+      "zh": "空军一防",
+      "time": 114
+    },
+    "ZergFlyerArmorsLevel2": {
+      "zh": "空军两防",
+      "time": 136
+    },
+    "ZergFlyerArmorsLevel3": {
+      "zh": "空军三防",
+      "time": 157
+    },
+    "GlialReconstitution": {
+      "zh": "蟑螂速度",
+      "time": 79
+    },
+    "TunnelingClaws": {
+      "zh": "蟑螂埋地移动",
+      "time": 79
+    },
+    "CentrificalHooks": {
+      "zh": "毒爆速度",
+      "time": 71
+    },
+    "NeuralParasite": {
+      "zh": "神经寄生",
+      "time": 79
+    },
+    "EvolveMuscularAugments": {
+      "zh": "刺蛇速度",
+      "time": 64
+    },
+    "EvolveGroovedSpines": {
+      "zh": "刺蛇射程",
+      "time": 50
+    },
+    "DiggingClaws": {
+      "zh": "地刺速埋",
+      "time": 57
+    },
+    "LurkerRange": {
+      "zh": "地刺射程",
+      "time": 57
+    },
+    "ChitinousPlating": {
+      "zh": "牛甲",
+      "time": 79
+    },
+    "AnabolicSynthesis": {
+      "zh": "牛速",
+      "time": 43
+    },
+    "TerranBuildingArmor": {
+      "zh": "建筑甲",
+      "time": 100
+    },
+    "HiSecAutoTracking": {
+      "zh": "建筑射程",
+      "time": 57
+    },
+    "PunisherGrenades": {
+      "zh": "震撼弹",
+      "time": 43
+    },
+    "ShieldWall": {
+      "zh": "盾牌",
+      "time": 79
+    },
+    "Stimpack": {
+      "zh": "兴奋剂",
+      "time": 100
+    },
+    "BansheeCloak": {
+      "zh": "女妖隐形",
+      "time": 79
+    },
+    "InterferenceMatrix": {
+      "zh": "渡鸦锁定",
+      "time": 57
+    },
+    "LiberatorAGRangeUpgrade": {
+      "zh": "解放射程",
+      "time": 79
+    },
+    "BansheeSpeed": {
+      "zh": "女妖速度",
+      "time": 100
+    },
+    "PersonalCloaking": {
+      "zh": "幽灵隐形",
+      "time": 86
+    },
+    "HurricaneThrusters": {
+      "zh": "导弹车速度",
+      "time": 100
+    },
+    "DrillClaws": {
+      "zh": "地雷速埋",
+      "time": 79
+    },
+    "SmartServos": {
+      "zh": "快速变形",
+      "time": 79
+    },
+    "HighCapacityBarrels": {
+      "zh": "蓝火",
+      "time": 79
+    },
+    "BattlecruiserEnableSpecializations": {
+      "zh": "大和炮",
+      "time": 100
+    },
+    "MedivacCaduceusReactor": {
+      "zh": "运输机回能速度",
+      "time": 53
+    },
+    "TerranInfantryWeaponsLevel1": {
+      "zh": "生化一攻",
+      "time": 114
+    },
+    "TerranInfantryArmorsLevel1": {
+      "zh": "生化一防",
+      "time": 114
+    },
+    "TerranVehicleAndShipArmorsLevel1": {
+      "zh": "机械化一防",
+      "time": 114
+    },
+    "TerranShipWeaponsLevel1": {
+      "zh": "空军一攻",
+      "time": 114
+    },
+    "TerranVehicleWeaponsLevel1": {
+      "zh": "机械化一攻",
+      "time": 114
+    },
+    "TerranInfantryWeaponsLevel2": {
+      "zh": "生化两攻",
+      "time": 136
+    },
+    "TerranInfantryArmorsLevel2": {
+      "zh": "生化两防",
+      "time": 136
+    },
+    "TerranVehicleAndShipArmorsLevel2": {
+      "zh": "机械化两防",
+      "time": 136
+    },
+    "TerranShipWeaponsLevel2": {
+      "zh": "空军两攻",
+      "time": 136
+    },
+    "TerranVehicleWeaponsLevel2": {
+      "zh": "机械化两攻",
+      "time": 136
+    },
+    "TerranInfantryWeaponsLevel3": {
+      "zh": "生化三攻",
+      "time": 157
+    },
+    "TerranInfantryArmorsLevel3": {
+      "zh": "生化三防",
+      "time": 157
+    },
+    "TerranVehicleAndShipArmorsLevel3": {
+      "zh": "机械化三防",
+      "time": 157
+    },
+    "TerranShipWeaponsLevel3": {
+      "zh": "空军三攻",
+      "time": 157
+    },
+    "TerranVehicleWeaponsLevel3": {
+      "zh": "机械化三攻",
+      "time": 157
+    },
+    "WarpGateResearch": {
+      "zh": "折跃门",
+      "time": 100
+    },
+    "BlinkTech": {
+      "zh": "追猎闪烁",
+      "time": 100
+    },
+    "ResonatingGlaives": {
+      "zh": "使徒攻速",
+      "time": 100
+    },
+    "Charge": {
+      "zh": "狂热者脚速",
+      "time": 100
+    },
+    "ExtendedThermalLance": {
+      "zh": "巨像射程",
+      "time": 100
+    },
+    "PsiStormTech": {
+      "zh": "闪电科技",
+      "time": 79
+    },
+    "GraviticDrive": {
+      "zh": "提速棱镜",
+      "time": 57
+    },
+    "DarkTemplarBlinkUpgrade": {
+      "zh": "隐刀闪烁",
+      "time": 100
+    },
+    "TempestGroundAttackUpgrade": {
+      "zh": "风暴对建筑伤害",
+      "time": 100
+    },
+    "PhoenixRangeUpgrade": {
+      "zh": "凤凰射程",
+      "time": 64
+    },
+    "VoidRaySpeedUpgrade": {
+      "zh": "虚空速度",
+      "time": 80
+    },
+    "ObserverGraviticBooster": {
+      "zh": "提速OB",
+      "time": 80
+    },
+    "ProtossAirWeaponsLevel1": {
+      "zh": "空军一攻",
+      "time": 129
+    },
+    "ProtossGroundWeaponsLevel1": {
+      "zh": "地面一攻",
+      "time": 129
+    },
+    "ProtossShieldsLevel1": {
+      "zh": "一级护盾",
+      "time": 129
+    },
+    "ProtossAirArmorsLevel1": {
+      "zh": "空军一防",
+      "time": 129
+    },
+    "ProtossGroundArmorsLevel1": {
+      "zh": "地面一防",
+      "time": 129
+    },
+    "ProtossAirWeaponsLevel2": {
+      "zh": "空军两攻",
+      "time": 154
+    },
+    "ProtossGroundWeaponsLevel2": {
+      "zh": "地面二攻",
+      "time": 154
+    },
+    "ProtossShieldsLevel2": {
+      "zh": "两级护盾",
+      "time": 154
+    },
+    "ProtossAirArmorsLevel2": {
+      "zh": "空军两防",
+      "time": 154
+    },
+    "ProtossGroundArmorsLevel2": {
+      "zh": "地面两防",
+      "time": 154
+    },
+    "ProtossAirWeaponsLevel3": {
+      "zh": "空军三攻",
+      "time": 179
+    },
+    "ProtossGroundWeaponsLevel3": {
+      "zh": "地面三攻",
+      "time": 179
+    },
+    "ProtossShieldsLevel3": {
+      "zh": "三级护盾",
+      "time": 179
+    },
+    "ProtossAirArmorsLevel3": {
+      "zh": "空军三防",
+      "time": 179
+    },
+    "ProtossGroundArmorsLevel3": {
+      "zh": "地面三防",
+      "time": 179
+    }
+  },
+  "build": {
+    "Hatchery": {
+      "zh": "孵化场",
+      "time": 0
+    },
+    "Extractor": {
+      "zh": "气矿",
+      "time": 0
+    },
+    "SpawningPool": {
+      "zh": "孵化池",
+      "time": 0
+    },
+    "SporeCrawler": {
+      "zh": "孢子爬虫",
+      "time": 0
+    },
+    "SporeCrawlerUprooted": {
+      "zh": "孢子爬虫",
+      "time": 0
+    },
+    "SpineCrawler": {
+      "zh": "脊针爬虫",
+      "time": 0
+    },
+    "SpineCrawlerUprooted": {
+      "zh": "脊针爬虫",
+      "time": 0
+    },
+    "ExtractorRich": {
+      "zh": "高能瓦斯",
+      "time": 0
+    },
+    "CreepTumorBurrowed": {
+      "zh": "菌毯",
+      "time": 0
+    },
+    "CreepTumor": {
+      "zh": "菌毯",
+      "time": 0
+    },
+    "CreepTumorQueen": {
+      "zh": "菌毯",
+      "time": 0
+    },
+    "BanelingNest": {
+      "zh": "毒爆虫巢",
+      "time": 0
+    },
+    "EvolutionChamber": {
+      "zh": "进化腔[BV]",
+      "time": 0
+    },
+    "RoachWarren": {
+      "zh": "蟑螂巢",
+      "time": 0
+    },
+    "GreaterSpire": {
+      "zh": "龙塔",
+      "time": 0
+    },
+    "Lair": {
+      "zh": "孵化场",
+      "time": 0
+    },
+    "Hive": {
+      "zh": "孵化场",
+      "time": 0
+    },
+    "InfestationPit": {
+      "zh": "感染深渊",
+      "time": 0
+    },
+    "Spire": {
+      "zh": "龙塔",
+      "time": 0
+    },
+    "NydusNetwork": {
+      "zh": "虫道网络",
+      "time": 0
+    },
+    "NydusCanal": {
+      "zh": "虫洞",
+      "time": 0
+    },
+    "LurkerDenMP": {
+      "zh": "地刺巢",
+      "time": 0
+    },
+    "LurkerDen": {
+      "zh": "地刺巢",
+      "time": 0
+    },
+    "UltraliskCavern": {
+      "zh": "牛牛巢穴",
+      "time": 0
+    },
+    "HydraliskDen": {
+      "zh": "刺蛇巢",
+      "time": 0
+    },
+    "Pylon": {
+      "zh": "水晶塔",
+      "time": 0
+    },
+    "WarpGate": {
+      "zh": "传送门",
+      "time": 0
+    },
+    "Gateway": {
+      "zh": "传送门",
+      "time": 0
+    },
+    "Assimilator": {
+      "zh": "气矿",
+      "time": 0
+    },
+    "Nexus": {
+      "zh": "星灵枢纽",
+      "time": 0
+    },
+    "CyberneticsCore": {
+      "zh": "控制芯核[BY]",
+      "time": 0
+    },
+    "TwilightCouncil": {
+      "zh": "光影议会[VC]",
+      "time": 0
+    },
+    "RoboticsFacility": {
+      "zh": "机械台[VR]",
+      "time": 0
+    },
+    "RoboticsBay": {
+      "zh": "机械研究所[VB]",
+      "time": 0
+    },
+    "TemplarArchive": {
+      "zh": "圣堂武士文献馆[VT]",
+      "time": 0
+    },
+    "ShieldBattery": {
+      "zh": "电池",
+      "time": 0
+    },
+    "Stargate": {
+      "zh": "星门",
+      "time": 0
+    },
+    "Forge": {
+      "zh": "锻炉[BF]",
+      "time": 0
+    },
+    "FleetBeacon": {
+      "zh": "舰队航标[VF]",
+      "time": 0
+    },
+    "DarkShrine": {
+      "zh": "黑暗圣坛[VD]",
+      "time": 0
+    },
+    "PhotonCannon": {
+      "zh": "地堡",
+      "time": 0
+    },
+    "Adept": {
+      "zh": "使徒",
+      "time": 0
+    },
+    "Sentry": {
+      "zh": "哨兵",
+      "time": 0
+    },
+    "Zealot": {
+      "zh": "狂热者",
+      "time": 0
+    },
+    "Stalker": {
+      "zh": "追猎",
+      "time": 0
+    },
+    "HighTemplar": {
+      "zh": "闪电",
+      "time": 0
+    },
+    "DarkTemplar": {
+      "zh": "隐刀",
+      "time": 0
+    },
+    "Archon": {
+      "zh": "白球",
+      "time": 0
+    },
+    "MissileTurret": {
+      "zh": "导弹塔",
+      "time": 0
+    },
+    "SensorTower": {
+      "zh": "感应塔",
+      "time": 0
+    },
+    "SupplyDepot": {
+      "zh": "补给站",
+      "time": 0
+    },
+    "SupplyDepotLowered": {
+      "zh": "补给站",
+      "time": 0
+    },
+    "Barracks": {
+      "zh": "兵营",
+      "time": 0
+    },
+    "Factory": {
+      "zh": "重工厂[VF]",
+      "time": 0
+    },
+    "Starport": {
+      "zh": "星港[VS]",
+      "time": 0
+    },
+    "OrbitalCommandFlying": {
+      "zh": "星轨起飞",
+      "time": 0
+    },
+    "FactoryFlying": {
+      "zh": "重工厂起飞",
+      "time": 0
+    },
+    "StarporFlying": {
+      "zh": "星港起飞",
+      "time": 0
+    },
+    "BarracksFlying": {
+      "zh": "兵营起飞",
+      "time": 0
+    },
+    "Refinery": {
+      "zh": "气矿",
+      "time": 0
+    },
+    "Armory": {
+      "zh": "军械库[VA]",
+      "time": 0
+    },
+    "EngineeringBay": {
+      "zh": "工程站[BE]",
+      "time": 0
+    },
+    "GhostAcademy": {
+      "zh": "幽灵军校",
+      "time": 0
+    },
+    "FusionCore": {
+      "zh": "大和巢穴",
+      "time": 0
+    },
+    "BarracksReactor": {
+      "zh": "新建双倍挂件[兵营]",
+      "time": 0
+    },
+    "BarracksTechLab": {
+      "zh": "新建科技挂件[兵营]",
+      "time": 0
+    },
+    "StarportTechLab": {
+      "zh": "新建科技挂件[星港]",
+      "time": 0
+    },
+    "StarportReactor": {
+      "zh": "新建双倍挂件[星港]",
+      "time": 0
+    },
+    "FactoryReactor": {
+      "zh": "新建双倍挂件[重工厂]",
+      "time": 0
+    },
+    "FactoryTechLab": {
+      "zh": "新建科技挂件[重工厂]",
+      "time": 0
+    },
+    "Reactor": {
+      "zh": "双倍挂件",
+      "time": 0
+    },
+    "TechLab": {
+      "zh": "科技挂件",
+      "time": 0
+    },
+    "OrbitalCommand": {
+      "zh": "基地",
+      "time": 0
+    },
+    "PlanetaryFortress": {
+      "zh": "基地",
+      "time": 0
+    },
+    "CommandCenter": {
+      "zh": "基地",
+      "time": 0
+    },
+    "Bunker": {
+      "zh": "地堡",
+      "time": 0
+    }
+  },
+  "change": {
+    "Clist": {
+      "BanelingCocoon": {
+        "zh": "毒爆",
+        "time": 0
+      },
+      "RavagerCocoon": {
+        "zh": "火蟑螂",
+        "time": 0
+      },
+      "LurkerMPEgg": {
+        "zh": "地刺",
+        "time": 0
+      },
+      "Hive": {
+        "zh": "三本",
+        "time": 0
+      },
+      "Lair": {
+        "zh": "二本",
+        "time": 0
+      },
+      "OrbitalCommand": {
+        "zh": "星轨",
+        "time": 0
+      },
+      "PlanetaryFortress": {
+        "zh": "要塞",
+        "time": 0
+      },
+      "CommandCenterFlying": {
+        "zh": "指挥中心起飞",
+        "time": 0
+      },
+      "CommandCenter": {
+        "zh": "指挥中心落地",
+        "time": 0
+      },
+      "OrbitalCommandFlying": {
+        "zh": "星轨起飞",
+        "time": 0
+      },
+      "FactoryFlying": {
+        "zh": "重工厂起飞",
+        "time": 0
+      },
+      "StarportFlying": {
+        "zh": "星港起飞",
+        "time": 0
+      },
+      "BarracksFlying": {
+        "zh": "兵营起飞",
+        "time": 0
+      },
+      "Factory": {
+        "zh": "重工厂落地",
+        "time": 0
+      },
+      "Barracks": {
+        "zh": "兵营落地",
+        "time": 0
+      },
+      "Starport": {
+        "zh": "星港落地",
+        "time": 0
+      },
+      "BarracksReactor": {
+        "zh": "接入双倍挂件[兵营]",
+        "time": 0
+      },
+      "BarracksTechLab": {
+        "zh": "接入科技挂件[兵营]",
+        "time": 0
+      },
+      "StarportTechLab": {
+        "zh": "接入科技挂件[星港]",
+        "time": 0
+      },
+      "StarportReactor": {
+        "zh": "接入双倍挂件[星港]",
+        "time": 0
+      },
+      "FactoryReactor": {
+        "zh": "接入双倍挂件[重工厂]",
+        "time": 0
+      },
+      "FactoryTechLab": {
+        "zh": "接入科技挂件[重工厂]",
+        "time": 0
+      },
+      "Reactor": {
+        "zh": "双倍挂件脱离",
+        "time": 0
+      },
+      "TechLab": {
+        "zh": "科技挂件脱离",
+        "time": 0
+      },
+      "GreaterSpire": {
+        "zh": "大龙塔",
+        "time": 0
+      },
+      "BroodLordCocoon": {
+        "zh": "大龙",
+        "time": 0
+      },
+      "TransportOverlordCocoon": {
+        "zh": "载货王虫",
+        "time": 0
+      },
+      "OverseerSiegeModeCocoon": {
+        "zh": "眼虫",
+        "time": 0
+      },
+      "OverlordCocoon": {
+        "zh": "眼虫",
+        "time": 0
+      }
+    },
+    "CClist": {
+      "Baneling": {
+        "zh": "毒爆",
+        "time": 0
+      },
+      "Ravager": {
+        "zh": "火蟑螂",
+        "time": 0
+      },
+      "LurkerMP": {
+        "zh": "地刺",
+        "time": 0
+      },
+      "Lurker": {
+        "zh": "地刺",
+        "time": 0
+      },
+      "BroodLord": {
+        "zh": "大龙",
+        "time": 0
+      },
+      "OverlordTransport": {
+        "zh": "载货王虫",
+        "time": 0
+      },
+      "Overseer": {
+        "zh": "眼虫",
+        "time": 0
+      },
+      "BroodLordCocoon": {
+        "zh": "大龙茧",
+        "time": 0
+      },
+      "TransportOverlordCocoon": {
+        "zh": "载货王虫茧",
+        "time": 0
+      },
+      "OverseerSiegeModeCocoon": {
+        "zh": "眼虫茧",
+        "time": 0
+      },
+      "OverlordCocoon": {
+        "zh": "眼虫茧",
+        "time": 0
+      },
+      "BanelingCocoon": {
+        "zh": "毒爆卵",
+        "time": 0
+      },
+      "RavagerCocoon": {
+        "zh": "火蟑螂茧",
+        "time": 0
+      },
+      "LurkerMPEgg": {
+        "zh": "地刺茧",
+        "time": 0
+      },
+      "Zergling": {
+        "zh": "跳虫",
+        "time": 0
+      },
+      "Roach": {
+        "zh": "蟑螂",
+        "time": 0
+      },
+      "Hydralisk": {
+        "zh": "刺蛇",
+        "time": 0
+      },
+      "Corruptor": {
+        "zh": "腐化",
+        "time": 0
+      }
+    },
+    "CCClist": {
+      "BanelingBurrowed": {
+        "zh": "毒爆",
+        "time": 0
+      },
+      "RavagerBurrowed": {
+        "zh": "火蟑螂",
+        "time": 0
+      },
+      "Lurker": {
+        "zh": "地刺",
+        "time": 0
+      },
+      "LurkerBurrowed": {
+        "zh": "地刺",
+        "time": 0
+      }
+    }
+  }
+}
