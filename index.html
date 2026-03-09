@@ -245,6 +245,36 @@
 
     .build-list { max-height: 400px; overflow-y: auto; }
 
+    /* 列表/聊天区域定制滚动条，保持与整体暗色+蓝绿强调色风格统一 */
+    .build-list,
+    .chat-panel {
+      scrollbar-width: thin; /* Firefox */
+      scrollbar-color: var(--accent-blue) transparent;
+    }
+
+    .build-list::-webkit-scrollbar,
+    .chat-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .build-list::-webkit-scrollbar-track,
+    .chat-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .build-list::-webkit-scrollbar-thumb,
+    .chat-panel::-webkit-scrollbar-thumb {
+      background: rgba(88, 166, 255, 0.4);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    .build-list::-webkit-scrollbar-thumb:hover,
+    .chat-panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(88, 166, 255, 0.8);
+    }
+
     .build-item {
       display: grid;
       grid-template-columns: 60px 50px 1fr;
