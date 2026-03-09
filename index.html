@@ -506,6 +506,8 @@ def extract_build_order(replay):
                 build_order.append({
                     "start_time": start_time_sec,
                     "finish_time": finish_time_sec,
+                    "start_time": start_time_sec,
+                    "finish_time": finish_time_sec,
                     "supply": max(0, int(supply)),
                     "unit": name,
                     "category": "building" if is_building else "unit",
@@ -571,6 +573,8 @@ json.dumps(result)
 `;
         const resultJson = await pyodide.runPythonAsync(parseCode);
         const data2 = JSON.parse(resultJson);
+
+        lastData = data2;
 
         lastData = data2;
 
@@ -642,6 +646,7 @@ json.dumps(result)
       const gameLen = data.game_length || 0;
       gameInfo.innerHTML = `
         <span><strong>地图</strong> ${data.map_name || 'Unknown'}</span>
+        <span><strong>时长</strong> ${formatRealTime(gameLen)}</span>
         <span><strong>时长</strong> ${formatRealTime(gameLen)}</span>
       `;
 
