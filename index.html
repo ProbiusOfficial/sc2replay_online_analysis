@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StarCraft II Replay Analysis - Online</title>
-  <link rel="icon" type="image/png" href="./assets/StarCraft.svg">
+  <link rel="icon" type="image/png" href="StarCraft.svg">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap');
 
@@ -775,12 +775,21 @@ json.dumps(result)
         if (kind === 'upgrade') {
           return `升级完成：${name}`;
         }
+        if (kind === 'recall') {
+          const target = item.target || name || '';
+          return target ? `星空加速 → ${target}` : '星空加速';
+        }
         return name;
       }
 
+      // 未加载翻译表时，尽量保留语义
       if (!translationData) {
         if (kind === 'upgrade') {
           return `升级完成：${name}`;
+        }
+        if (kind === 'recall') {
+          const target = item.target || name || '';
+          return target ? `星空加速 → ${target}` : '星空加速';
         }
         return name;
       }
@@ -793,6 +802,30 @@ json.dumps(result)
         const t = upInfo && typeof upInfo.time === 'number' ? upInfo.time : 0;
         const timePart = t > 0 ? `[${t}s]` : '';
         return `升级完成：${zh}${timePart}`;
+      }
+
+      // 星空加速：前缀固定 + 目标建筑翻译
+      if (kind === 'recall') {
+        const targetName = item.target || name || '';
+        let zhTarget = null;
+
+        if (translationData.unit && translationData.unit[targetName]) {
+          zhTarget = translationData.unit[targetName].zh;
+        }
+        if (!zhTarget && translationData.build && translationData.build[targetName]) {
+          zhTarget = translationData.build[targetName].zh;
+        }
+        if (!zhTarget && translationData.change) {
+          for (const group of Object.values(translationData.change)) {
+            if (group && group[targetName]) {
+              zhTarget = group[targetName].zh;
+              break;
+            }
+          }
+        }
+
+        const finalTarget = zhTarget || targetName;
+        return finalTarget ? `星空加速 → ${finalTarget}` : '星空加速';
       }
 
       // 其它（单位/建筑等）：优先在 unit/build 查找
@@ -918,12 +951,12 @@ json.dumps(result)
           if (Array.isArray(player.recalls)) {
             player.recalls.forEach((rc) => {
               const t = typeof rc.time === 'number' ? rc.time : 0;
-              const targetText = rc.target ? ` → ${rc.target}` : '';
               items.push({
                 start_time: t,
                 finish_time: t,
                 supply: null,
-                unit: `星空加速${targetText}`,
+                unit: rc.target || '',
+                target: rc.target || '',
                 _kind: 'recall',
               });
             });

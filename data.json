@@ -129,7 +129,11 @@
       "time": 21
     },
     "WarpPrism": {
-      "zh": "棱镜",
+      "zh": "折跃棱镜",
+      "time": 36
+    },
+    "WarpPrismPhasing": {
+      "zh": "折跃棱镜[相位展开]",
       "time": 36
     },
     "Immortal": {
