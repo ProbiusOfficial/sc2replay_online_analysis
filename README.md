@@ -61,5 +61,6 @@
 
 在此对 **sc2reader** 以及 **SC2ReplayAnalyzer-main** 项目作者和贡献者表示感谢。
 
+### 更新日志
 
-
+26/03/10 为 Zerg 单位特殊处理：sc2reader 对虫族单位（通过幼虫孵化）的 started_at 没有做「建造时间回推」，导致 start_time 和 finish_time 相同，都是「孵化完成时刻」。采用回推策略，将 start_time 设置为孵化开始时刻，finish_time 设置为孵化完成时刻。
