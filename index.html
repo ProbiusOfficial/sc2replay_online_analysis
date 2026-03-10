@@ -1006,6 +1006,45 @@ json.dumps(result)
             });
           }
 
+          // Zerg 单位特殊处理：
+          // - sc2reader 对虫族单位（通过幼虫孵化）的 started_at 没有做「建造时间回推」，
+          //   导致 start_time 和 finish_time 相同，都是「孵化完成时刻」。
+          // - 为了让「开始建造时间」更贴近游戏内感觉，这里在「折算为游戏时间」之后，
+          //   再减去 data.json 里定义的单位建造时间（单位：显示秒），再折算回内部秒，
+          //   只影响前端展示，不改动原始解析结果（便于之后调试/比对）。
+          if (
+            race === 'Z' &&
+            translationData &&
+            translationData.unit
+          ) {
+            items.forEach((item) => {
+              if (
+                item &&
+                item.category === 'unit' &&
+                typeof item.start_time === 'number' &&
+                typeof item.finish_time === 'number' &&
+                item.start_time === item.finish_time &&
+                item.finish_time > 0
+              ) {
+                const info = translationData.unit[item.unit];
+                const buildTime =
+                  info && typeof info.time === 'number' ? info.time : null;
+                if (!buildTime) return;
+
+                // finish_game（内部秒） -> finish_display（游戏内显示秒）
+                const finishGame = item.finish_time;
+                const finishDisplay = Math.max(
+                  0,
+                  Math.round(finishGame / GAME_TIME_FACTOR)
+                );
+                const startDisplay = Math.max(0, finishDisplay - buildTime);
+                const startGame = Math.round(startDisplay * GAME_TIME_FACTOR);
+
+                item.start_time = startGame;
+              }
+            });
+          }
+
           // 根据当前模式对条目按时间排序，保证时间轴从小到大
           items.sort((a, b) => {
             const aStart = typeof a.start_time === 'number' ? a.start_time : a.time;
