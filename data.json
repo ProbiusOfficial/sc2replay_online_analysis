@@ -244,6 +244,10 @@
       "zh": "刺蛇",
       "time": 24
     },
+    "LurkerEgg":{
+      "zh": "刺蛇",
+      "time": 24
+    },
     "LurkerBurrowed": {
       "zh": "刺蛇",
       "time": 24
@@ -853,7 +857,7 @@
       "time": 0
     },
     "PhotonCannon": {
-      "zh": "地堡",
+      "zh": "光子炮塔",
       "time": 0
     },
     "Adept": {

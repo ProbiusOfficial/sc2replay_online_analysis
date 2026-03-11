@@ -243,6 +243,37 @@
     .race-badge.P { background: rgba(177, 151, 252, 0.3); color: var(--race-p); }
     .race-badge.Z { background: rgba(105, 219, 124, 0.3); color: var(--race-z); }
 
+    .player-header .player-name {
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .export-btn {
+      margin-left: auto;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.8rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(88, 166, 255, 0.08);
+      color: var(--accent-blue);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .export-btn::before {
+      content: '⇩';
+      font-size: 0.9em;
+    }
+
+    .export-btn:hover {
+      border-color: var(--accent-blue);
+      background: rgba(88, 166, 255, 0.2);
+    }
+
     .build-list { max-height: 400px; overflow-y: auto; }
 
     /* 列表/聊天区域定制滚动条，保持与整体暗色+蓝绿强调色风格统一 */
@@ -393,6 +424,10 @@
           <input type="checkbox" id="showInitEvents" />
           显示初始化事件
         </label>
+        <label>
+          <input type="checkbox" id="mergeSameActions" />
+          合并同一秒重复操作
+        </label>
       </div>
       <div class="chat-toggle-row">
         <button id="chatToggle" class="chat-toggle-btn" type="button">查看对局聊天</button>
@@ -424,6 +459,7 @@
     let timeMode = 'start';
     let showUpgrades = true;
     let showOriginal = false;
+    let mergeSameActions = false;
     let chatVisible = false;
     let translationData = null; // data.json 中的翻译与时间数据
     let showInitEvents = false; // 是否显示「初始化事件」（默认不显示）
@@ -776,6 +812,7 @@ def parse_replay(path):
       const showUpgradesCheckbox = document.getElementById('showUpgrades');
       const showOriginalCheckbox = document.getElementById('showOriginal');
       const showInitEventsCheckbox = document.getElementById('showInitEvents');
+      const mergeSameActionsCheckbox = document.getElementById('mergeSameActions');
 
       timeModeSelect.addEventListener('change', (e) => {
         timeMode = e.target.value || 'start';
@@ -801,6 +838,15 @@ def parse_replay(path):
       if (showInitEventsCheckbox) {
         showInitEventsCheckbox.addEventListener('change', (e) => {
           showInitEvents = !!e.target.checked;
+          if (lastData) {
+            displayResult(lastData);
+          }
+        });
+      }
+
+      if (mergeSameActionsCheckbox) {
+        mergeSameActionsCheckbox.addEventListener('change', (e) => {
+          mergeSameActions = !!e.target.checked;
           if (lastData) {
             displayResult(lastData);
           }
@@ -1167,31 +1213,92 @@ json.dumps(result)
             return au.localeCompare(bu, 'en');
           });
 
+          // 先把条目映射为渲染所需的中间结构，便于后续可选合并
+          const renderedItems = visibleItems.map((item) => {
+            const start = typeof item.start_time === 'number' ? item.start_time : item.time;
+            const finish = typeof item.finish_time === 'number' ? item.finish_time : item.time;
+            const chosen = timeMode === 'finish' ? finish : start;
+            const timeStr = formatGameTime(chosen);
+            const extraClasses = [];
+            if (item._kind === 'upgrade') extraClasses.push('upgrade');
+            if (item._kind === 'recall') extraClasses.push('recall');
+            if (item.category === 'unit') extraClasses.push('unit');
+            const extraClass = extraClasses.join(' ');
+            const unitText = getDisplayUnitText(item);
+            const supplyStr = item.supply ?? '';
+            return {
+              timeStr,
+              supplyStr,
+              unitText,
+              extraClass,
+              raw: item,
+            };
+          });
+
+          let finalItems;
+
+          if (!mergeSameActions) {
+            finalItems = renderedItems;
+          } else {
+            // 合并“同一秒、同一单位”的连续操作：
+            // - 时间：相同 timeStr
+            // - 单位：相同 unitText
+            // - 合并后使用最后一条的 supply，单位名后加 " xN"
+            finalItems = [];
+            let current = null;
+            let count = 0;
+
+            const flush = () => {
+              if (!current) return;
+              const text =
+                count > 1 ? `${current.unitText} x${count}` : current.unitText;
+              finalItems.push({
+                timeStr: current.timeStr,
+                supplyStr: current.supplyStr,
+                unitText: text,
+                extraClass: current.extraClass,
+              });
+              current = null;
+              count = 0;
+            };
+
+            renderedItems.forEach((item) => {
+              if (
+                !current ||
+                current.timeStr !== item.timeStr ||
+                current.unitText !== item.unitText
+              ) {
+                flush();
+                current = item;
+                count = 1;
+              } else {
+                // 同一时间+同一单位，累计数量，并用最新 supply 覆盖
+                count += 1;
+                current.supplyStr = item.supplyStr;
+              }
+            });
+            flush();
+          }
+
           html += `
             <div class="player-panel">
               <div class="player-header ${teamClasses[i]}">
                 <span class="race-badge ${race}">${race}</span>
-                <span>${player.name || 'Unknown'}</span>
+                <span class="player-name">${player.name || 'Unknown'}</span>
+                <button type="button" class="export-btn">导出TXT</button>
               </div>
               <div class="build-list">
-                ${visibleItems.map((item) => {
-                  const start = typeof item.start_time === 'number' ? item.start_time : item.time;
-                  const finish = typeof item.finish_time === 'number' ? item.finish_time : item.time;
-                  const chosen = timeMode === 'finish' ? finish : start;
-                  const extraClasses = [];
-                  if (item._kind === 'upgrade') extraClasses.push('upgrade');
-                  if (item._kind === 'recall') extraClasses.push('recall');
-                  if (item.category === 'unit') extraClasses.push('unit');
-                  const extraClass = extraClasses.join(' ');
-                  const unitText = getDisplayUnitText(item);
-                  return `
-                    <div class="build-item ${extraClass}">
-                      <span class="time">${formatGameTime(chosen)}</span>
-                      <span class="supply">${item.supply ?? ''}</span>
-                      <span class="unit">${unitText}</span>
+                ${finalItems
+                  .map(
+                    (it) => `
+                    <div class="build-item ${it.extraClass}">
+                      <span class="time">${it.timeStr}</span>
+                      <span class="supply">${it.supplyStr}</span>
+                      <span class="unit">${it.unitText}</span>
                     </div>
-                  `;
-                }).join('')}
+                  `,
+                  )
+                  .join('')}
               </div>
             </div>
           `;
@@ -1200,6 +1307,46 @@ json.dumps(result)
 
       buildOrders.innerHTML = html;
       result.classList.add('visible');
+      setupExportButtons();
+    }
+
+    function setupExportButtons() {
+      const panels = buildOrders.querySelectorAll('.player-panel');
+      panels.forEach((panel) => {
+        const btn = panel.querySelector('.export-btn');
+        if (!btn) return;
+        btn.onclick = () => {
+          const items = panel.querySelectorAll('.build-item');
+          const lines = [];
+          items.forEach((item) => {
+            const timeEl = item.querySelector('.time');
+            const supplyEl = item.querySelector('.supply');
+            const unitEl = item.querySelector('.unit');
+            const t = timeEl ? timeEl.textContent.trim() : '';
+            const s = supplyEl ? supplyEl.textContent.trim() : '';
+            const u = unitEl ? unitEl.textContent.trim() : '';
+            if (!t && !s && !u) return;
+            const parts = [];
+            if (t) parts.push(t);
+            if (s) parts.push(s);
+            if (u) parts.push(u);
+            lines.push(parts.join(' '));
+          });
+
+          const nameEl = panel.querySelector('.player-name');
+          const playerName = nameEl ? nameEl.textContent.trim() || 'player' : 'player';
+          const content = lines.join('\n');
+          const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${playerName}_build.txt`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+      });
     }
 
     async function initPyodide() {
