@@ -941,68 +941,16 @@ json.dumps(result)
     }
 
     // 判断某个条目是否属于「初始化事件」
-    // 规则（只在 showInitEvents === false 时用于过滤）：
-    // 1. 开局 0 秒的 RewardDance* 升级（_kind === 'upgrade'，unit 以 RewardDance 开头）
-    // 2. 开局 0 秒的 Beacon* 相关单位生产（category === 'unit'，unit 以 Beacon 开头）
-    // 3. 开局 11（含）补给占用内的所有单位生产（category === 'unit'，supply <= 11）
-    // 4. 开局 2 秒内的所有建筑建造（category === 'building'，游戏显示秒数 <= 2）
-    // 5. 虫族（Z）开局 1 秒内的王虫 Overlord 生产（category === 'unit'，unit 以 Overlord 开头，显示秒数 <= 1）
+    // 简化规则：仅在 start_time 与 finish_time（或 time）都为 0 时视为初始化事件。
     function isInitEvent(item, race) {
       if (!item) return false;
 
-      // 统一取得内部秒（frame/16）
-      let baseSeconds = 0;
-      if (typeof item.start_time === 'number') {
-        baseSeconds = item.start_time;
-      } else if (typeof item.time === 'number') {
-        baseSeconds = item.time;
-      }
-      const displaySeconds = Math.max(
-        0,
-        Math.round(baseSeconds / GAME_TIME_FACTOR)
-      );
-
-      const unitName = typeof item.unit === 'string' ? item.unit : '';
-      const supply = typeof item.supply === 'number' ? item.supply : null;
-
-      // 1) 开局 0 秒 RewardDance* 升级
-      if (
-        item._kind === 'upgrade' &&
-        unitName.startsWith('RewardDance') &&
-        displaySeconds === 0
-      ) {
+      // 0) start_time == finish_time == 0 的单位，一律视为初始化事件
+      const start0 = typeof item.start_time === 'number' ? item.start_time : 0;
+      const finish0 = typeof item.finish_time === 'number' ? item.finish_time : start0;
+      if (start0 === 0 && finish0 === 0) {
         return true;
       }
-
-      // 2) 开局 0 秒 Beacon* 单位
-      if (
-        item.category === 'unit' &&
-        unitName.startsWith('Beacon') &&
-        displaySeconds === 0
-      ) {
-        return true;
-      }
-
-      // 3) 开局 11 补给以内所有单位生产
-      if (item.category === 'unit' && supply !== null && supply <= 11) {
-        return true;
-      }
-
-      // 4) 开局 2 秒内的建筑建造
-      if (item.category === 'building' && displaySeconds <= 2) {
-        return true;
-      }
-
-      // 5) 虫族开局 1 秒内的王虫（Overlord）生产
-      if (
-        race === 'Z' &&
-        item.category === 'unit' &&
-        unitName.startsWith('Overlord') &&
-        displaySeconds <= 1
-      ) {
-        return true;
-      }
-
       return false;
     }
 
@@ -1130,45 +1078,6 @@ json.dumps(result)
           const visibleItems = showInitEvents
             ? items
             : items.filter((it) => !isInitEvent(it, race));
-
-          // Zerg 单位特殊处理：
-          // - sc2reader 对虫族单位（通过幼虫孵化）的 started_at 没有做「建造时间回推」，
-          //   导致 start_time 和 finish_time 相同，都是「孵化完成时刻」。
-          // - 为了让「开始建造时间」更贴近游戏内感觉，这里在「折算为游戏时间」之后，
-          //   再减去 data.json 里定义的单位建造时间（单位：显示秒），再折算回内部秒，
-          //   只影响前端展示，不改动原始解析结果（便于之后调试/比对）。
-          if (
-            race === 'Z' &&
-            translationData &&
-            translationData.unit
-          ) {
-            items.forEach((item) => {
-              if (
-                item &&
-                item.category === 'unit' &&
-                typeof item.start_time === 'number' &&
-                typeof item.finish_time === 'number' &&
-                item.start_time === item.finish_time &&
-                item.finish_time > 0
-              ) {
-                const info = translationData.unit[item.unit];
-                const buildTime =
-                  info && typeof info.time === 'number' ? info.time : null;
-                if (!buildTime) return;
-
-                // finish_game（内部秒） -> finish_display（游戏内显示秒）
-                const finishGame = item.finish_time;
-                const finishDisplay = Math.max(
-                  0,
-                  Math.round(finishGame / GAME_TIME_FACTOR)
-                );
-                const startDisplay = Math.max(0, finishDisplay - buildTime);
-                const startGame = Math.round(startDisplay * GAME_TIME_FACTOR);
-
-                item.start_time = startGame;
-              }
-            });
-          }
 
           // 根据当前模式对条目按时间排序，保证时间轴从小到大
           visibleItems.sort((a, b) => {
