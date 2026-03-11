@@ -518,10 +518,24 @@ import json
 import sc2reader
 from sc2reader.exceptions import ReadError
 from sc2reader.events.tracker import UpgradeCompleteEvent
+from sc2reader.events import UnitTypeChangeEvent
 from sc2reader.events.game import CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent
 from sc2reader.events.message import ChatEvent
 
-EXCLUDE_UNIT_TYPES = {"BanelingCocoon", "BroodLordCocoon", "Larva"}
+EXCLUDE_UNIT_TYPES = {
+    "BanelingCocoon",
+    "BroodLordCocoon",
+    "Larva",
+    "Egg",
+    "InvisibleTargetDummy",
+    "ParasiticBombRelayDummy",
+    "ParasiticBombDummy",
+    "BroodlingEscort",
+    "Broodling",
+    # 地刺相关：只保留变异事件，不把本体/埋地形态当作单独单位建造
+    "LurkerMP",
+    "LurkerMPBurrowed",
+}
 EXCLUDE_UPGRADES = {"SprayZerg", "SprayTerran", "SprayProtoss"}
 ABILITY_UNIT_MAP = {
     # 临时：某些单位在 player.units 中缺失时，用技能事件补一条建造记录
@@ -551,6 +565,8 @@ def extract_build_order(replay):
 
     # 收集每个玩家的升级事件（使用 UpgradeCompleteEvent）
     upgrade_events_by_pid = {}
+    # 收集每个玩家的单位变异 / 升本事件（UnitTypeChangeEvent）
+    morph_events_by_pid = {}
     for ev in getattr(replay, "tracker_events", []):
         if isinstance(ev, UpgradeCompleteEvent):
             if ev.upgrade_type_name in EXCLUDE_UPGRADES:
@@ -571,6 +587,30 @@ def extract_build_order(replay):
                 "time": int(sec),
                 "name": ev.upgrade_type_name,
             })
+
+    # UnitTypeChangeEvent 出现在全量 events 里，这里单独再遍历一次
+    for ev in getattr(replay, "events", []):
+        if not isinstance(ev, UnitTypeChangeEvent):
+            continue
+        unit = getattr(ev, "unit", None)
+        player = getattr(unit, "owner", None) if unit is not None else None
+        pid = getattr(player, "pid", None) if player is not None else None
+        if pid is None:
+            continue
+        sec = getattr(ev, "second", None)
+        if sec is None:
+            frame = getattr(ev, "frame", None)
+            if frame is None:
+                continue
+            sec = frame >> 4
+        morph_name = getattr(ev, "unit_type_name", None) or ""
+        # 过滤无意义的变异类型（如 Egg / Larva 等）
+        if morph_name in EXCLUDE_UNIT_TYPES:
+            continue
+        morph_events_by_pid.setdefault(pid, []).append({
+            "time": int(sec),
+            "name": morph_name,
+        })
 
     # 收集每个玩家的「星空加速」（NexusMassRecall）施放事件
     recall_events_by_pid = {}
@@ -717,6 +757,7 @@ def extract_build_order(replay):
                 "upgrades": upgrade_events_by_pid.get(player.pid, []),
                 "recalls": recall_events_by_pid.get(player.pid, []),
                 "ability_units": ability_units_by_pid.get(player.pid, []),
+                "morphs": morph_events_by_pid.get(player.pid, []),
             })
         result["teams"].append(team_data)
     return result
@@ -847,6 +888,18 @@ json.dumps(result)
         const t = upInfo && typeof upInfo.time === 'number' ? upInfo.time : 0;
         const timePart = t > 0 ? `[${t}s]` : '';
         return `升级完成：${zh}${timePart}`;
+      }
+
+      // 变异 / 升本：优先使用 change 表里的中文（例如 Lair/Hive/GreaterSpire → 二本/三本/大龙塔）
+      if (kind === 'morph') {
+        if (translationData.change) {
+          for (const group of Object.values(translationData.change)) {
+            if (group && group[name]) {
+              return group[name].zh || name;
+            }
+          }
+        }
+        // 找不到专门的变异翻译时，退回通用逻辑
       }
 
       // 星空加速：前缀固定 + 目标建筑翻译
@@ -1007,6 +1060,29 @@ json.dumps(result)
             });
           }
 
+          // 变异 / 升本类事件（UnitTypeChangeEvent），在 Python 侧仅记录时间和新类型名称，
+          // 在前端用 data.json 的 change 区域做翻译。
+          if (Array.isArray(player.morphs)) {
+            player.morphs.forEach((m) => {
+              const t = typeof m.time === 'number' ? m.time : 0;
+              const name = m.name || '';
+              // 像 Baneling / Ravager / LurkerMP 这类“变异出来的战斗单位”，
+              // 只要在 unit 表里有配置，就视为单位，用于后续开始时间回推和橙色高亮。
+              const asUnit =
+                translationData &&
+                translationData.unit &&
+                Object.prototype.hasOwnProperty.call(translationData.unit, name);
+              items.push({
+                start_time: t,
+                finish_time: t,
+                supply: null,
+                unit: name,
+                _kind: 'morph',
+                ...(asUnit ? { category: 'unit' } : {}),
+              });
+            });
+          }
+
           if (Array.isArray(player.recalls)) {
             player.recalls.forEach((rc) => {
               const t = typeof rc.time === 'number' ? rc.time : 0;
@@ -1035,17 +1111,12 @@ json.dumps(result)
             });
           }
 
-          // Zerg 单位特殊处理：
-          // - sc2reader 对虫族单位（通过幼虫孵化）的 started_at 没有做「建造时间回推」，
-          //   导致 start_time 和 finish_time 相同，都是「孵化完成时刻」。
-          // - 为了让「开始建造时间」更贴近游戏内感觉，这里在「折算为游戏时间」之后，
-          //   再减去 data.json 里定义的单位建造时间（单位：显示秒），再折算回内部秒，
-          //   只影响前端展示，不改动原始解析结果（便于之后调试/比对）。
-          if (
-            race === 'Z' &&
-            translationData &&
-            translationData.unit
-          ) {
+          // 单位开始时间统一回推逻辑：
+          // - sc2reader 对大部分单位没有 started_at（只有 finished_at）
+          // - 当 start_time === finish_time 时，认为是“只有结束时间”，
+          //   用 data.json 里的建造时长（显示秒）回推开始时间
+          // - 适用于三族单位；建筑本身因为有 started_at，不会命中这个条件
+          if (translationData && translationData.unit) {
             items.forEach((item) => {
               if (
                 item &&

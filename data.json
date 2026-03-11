@@ -105,7 +105,7 @@
       "time": 27
     },
     "Stalker": {
-      "zh": "追猎",
+      "zh": "追猎者",
       "time": 30
     },
     "HighTemplar": {
@@ -137,7 +137,7 @@
       "time": 36
     },
     "Immortal": {
-      "zh": "不朽",
+      "zh": "不朽者",
       "time": 39
     },
     "Colossus": {
@@ -155,6 +155,14 @@
     "VoidRay": {
       "zh": "虚空辉光舰",
       "time": 43
+    },
+    "OracleStasisTrap": {
+      "zh": "先知陷阱",
+      "time": 37
+    },
+    "AdeptPhaseShift": {
+      "zh": "使徒技能释放(生成阴影)",
+      "time": 0
     },
     "Oracle": {
       "zh": "先知",
@@ -281,7 +289,7 @@
       "time": 18
     },
     "Egg": {
-      "zh": "夭折的卵",
+      "zh": "未孵化的卵",
       "time": 0
     },
     "Corruptor": {
@@ -326,6 +334,10 @@
     }
   },
   "upgrade": {
+    "GameHeartActive": {
+      "zh": "比赛模块[OB]",
+      "time": 0
+    },
     "zerglingmovementspeed": {
       "zh": "狗速",
       "time": 79
@@ -429,6 +441,10 @@
     "DiggingClaws": {
       "zh": "地刺速埋",
       "time": 57
+    },
+    "Frenzy":{
+      "zh": "刺蛇滑铲",
+      "time": 64
     },
     "LurkerRange": {
       "zh": "地刺射程",
@@ -817,7 +833,7 @@
       "time": 0
     },
     "ShieldBattery": {
-      "zh": "电池",
+      "zh": "护盾电池",
       "time": 0
     },
     "Stargate": {
