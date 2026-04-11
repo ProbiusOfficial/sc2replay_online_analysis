@@ -45,6 +45,8 @@
 ### 许可证与致谢
 
 - 感谢全科普鲁星区最温柔善良可靠的贝妮小姐w！
+- 致谢 https://github.com/wayne19980/sc2build-tts ，感谢 @wayne19980 老师
+
 
 - **sc2reader（依赖库）**
 
