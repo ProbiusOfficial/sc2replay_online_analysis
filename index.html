@@ -223,8 +223,18 @@
     .voice-btn:active { transform: scale(0.98); }
     .voice-btn-play { background: var(--purple); color: white; }
     .voice-btn-reset { background: #30363d; color: #e6edf3; }
-    #pipBtn { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 1.25rem; padding: 4px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; filter: grayscale(1); }
-    #pipBtn:hover { color: var(--purple); filter: grayscale(0); transform: scale(1.1); }
+    #pipBtn {
+      background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.45); color: #e9d5ff;
+      cursor: pointer; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+      padding: 6px 11px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+      transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
+      white-space: nowrap; font-family: inherit;
+    }
+    #pipBtn:hover {
+      background: rgba(168, 85, 247, 0.32); border-color: var(--purple); color: #fff;
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
+    }
     .voice-settings { border-top: 1px solid #30363d; padding-top: 12px; font-size: 0.75rem; color: #8b949e; }
     .voice-setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .voice-setting-row select, .voice-setting-row input[type="range"] { background: #0d1117; border: 1px solid #30363d; color: white; padding: 2px 5px; border-radius: 4px; }
@@ -283,7 +293,7 @@
         <label><input type="checkbox" id="showUpgrades" checked /> 显示科技升级</label>
         <label><input type="checkbox" id="showOriginal" /> 显示英文名称</label>
         <label><input type="checkbox" id="showWorkers" checked /> 显示农民</label>
-        <label><input type="checkbox" id="mergeSameActions" /> 合并同秒操作</label>
+        <label><input type="checkbox" id="mergeSameActions" checked /> 合并同秒操作</label>
         <label><input type="checkbox" id="showWorkerDeaths" /> 显示工人阵亡</label>
       </div>
       <div class="chat-toggle-row">
@@ -327,7 +337,7 @@
         <div class="voice-reader-header">
           <h3 id="voice-player-name">Build Order Reader</h3>
           <div style="display:flex;gap:8px;align-items:center">
-            <button id="pipBtn" title="画中画模式">🖼️</button>
+            <button type="button" id="pipBtn" title="打开悬浮小窗（浏览器 Document 画中画）">悬浮模式</button>
             <button class="voice-reader-close" id="voiceClose">&times;</button>
           </div>
         </div>
@@ -380,7 +390,7 @@
     let showUpgrades = true;
     let showOriginal = false;
     let showWorkers = true;
-    let mergeSameActions = false;
+    let mergeSameActions = true;
     let showWorkerDeaths = false;
     let chatVisible = false;
     let translationData = null;
@@ -1329,7 +1339,7 @@ def extract_replay_data(replay_path):
       } catch {
         clearInterval(videoDrawId);
         video.remove();
-        alert("浏览器不支持画中画模式");
+        alert("当前浏览器不支持悬浮模式（Document画中画）");
       }
     }
 
