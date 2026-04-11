@@ -1,373 +1,249 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StarCraft II Replay Analysis - Online</title>
-  <link rel="icon" type="image/png" href="StarCraft.svg">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StarCraft II Replay Analysis Online</title>
+  <link rel="icon" type="image/png" href="StarCraft.svg" />
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap');
-
+    @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap");
     :root {
-      --bg-dark: #0d1117;
-      --bg-card: #161b22;
-      --bg-hover: #21262d;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --accent-blue: #58a6ff;
-      --accent-green: #3fb950;
-      --accent-orange: #d29922;
-      --accent-red: #f85149;
-      --race-t: #74c0fc;
-      --race-p: #b197fc;
-      --race-z: #69db7c;
+      --bg-dark: #0d1117; --bg-card: #161b22; --bg-hover: #21262d;
+      --border: #30363d; --text: #e6edf3; --text-muted: #8b949e;
+      --accent-blue: #58a6ff; --accent-green: #3fb950;
+      --accent-orange: #d29922; --accent-red: #f85149;
+      --race-t: #74c0fc; --race-p: #b197fc; --race-z: #69db7c;
+      --purple: #a855f7;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
-      font-family: 'Noto Sans SC', -apple-system, sans-serif;
-      background: var(--bg-dark);
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.6;
+      font-family: "Noto Sans SC", -apple-system, sans-serif;
+      background: var(--bg-dark); color: var(--text);
+      min-height: 100vh; line-height: 1.6;
     }
-
     .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-
     header { text-align: center; margin-bottom: 2.5rem; }
-
     h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
+      font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;
       background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-
     .subtitle { color: var(--text-muted); font-size: 0.9rem; }
-
     .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 3rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      background: var(--bg-card);
-      margin-bottom: 2rem;
+      border: 2px dashed var(--border); border-radius: 12px;
+      padding: 3rem 2rem; text-align: center; cursor: pointer;
+      transition: all 0.2s ease; background: var(--bg-card); margin-bottom: 2rem;
     }
-
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent-blue);
-      background: var(--bg-hover);
-    }
-
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-blue); background: var(--bg-hover); }
     .drop-zone .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.7; }
     .drop-zone p { color: var(--text-muted); font-size: 0.95rem; }
     .drop-zone .hint { margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.8; }
-
     input[type="file"] { display: none; }
-
     .result { display: none; }
     .result.visible { display: block; }
-
     .game-info {
-      background: var(--bg-card);
-      border-radius: 12px;
-      padding: 1rem 1.5rem;
-      margin-bottom: 1.5rem;
-      display: flex;
-      gap: 2rem;
-      flex-wrap: wrap;
+      background: var(--bg-card); border-radius: 12px; padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem; display: flex; gap: 2rem; flex-wrap: wrap;
       border: 1px solid var(--border);
     }
-
     .game-info span { color: var(--text-muted); font-size: 0.9rem; }
     .game-info strong { color: var(--accent-blue); }
-
-    .build-orders {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
-
+    .build-orders { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
     .time-mode-toggle {
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: var(--text-muted);
+      margin-bottom: 1rem; display: flex; align-items: center;
+      gap: 0.75rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap;
     }
-
-    .time-mode-toggle select {
-      background: var(--bg-card);
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.25rem 0.5rem;
-      font-size: 0.85rem;
-    }
-
-    .time-mode-toggle label {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      cursor: pointer;
-    }
-
-    .chat-toggle-row {
-      margin: 0.5rem 0 0.25rem;
-      display: flex;
-      justify-content: flex-end;
-    }
-
+    .time-mode-toggle label { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; }
+    .chat-toggle-row { margin: 0.5rem 0 0.25rem; display: flex; justify-content: flex-end; }
     .chat-toggle-btn {
-      background: transparent;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      color: var(--accent-blue);
-      padding: 0.25rem 0.75rem;
-      font-size: 0.8rem;
-      cursor: pointer;
+      background: transparent; border-radius: 6px; border: 1px solid var(--border);
+      color: var(--accent-blue); padding: 0.25rem 0.75rem; font-size: 0.8rem; cursor: pointer;
     }
-
-    .chat-toggle-btn:hover {
-      background: var(--bg-hover);
-      border-color: var(--accent-blue);
-    }
-
+    .chat-toggle-btn:hover { background: var(--bg-hover); border-color: var(--accent-blue); }
     .chat-panel {
-      display: none;
-      background: var(--bg-card);
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      padding: 0.75rem 1rem;
-      margin-bottom: 1rem;
-      max-height: 240px;
-      overflow-y: auto;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
+      display: none; background: var(--bg-card); border-radius: 8px;
+      border: 1px solid var(--border); padding: 0.75rem 1rem; margin-bottom: 1rem;
+      max-height: 240px; overflow-y: auto; font-family: "JetBrains Mono", monospace; font-size: 0.8rem;
     }
-
-    .chat-item {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .chat-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .chat-time {
-      color: var(--text-muted);
-    }
-
-    .chat-player {
-      color: var(--accent-green);
-    }
-
-    .chat-target {
-      color: var(--text-muted);
-    }
-
-    .chat-text {
-      color: var(--text);
-    }
-
-    .build-item.upgrade .unit {
-      color: var(--accent-red);
-    }
-
-    .build-item.upgrade .time {
-      color: var(--accent-red);
-    }
-
-    .build-item.recall .unit {
-      color: var(--accent-blue);
-    }
-
-    .build-item.recall .time {
-      color: var(--accent-blue);
-    }
-
-    /* 单位训练：橙色，建筑保持默认白色 */
-    .build-item.unit .unit {
-      color: var(--accent-orange);
-    }
-
-    @media (max-width: 768px) {
-      .build-orders { grid-template-columns: 1fr; }
-    }
-
-    .player-panel {
-      background: var(--bg-card);
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-
+    .chat-item { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.25rem; }
+    .chat-item:last-child { margin-bottom: 0; }
+    .chat-time { color: var(--text-muted); }
+    .chat-player { color: var(--accent-green); }
+    .chat-target { color: var(--text-muted); }
+    .chat-text { color: var(--text); }
+    .build-item.upgrade .unit, .build-item.upgrade .time { color: var(--accent-red); }
+    .build-item.recall .unit, .build-item.recall .time { color: var(--accent-blue); }
+    .build-item.unit .unit { color: var(--accent-orange); }
+    .build-item.worker-death .unit, .build-item.worker-death .time { color: var(--accent-red); }
+    @media (max-width: 768px) { .build-orders { grid-template-columns: 1fr; } }
+    .player-panel { background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
     .player-header {
-      padding: 1rem 1.25rem;
-      font-weight: 600;
-      font-size: 1rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      padding: 1rem 1.25rem; font-weight: 600; font-size: 1rem;
+      border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;
     }
-
-    .player-header.team1 {
-      background: linear-gradient(90deg, rgba(116, 192, 252, 0.15), transparent);
-    }
-
-    .player-header.team2 {
-      background: linear-gradient(90deg, rgba(249, 81, 73, 0.15), transparent);
-    }
-
-    .race-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 0.85rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-    }
-
-    .race-badge.T { background: rgba(116, 192, 252, 0.3); color: var(--race-t); }
-    .race-badge.P { background: rgba(177, 151, 252, 0.3); color: var(--race-p); }
-    .race-badge.Z { background: rgba(105, 219, 124, 0.3); color: var(--race-z); }
-
-    .player-header .player-name {
-      max-width: 200px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
+    .player-header.team1 { background: linear-gradient(90deg, rgba(116,192,252,0.15), transparent); }
+    .player-header.team2 { background: linear-gradient(90deg, rgba(249,81,73,0.15), transparent); }
+    .race-badge { font-family: "JetBrains Mono", monospace; font-weight: 600; font-size: 0.85rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+    .race-badge.T { background: rgba(116,192,252,0.3); color: var(--race-t); }
+    .race-badge.P { background: rgba(177,151,252,0.3); color: var(--race-p); }
+    .race-badge.Z { background: rgba(105,219,124,0.3); color: var(--race-z); }
+    .player-header .player-name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .export-btn {
-      margin-left: auto;
-      padding: 0.2rem 0.75rem;
-      font-size: 0.8rem;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: rgba(88, 166, 255, 0.08);
-      color: var(--accent-blue);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
+      padding: 0.2rem 0.75rem; font-size: 0.8rem; border-radius: 999px;
+      border: 1px solid var(--border); background: rgba(88,166,255,0.08);
+      color: var(--accent-blue); cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;
     }
-
-    .export-btn::before {
-      content: '⇩';
-      font-size: 0.9em;
+    .export-btn::before { content: "\21E9"; font-size: 0.9em; }
+    .export-btn:hover { border-color: var(--accent-blue); background: rgba(88,166,255,0.2); }
+    .voice-reader-btn {
+      background: rgba(168,85,247,0.1); color: var(--purple);
+      border: 1px solid rgba(168,85,247,0.2); border-radius: 6px;
+      padding: 4px 10px; font-size: 0.75rem; cursor: pointer;
+      margin-right: 8px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;
     }
-
-    .export-btn:hover {
-      border-color: var(--accent-blue);
-      background: rgba(88, 166, 255, 0.2);
-    }
-
+    .voice-reader-btn:hover { background: rgba(168,85,247,0.2); border-color: var(--purple); }
+    .voice-reader-btn span { font-size: 0.9rem; }
     .build-list { max-height: 400px; overflow-y: auto; }
-
-    /* 列表/聊天区域定制滚动条，保持与整体暗色+蓝绿强调色风格统一 */
-    .build-list,
-    .chat-panel {
-      scrollbar-width: thin; /* Firefox */
-      scrollbar-color: var(--accent-blue) transparent;
+    .build-list, .chat-panel { scrollbar-width: thin; scrollbar-color: var(--accent-blue) transparent; }
+    .build-list::-webkit-scrollbar, .chat-panel::-webkit-scrollbar { width: 8px; }
+    .build-list::-webkit-scrollbar-track, .chat-panel::-webkit-scrollbar-track { background: transparent; }
+    .build-list::-webkit-scrollbar-thumb, .chat-panel::-webkit-scrollbar-thumb {
+      background: rgba(88,166,255,0.4); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box;
     }
-
-    .build-list::-webkit-scrollbar,
-    .chat-panel::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .build-list::-webkit-scrollbar-track,
-    .chat-panel::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .build-list::-webkit-scrollbar-thumb,
-    .chat-panel::-webkit-scrollbar-thumb {
-      background: rgba(88, 166, 255, 0.4);
-      border-radius: 999px;
-      border: 2px solid transparent;
-      background-clip: padding-box;
-    }
-
-    .build-list::-webkit-scrollbar-thumb:hover,
-    .chat-panel::-webkit-scrollbar-thumb:hover {
-      background: rgba(88, 166, 255, 0.8);
-    }
-
+    .build-list::-webkit-scrollbar-thumb:hover, .chat-panel::-webkit-scrollbar-thumb:hover { background: rgba(88,166,255,0.8); }
     .build-item {
-      display: grid;
-      grid-template-columns: 60px 50px 1fr;
-      gap: 0.75rem;
-      padding: 0.5rem 1.25rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      border-bottom: 1px solid var(--border);
-      align-items: center;
+      display: grid; grid-template-columns: 60px 50px 1fr; gap: 0.75rem;
+      padding: 0.5rem 1.25rem; font-family: "JetBrains Mono", monospace;
+      font-size: 0.85rem; border-bottom: 1px solid var(--border); align-items: center;
     }
-
     .build-item:last-child { border-bottom: none; }
     .build-item:hover { background: var(--bg-hover); }
     .build-item .time { color: var(--text-muted); font-weight: 500; }
     .build-item .supply { color: var(--accent-orange); font-size: 0.8rem; }
     .build-item .unit { color: var(--text); }
-
-    .loading {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-muted);
-      display: none;
-    }
-
+    .loading { text-align: center; padding: 2rem; color: var(--text-muted); display: none; }
     .loading.visible { display: block; }
-
     .loading .spinner {
-      display: inline-block;
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent-blue);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 1rem;
+      display: inline-block; width: 32px; height: 32px;
+      border: 3px solid var(--border); border-top-color: var(--accent-blue);
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
-
     .error {
-      background: rgba(248, 81, 73, 0.15);
-      border: 1px solid var(--accent-red);
-      border-radius: 8px;
-      padding: 1rem;
-      color: var(--accent-red);
-      margin-bottom: 1rem;
-      display: none;
+      background: rgba(248,81,73,0.15); border: 1px solid var(--accent-red);
+      border-radius: 8px; padding: 1rem; color: var(--accent-red); margin-bottom: 1rem; display: none;
     }
-
     .error.visible { display: block; }
+    .init-status { text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.9rem; }
+    .init-status .progress { margin-top: 1rem; color: var(--accent-blue); }
 
-    .init-status {
-      text-align: center;
-      padding: 1.5rem;
-      color: var(--text-muted);
-      font-size: 0.9rem;
+    /* Voice Reader */
+    .voice-reader-panel {
+      position: fixed; bottom: 20px; right: 20px; width: 340px;
+      background: rgba(22,27,34,0.98); border: 1px solid #30363d; border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6); display: none; padding: 18px;
+      z-index: 1000; color: #e6edf3; font-family: "Noto Sans SC", sans-serif;
+      backdrop-filter: blur(10px);
+      --voice-pip-font-scale: 1;
     }
+    .voice-reader-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+    .voice-reader-header h3 { margin: 0; font-size: 0.95rem; color: var(--purple); line-height: 1.2; padding-right: 20px; }
+    .voice-reader-close { background: none; border: none; color: #8b949e; font-size: 1.4rem; cursor: pointer; line-height: 1; }
+    #voice-timer { text-align: center; font-size: 1.8rem; font-weight: bold; margin: 12px 0; color: var(--accent-green); font-family: "JetBrains Mono", monospace; }
+    .voice-reader-pip-strip {
+      display: none; flex-direction: column; gap: 0; width: 100%; height: 100%; min-height: 0; flex: 1 1 auto;
+      font-size: calc(var(--voice-pip-font-scale, 1) * clamp(13px, min(4vmin, 3.5vh), 22px));
+    }
+    .voice-pip-row {
+      display: flex; align-items: stretch; gap: 0; flex: 1 1 auto; min-height: 0;
+      padding: clamp(4px, 0.9vmin, 10px) clamp(6px, 1.6vmin, 12px) clamp(3px, 0.7vmin, 8px);
+      background: rgba(10,12,16,0.95); border-radius: 8px 8px 0 0;
+    }
+    .voice-pip-left { display: flex; align-items: center; justify-content: center; flex: 0 0 clamp(4.2em, 14vmin, 7.5em); }
+    #voice-timer-pip {
+      font-size: 2.35em; font-weight: 700; color: #39ff14; font-family: "JetBrains Mono", monospace;
+      line-height: 1; text-shadow: 0 0 12px rgba(57,255,20,0.35); letter-spacing: -0.02em;
+    }
+    .voice-pip-divider { width: 2px; flex: 0 0 2px; margin: clamp(2px, 0.5vmin, 6px) clamp(6px, 1.4vmin, 10px); background: linear-gradient(180deg, transparent, #3fb950 20%, #3fb950 80%, transparent); border-radius: 1px; opacity: 0.85; }
+    .voice-pip-center { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(2px, 0.4vmin, 5px); }
+    .voice-pip-current { display: flex; align-items: baseline; flex-wrap: wrap; gap: clamp(4px, 0.8vmin, 8px); line-height: 1.2; }
+    #voice-pip-step-time { font-family: "JetBrains Mono", monospace; font-size: 1.08em; font-weight: 600; color: #d29922; flex-shrink: 0; }
+    #voice-pip-step-text { font-size: 1.08em; font-weight: 600; color: #f0f6fc; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #voice-pip-context {
+      font-size: 0.9em; color: #6e7681; line-height: 1.3; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    }
+    .voice-pip-actions {
+      display: flex; flex-direction: column; justify-content: center; gap: clamp(3px, 0.55vmin, 6px);
+      flex: 0 0 auto; padding-left: clamp(4px, 1vmin, 8px);
+    }
+    .voice-pip-btn {
+      font-size: 0.85em; padding: 0.45em 0.65em; border-radius: 6px; border: 1px solid #30363d;
+      background: #21262d; color: #e6edf3; cursor: pointer; font-weight: 600; font-family: inherit;
+      white-space: nowrap; line-height: 1.2;
+    }
+    .voice-pip-btn:hover:not(:disabled) { background: #30363d; border-color: #484f58; }
+    .voice-pip-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+    .voice-pip-footer-bars {
+      display: flex; flex-direction: column; gap: clamp(2px, 0.45vmin, 5px); flex-shrink: 0;
+      padding: 0 clamp(6px, 1.6vmin, 12px) clamp(5px, 1vmin, 9px); background: rgba(10,12,16,0.95); border-radius: 0 0 8px 8px;
+    }
+    .voice-reader-panel.pip-compact {
+      width: 100% !important; max-width: none !important; height: 100% !important; padding: 0 !important; border-radius: 10px !important;
+      flex: 1 1 auto !important; min-height: 0 !important; flex-direction: column !important; align-items: stretch !important;
+    }
+    .voice-reader-panel.pip-compact .voice-reader-main { display: none !important; }
+    .voice-reader-panel.pip-compact .voice-reader-pip-strip { display: flex !important; }
+    .voice-reader-panel.pip-compact .voice-bars-host { gap: clamp(2px, 0.5vmin, 6px); margin-bottom: 0; flex-shrink: 0; }
+    .voice-reader-panel.pip-compact .voice-bars-host .voice-timeline { margin: 0; height: clamp(4px, 0.9vmin, 8px); }
+    .voice-reader-panel.pip-compact .voice-bars-host .voice-step-progress { margin: 0; height: clamp(3px, 0.7vmin, 6px); }
+    .voice-bars-host { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .voice-reader-main { display: flex; flex-direction: column; align-items: stretch; }
+    .voice-queue { min-height: 180px; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; overflow: hidden; }
+    .voice-step {
+      padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; transition: all 0.2s;
+      border: 1px solid transparent; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .voice-step.past { color: #484f58; opacity: 0.6; }
+    .voice-step.active { background: rgba(168,85,247,0.15); border-color: var(--purple); color: #fff; font-weight: bold; font-size: 1rem; box-shadow: 0 0 10px rgba(168,85,247,0.2); }
+    .voice-step.future { color: #8b949e; }
+    .voice-step-progress {
+      height: 4px; background: #21262d; border-radius: 2px; overflow: hidden;
+      width: 100%; box-sizing: border-box; flex-shrink: 0;
+    }
+    #voice-step-bar {
+      height: 100%; min-height: 4px; display: block; width: 0%; box-sizing: border-box;
+      background: linear-gradient(90deg, #eae608 0%, #22c55e 33%, #ef4444 66%, #a855f7 100%);
+      background-size: 100% 100%; transition: width 0.1s linear;
+    }
+    .voice-timeline { height: 8px; background: #21262d; border-radius: 4px; margin: 20px 0; cursor: pointer; position: relative; overflow: hidden; }
+    #voice-timeline-bar { height: 100%; background: var(--accent-blue); width: 0%; border-radius: 4px; opacity: 0.5; }
+    .voice-controls { display: flex; gap: 12px; margin: 15px 0; }
+    .voice-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: transform 0.1s; }
+    .voice-btn:active { transform: scale(0.98); }
+    .voice-btn-play { background: var(--purple); color: white; }
+    .voice-btn-reset { background: #30363d; color: #e6edf3; }
+    #pipBtn { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 1.25rem; padding: 4px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; filter: grayscale(1); }
+    #pipBtn:hover { color: var(--purple); filter: grayscale(0); transform: scale(1.1); }
+    .voice-settings { border-top: 1px solid #30363d; padding-top: 12px; font-size: 0.75rem; color: #8b949e; }
+    .voice-setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .voice-setting-row select, .voice-setting-row input[type="range"] { background: #0d1117; border: 1px solid #30363d; color: white; padding: 2px 5px; border-radius: 4px; }
+    .voice-setting-row input[type="range"] { height: 4px; }
+    .voice-pip-font-val { min-width: 2.75rem; text-align: right; font-size: 0.7rem; color: #8b949e; font-variant-numeric: tabular-nums; }
 
-    .init-status .progress {
-      margin-top: 1rem;
-      color: var(--accent-blue);
+    /* Benchmarks */
+    .benchmarks-section { margin-top: 2rem; }
+    .section-title {
+      font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--accent-blue);
+      padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
     }
+    .benchmarks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 768px) { .benchmarks-grid { grid-template-columns: 1fr; } }
+    .benchmark-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1rem 1.25rem; min-height: 240px;
+    }
+    .benchmark-card h3 { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -375,26 +251,23 @@
     <header>
       <h1>StarCraft II Replay Analysis - Online</h1>
       <p class="subtitle">拖入 .SC2Replay 文件，纯前端解析，无需后端</p>
-    <p class="subtitle" style="font-size:0.8rem;margin-top:0.25rem">
-      By 探姬#51276（国服喵） ，欢迎关注
-      <a href="https://space.bilibili.com/27109929" target="_blank" rel="noopener noreferrer" style="color:var(--accent-blue);text-decoration:none;">
-        探姬_Official的bilibili
-      </a>
-      ！！
-    </p>
+      <p class="subtitle" style="font-size:0.8rem;margin-top:0.25rem">
+        By 探姬#51276（国服喵），欢迎关注
+        <a href="https://space.bilibili.com/27109929" target="_blank" rel="noopener noreferrer" style="color:var(--accent-blue);text-decoration:none;">探姬_Official的bilibili</a>
+      </p>
     </header>
 
     <div class="init-status" id="initStatus">
       <p>正在加载 Python 运行环境...</p>
       <p class="progress" id="initProgress">初始化中</p>
-      <p class="hint" style="margin-top:1rem;font-size:0.8rem">请勿直接双击打开，需通过 HTTP 服务访问（见下方说明）</p>
+      <p class="hint" style="margin-top:1rem;font-size:0.8rem">请勿直接双击打开，需通过 HTTP 服务访问</p>
     </div>
 
-    <div class="drop-zone" id="dropZone" style="display:none;">
+    <div class="drop-zone" id="dropZone" style="display:none">
       <div class="icon">📁</div>
       <p>将录像文件拖放到此处，或点击选择文件</p>
       <p class="hint">支持 .SC2Replay 格式 · 解析在浏览器内完成，文件不会上传</p>
-      <input type="file" id="fileInput" accept=".SC2Replay,.sc2replay">
+      <input type="file" id="fileInput" accept=".SC2Replay,.sc2replay" />
     </div>
 
     <div class="loading" id="loading">
@@ -407,1011 +280,1326 @@
     <div class="result" id="result">
       <div class="game-info" id="gameInfo"></div>
       <div class="time-mode-toggle">
-        <span>时间显示：</span>
-        <select id="timeModeSelect">
-          <option value="start">开始建造时间</option>
-          <option value="finish">完成建造时间</option>
-        </select>
-        <label>
-          <input type="checkbox" id="showUpgrades" checked />
-          在时间轴中显示科技升级
-        </label>
-        <label>
-          <input type="checkbox" id="showOriginal" />
-          显示原始英文名称
-        </label>
-        <label>
-          <input type="checkbox" id="showInitEvents" />
-          显示初始化事件
-        </label>
-        <label>
-          <input type="checkbox" id="mergeSameActions" />
-          合并同一秒重复操作
-        </label>
+        <label><input type="checkbox" id="showUpgrades" checked /> 显示科技升级</label>
+        <label><input type="checkbox" id="showOriginal" /> 显示英文名称</label>
+        <label><input type="checkbox" id="showWorkers" checked /> 显示农民</label>
+        <label><input type="checkbox" id="mergeSameActions" /> 合并同秒操作</label>
+        <label><input type="checkbox" id="showWorkerDeaths" /> 显示工人阵亡</label>
       </div>
       <div class="chat-toggle-row">
         <button id="chatToggle" class="chat-toggle-btn" type="button">查看对局聊天</button>
       </div>
       <div class="chat-panel" id="chatPanel"></div>
       <div class="build-orders" id="buildOrders"></div>
+      <div id="benchmarks" class="benchmarks-section" style="display:none">
+        <h2 class="section-title">对局分析 (Benchmarks)</h2>
+        <div class="benchmarks-grid">
+          <div class="benchmark-card"><h3>农民数量 (每秒采样 · 更快)</h3><canvas id="chartWorkers"></canvas></div>
+          <div class="benchmark-card"><h3>军队价值 (Army Value)</h3><canvas id="chartArmy"></canvas></div>
+          <div class="benchmark-card"><h3>采集速率 (Collection Rate)</h3><canvas id="chartCollection"></canvas></div>
+          <div class="benchmark-card"><h3>人口 / 补给 (已用人口 &amp; 补给上限)</h3><canvas id="chartSupply"></canvas></div>
+          <div class="benchmark-card"><h3>工人战损 (累计击杀 / 累计损失)</h3><canvas id="chartWorkerKD"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice Reader Panel -->
+    <div class="voice-reader-panel" id="voiceReader">
+      <div class="voice-reader-pip-strip" aria-hidden="true">
+        <div class="voice-pip-row">
+          <div class="voice-pip-left"><div id="voice-timer-pip">00:00</div></div>
+          <div class="voice-pip-divider"></div>
+          <div class="voice-pip-center">
+            <div class="voice-pip-current">
+              <span id="voice-pip-step-time"></span>
+              <span id="voice-pip-step-text">准备就绪</span>
+            </div>
+            <div id="voice-pip-context"></div>
+          </div>
+          <div class="voice-pip-actions">
+            <button type="button" class="voice-pip-btn" id="voicePipBtnStart">开始</button>
+            <button type="button" class="voice-pip-btn" id="voicePipBtnPause">暂停</button>
+          </div>
+        </div>
+        <div class="voice-pip-footer-bars"></div>
+      </div>
+      <div class="voice-reader-main">
+        <div class="voice-reader-header">
+          <h3 id="voice-player-name">Build Order Reader</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="pipBtn" title="画中画模式">🖼️</button>
+            <button class="voice-reader-close" id="voiceClose">&times;</button>
+          </div>
+        </div>
+        <div id="voice-timer">00:00</div>
+        <div class="voice-queue">
+          <div class="voice-step past" id="v-q-2"></div>
+          <div class="voice-step past" id="v-q-1"></div>
+          <div class="voice-step active" id="v-q0">准备就绪</div>
+          <div class="voice-step future" id="v-q1"></div>
+          <div class="voice-step future" id="v-q2"></div>
+        </div>
+        <div class="voice-bars-host" id="voiceBarsHost">
+          <div class="voice-step-progress"><div id="voice-step-bar"></div></div>
+          <div class="voice-timeline" id="voiceTimeline"><div id="voice-timeline-bar"></div></div>
+        </div>
+        <div class="voice-controls">
+          <button class="voice-btn voice-btn-play" id="voicePlay">开始 (Alt+↑)</button>
+          <button class="voice-btn voice-btn-reset" id="voiceReset">重置 (Alt+↓)</button>
+        </div>
+        <div class="voice-settings">
+          <div class="voice-setting-row"><span>语速</span><input type="range" id="voiceRate" min="1" max="4" step="0.2" value="2.0" /></div>
+          <div class="voice-setting-row"><span>画中画字号</span><input type="range" id="voicePipFontScale" min="75" max="150" step="5" value="100" /><span class="voice-pip-font-val" id="voicePipFontScaleVal">100%</span></div>
+          <div class="voice-setting-row"><span>语言</span><select id="voiceLang"><option value="zh-CN">中文 (简体)</option><option value="en-US">English (US)</option></select></div>
+          <div style="font-size:0.65rem;margin-top:0.25rem">Alt+↑/↓ 播放/重置 | Alt+←/→ 跳步</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script type="text/javascript">
-    const PYODIDE_VERSION = '0.26.4';
+    const PYODIDE_VERSION = "0.29.3";
 
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const loading = document.getElementById('loading');
-    const error = document.getElementById('error');
-    const result = document.getElementById('result');
-    const gameInfo = document.getElementById('gameInfo');
-    const buildOrders = document.getElementById('buildOrders');
-    const chatPanel = document.getElementById('chatPanel');
-    const chatToggle = document.getElementById('chatToggle');
-    const initStatus = document.getElementById('initStatus');
-    const initProgress = document.getElementById('initProgress');
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const loading = document.getElementById("loading");
+    const error = document.getElementById("error");
+    const result = document.getElementById("result");
+    const gameInfo = document.getElementById("gameInfo");
+    const buildOrders = document.getElementById("buildOrders");
+    const chatPanel = document.getElementById("chatPanel");
+    const chatToggle = document.getElementById("chatToggle");
+    const initStatus = document.getElementById("initStatus");
+    const initProgress = document.getElementById("initProgress");
 
     let pyodide = null;
     let lastData = null;
-    let lastFileMeta = null; // 录像文件的基础信息（名称、大小）
-    let timeMode = 'start';
+    let lastFileMeta = null;
     let showUpgrades = true;
     let showOriginal = false;
+    let showWorkers = true;
     let mergeSameActions = false;
+    let showWorkerDeaths = false;
     let chatVisible = false;
-    let translationData = null; // data.json 中的翻译与时间数据
-    let showInitEvents = false; // 是否显示「初始化事件」（默认不显示）
+    let translationData = null;
 
-    // SC2 默认「更快（Faster）」游戏时间与实际显示时间存在约 1.4 倍系数（仅用于单位事件的游戏秒）
     const GAME_TIME_FACTOR = 1.4;
+    const SC2_FASTER_REAL_FACTOR = 0.9803;
 
-    // 直接使用真实秒数（例如 replay.game_length.seconds）
     function formatRealTime(seconds) {
-      const safe = Math.max(0, Math.round(seconds));
-      const m = Math.floor(safe / 60);
-      const s = safe % 60;
-      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      const s = Math.max(0, Math.round(seconds));
+      return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
     }
 
-    // 把游戏内部秒（frame/16）折算成接近游戏内计时的秒数
     function formatGameTime(gameSeconds) {
-      const displaySeconds = Math.max(0, Math.round(gameSeconds / GAME_TIME_FACTOR));
-      const m = Math.floor(displaySeconds / 60);
-      const s = displaySeconds % 60;
-      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      const s = Math.max(0, Math.round(gameSeconds / GAME_TIME_FACTOR));
+      return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
     }
 
-    // 把 Unix 时间戳格式化为本地时间字符串
-    function formatRealWorldTime(timestamp) {
-      if (!timestamp && timestamp !== 0) return '';
-      const d = new Date(timestamp * 1000);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      return `${y}-${m}-${day} ${hh}:${mm}`;
+    function formatRealWorldTime(ts) {
+      if (!ts && ts !== 0) return "";
+      const d = new Date(ts * 1000);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     }
 
-    // 格式化文件大小
     function formatFileSize(bytes) {
-      if (bytes === undefined || bytes === null) return '';
-      const thresh = 1024;
-      if (bytes < thresh) return `${bytes} B`;
-      const units = ['KB', 'MB', 'GB', 'TB'];
-      let u = -1;
-      let size = bytes;
-      do {
-        size /= thresh;
-        ++u;
-      } while (size >= thresh && u < units.length - 1);
-      return `${size.toFixed(1)} ${units[u]}`;
+      if (bytes == null) return "";
+      if (bytes < 1024) return `${bytes} B`;
+      const u = ["KB", "MB", "GB"];
+      let i = -1, s = bytes;
+      do { s /= 1024; i++; } while (s >= 1024 && i < u.length - 1);
+      return `${s.toFixed(1)} ${u[i]}`;
     }
 
     function escapeHtml(str) {
-      if (str == null) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+      if (str == null) return "";
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    function showError(msg) {
-      error.textContent = msg;
-      error.classList.add('visible');
-      result.classList.remove('visible');
-      loading.classList.remove('visible');
-    }
-
-    function hideError() {
-      error.classList.remove('visible');
-    }
-
-    function setInitStatus(msg) {
-      if (initProgress) initProgress.textContent = msg;
-    }
+    function showError(msg) { error.textContent = msg; error.classList.add("visible"); result.classList.remove("visible"); loading.classList.remove("visible"); }
+    function hideError() { error.classList.remove("visible"); }
+    function setInitStatus(msg) { if (initProgress) initProgress.textContent = msg; }
 
     async function loadTranslationData() {
       try {
-        const resp = await fetch('data.json', { cache: 'no-cache' });
-        if (!resp.ok) {
-          console.warn('data.json 加载失败:', resp.status);
-          return;
-        }
+        const resp = await fetch("data.json", { cache: "no-cache" });
+        if (!resp.ok) { console.warn("data.json load failed:", resp.status); return; }
         translationData = await resp.json();
-        console.log('translation data loaded');
-      } catch (e) {
-        console.warn('data.json 加载异常:', e);
-      }
+        console.log("translation data loaded");
+      } catch (e) { console.warn("data.json load error:", e); }
     }
 
+    /* ========== Python PARSE_SCRIPT ========== */
     const PARSE_SCRIPT = `
 import json
 import sc2reader
-from sc2reader.exceptions import ReadError
-from sc2reader.events.tracker import UpgradeCompleteEvent
-from sc2reader.events import UnitTypeChangeEvent
-from sc2reader.events.game import CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent
 from sc2reader.events.message import ChatEvent
+import spawningtool.parser
 
-EXCLUDE_UNIT_TYPES = {
-    "BanelingCocoon",
-    "BroodLordCocoon",
-    "Larva",
-    "Egg",
-    "InvisibleTargetDummy",
-    "ParasiticBombRelayDummy",
-    "ParasiticBombDummy",
-    "BroodlingEscort",
-    "Broodling",
-    # 地刺相关：只保留变异事件，不把本体/埋地形态当作单独单位建造
-    "LurkerMP",
-    "LurkerMPBurrowed",
-}
-EXCLUDE_UPGRADES = {"SprayZerg", "SprayTerran", "SprayProtoss"}
-ABILITY_UNIT_MAP = {
-    # 临时：某些单位在 player.units 中缺失时，用技能事件补一条建造记录
-    "TrainWarpPrism": "WarpPrism",
-}
+WORKER_NAMES = {"SCV","Probe","Drone"}
 
-def extract_build_order(replay):
-    # 开始时间（现实世界时间戳，秒）
-    start_time = getattr(replay, "start_time", None)
+def extract_replay_data(replay_path):
+    def patched_get_display_name(self, unit_name, player):
+        return unit_name
+    spawningtool.parser.GameParser.get_display_name = patched_get_display_name
+
+    parser = spawningtool.parser.GameParser(replay_path)
+    st_data = parser.get_parsed_data()
+    replay = parser.replay
+
     start_time_ts = None
-    if start_time is not None:
+    if hasattr(replay, "start_time"):
         try:
-            start_time_ts = int(start_time.timestamp())
+            start_time_ts = int(replay.start_time.timestamp())
         except Exception:
-            start_time_ts = None
+            pass
 
     result = {
-        "map_name": getattr(replay, "map_name", "Unknown"),
-        "game_length": getattr(getattr(replay, "game_length", None), "seconds", 0),
-        "client_version": getattr(replay, "release_string", None),
-        "region": getattr(replay, "region", None) or getattr(replay, "gateway", None),
+        "map_name": st_data.get("map", "Unknown"),
+        "game_length": st_data.get("frames", 0) // max(st_data.get("frames_per_second", 16), 1),
+        "client_version": st_data.get("build"),
+        "region": st_data.get("region"),
         "start_time": start_time_ts,
         "winner": None,
         "teams": [],
         "chat": [],
     }
 
-    # 收集每个玩家的升级事件（使用 UpgradeCompleteEvent）
-    upgrade_events_by_pid = {}
-    # 收集每个玩家的单位变异 / 升本事件（UnitTypeChangeEvent）
-    morph_events_by_pid = {}
-    for ev in getattr(replay, "tracker_events", []):
-        if isinstance(ev, UpgradeCompleteEvent):
-            if ev.upgrade_type_name in EXCLUDE_UPGRADES:
-                continue
-            player = getattr(ev, "player", None)
-            if player is None:
-                continue
-            sec = getattr(ev, "second", None)
-            if sec is None:
-                frame = getattr(ev, "frame", None)
-                if frame is None:
-                    continue
-                sec = frame >> 4
-            pid = getattr(player, "pid", None)
-            if pid is None:
-                continue
-            upgrade_events_by_pid.setdefault(pid, []).append({
-                "time": int(sec),
-                "name": ev.upgrade_type_name,
+    # Chat
+    for ev in getattr(replay, "events", []):
+        if isinstance(ev, ChatEvent):
+            frame = int(getattr(ev, "frame", 0))
+            result["chat"].append({
+                "time": frame >> 4,
+                "player": getattr(ev.player, "name", ""),
+                "pid": getattr(ev, "pid", None),
+                "target": getattr(ev, "target", ""),
+                "text": getattr(ev, "text", ""),
             })
 
-    # UnitTypeChangeEvent 出现在全量 events 里，这里单独再遍历一次
-    for ev in getattr(replay, "events", []):
-        if not isinstance(ev, UnitTypeChangeEvent):
-            continue
-        unit = getattr(ev, "unit", None)
-        player = getattr(unit, "owner", None) if unit is not None else None
-        pid = getattr(player, "pid", None) if player is not None else None
-        if pid is None:
-            continue
-        sec = getattr(ev, "second", None)
-        if sec is None:
-            frame = getattr(ev, "frame", None)
-            if frame is None:
-                continue
-            sec = frame >> 4
-        morph_name = getattr(ev, "unit_type_name", None) or ""
-        # 过滤无意义的变异类型（如 Egg / Larva 等）
-        if morph_name in EXCLUDE_UNIT_TYPES:
-            continue
-        morph_events_by_pid.setdefault(pid, []).append({
-            "time": int(sec),
-            "name": morph_name,
-        })
+    # Winner
+    winners = []
+    for team in getattr(replay, "teams", []):
+        if getattr(team, "result", None) == "Win":
+            winners.append(" & ".join([p.name for p in team.players]))
+    if winners:
+        result["winner"] = " / ".join(winners)
 
-    # 收集每个玩家的「星空加速」（NexusMassRecall）施放事件
+    # 群体传送 / 星空加速：仅用 sc2reader（含目标单位），spawningtool abilities 无可靠目标
+    RECALL_ABILITY_KEYS = frozenset({
+        "NexusMassRecall",
+        "MassRecallMothership",
+        "MothershipMassRecall",
+        "MassRecallMothershipCore",
+    })
     recall_events_by_pid = {}
-    # 收集通过技能推断的单位生产事件（如 WarpPrism）
-    ability_units_by_pid = {}
-    for ev in getattr(replay, "events", []):
-        if not isinstance(ev, CommandEvent):
-            continue
-        if not getattr(ev, "has_ability", False):
-            continue
-        ability_name = getattr(ev, "ability_name", None)
-        ability_obj = getattr(ev, "ability", None)
-        ability_name2 = getattr(ability_obj, "name", None)
-        ability_key = ability_name or ability_name2
-
-        # 星空加速
-        if ability_key == "NexusMassRecall":
-
-            frame = getattr(ev, "frame", None)
-            sec = getattr(ev, "second", None)
-            if sec is None and frame is not None:
-                sec = frame >> 4
-            if sec is None:
-                continue
-
-            player = getattr(ev, "player", None)
-            pid = getattr(player, "pid", None) if player is not None else None
-            if pid is None:
-                continue
-
-            target_name = None
-            if isinstance(ev, TargetUnitCommandEvent):
-                target = getattr(ev, "target", None) or getattr(ev, "target_unit", None)
-                target_name = getattr(target, "name", None)
-            elif isinstance(ev, TargetPointCommandEvent):
-                # 点地形时不用显示坐标，保持简洁
-                target_name = None
-
-            recall_events_by_pid.setdefault(pid, []).append({
-                "time": int(sec),
-                "target": target_name,
-            })
-
-        # 通过技能推断单位建造（例如 WarpPrism）
-        if ability_key in ABILITY_UNIT_MAP:
-            frame = getattr(ev, "frame", None)
-            sec = getattr(ev, "second", None)
-            if sec is None and frame is not None:
-                sec = frame >> 4
-            if sec is None:
-                continue
-
-            player = getattr(ev, "player", None)
-            pid = getattr(player, "pid", None) if player is not None else None
-            if pid is None:
-                continue
-
-            unit_name = ABILITY_UNIT_MAP[ability_key]
-            ability_units_by_pid.setdefault(pid, []).append({
-                "time": int(sec),
-                "unit": unit_name,
-            })
-
-    # 收集对局聊天记录
-    chat_log = []
-    for ev in getattr(replay, "events", []):
-        if not isinstance(ev, ChatEvent):
-            continue
-
-        frame = getattr(ev, "frame", None)
-        sec = getattr(ev, "second", None)
-        if sec is None and frame is not None:
-            sec = frame >> 4
-        if sec is None:
-            continue
-
-        player = getattr(ev, "player", None)
-        name = getattr(player, "name", None) if player is not None else None
-        pid = getattr(ev, "pid", None)
-        target = getattr(ev, "target", None)
-        text = getattr(ev, "text", "")
-
-        chat_log.append({
-            "time": int(sec),
-            "player": name or "",
-            "pid": pid,
-            "target": target,
-            "text": text,
-        })
-
-    result["chat"] = chat_log
-
-    # 计算获胜方（可能多队并列获胜，例如多人合作）
     try:
-        winners = []
-        for team in getattr(replay, "teams", []):
-            if getattr(team, "result", None) == "Win":
-                names = [p.name or "Unknown" for p in getattr(team, "players", [])]
-                if names:
-                    winners.append(" & ".join(names))
-        if winners:
-            result["winner"] = " / ".join(winners)
+        from sc2reader.events.game import CommandEvent, TargetUnitCommandEvent
+        for ev in getattr(replay, "events", []):
+            if not isinstance(ev, CommandEvent):
+                continue
+            if not getattr(ev, "has_ability", False):
+                continue
+            aname = getattr(ev, "ability_name", None)
+            aobj = getattr(ev, "ability", None)
+            aname2 = getattr(aobj, "name", None)
+            akey = aname or aname2
+            if akey not in RECALL_ABILITY_KEYS:
+                continue
+            f = getattr(ev, "frame", None)
+            sec = getattr(ev, "second", None)
+            if sec is None and f is not None:
+                sec = f >> 4
+            if sec is None:
+                continue
+            player = getattr(ev, "player", None)
+            pid = getattr(player, "pid", None) if player else None
+            if pid is None:
+                continue
+            tname = None
+            t = None
+            if isinstance(ev, TargetUnitCommandEvent):
+                t = getattr(ev, "target", None) or getattr(ev, "target_unit", None)
+            if t is None:
+                t = getattr(ev, "target", None)
+            if t is not None:
+                tname = getattr(t, "name", None)
+            recall_events_by_pid.setdefault(pid, []).append({"time": int(sec), "target": tname})
     except Exception:
         pass
+
+    # Worker deaths + benchmark stats from tracker events
+    worker_deaths_by_pid = {}
+    worker_kills_cum = {}
+    worker_losses_cum = {}
+    worker_kills_by_min = {}
+    worker_losses_by_min = {}
+    stats_raw = {}
+    workers_sec_bucket = {}
+
+    try:
+        from sc2reader.events.tracker import PlayerStatsEvent, UnitDiedEvent
+        for ev in getattr(replay, "tracker_events", []):
+            if isinstance(ev, UnitDiedEvent):
+                unit = getattr(ev, "unit", None)
+                if not unit:
+                    continue
+                uname = getattr(unit, "name", None)
+                if uname not in WORKER_NAMES:
+                    continue
+                owner = getattr(unit, "owner", None)
+                opid = getattr(owner, "pid", None) if owner else None
+                sec = getattr(ev, "second", None)
+                if sec is None:
+                    f = getattr(ev, "frame", None)
+                    if f is None: continue
+                    sec = f >> 4
+                killing_pl = getattr(ev, "killing_player", None)
+                kpid = getattr(killing_pl, "pid", None) if killing_pl else None
+                if kpid is None:
+                    kid = getattr(ev, "killing_player_id", None)
+                    try:
+                        if kid is not None and int(kid) > 0:
+                            kpid = int(kid)
+                    except (TypeError, ValueError):
+                        pass
+                if kpid is None:
+                    killer = getattr(ev, "killer", None)
+                    kowner = getattr(killer, "owner", None) if killer else None
+                    kpid = getattr(kowner, "pid", None) if kowner else None
+                ku = getattr(ev, "killing_unit", None)
+                kname = getattr(ku, "name", None) if ku else None
+                if not kname:
+                    killer = getattr(ev, "killer", None)
+                    kname = getattr(killer, "name", None) if killer else None
+                if opid is not None:
+                    worker_deaths_by_pid.setdefault(opid, []).append({"time": int(sec), "unit": uname, "killer": kname})
+                    dsec = sec / 1.4
+                    minute = max(1, int(dsec / 60) + 1)
+                    worker_losses_cum.setdefault(opid, 0)
+                    worker_losses_cum[opid] += 1
+                    worker_losses_by_min.setdefault(opid, {})[minute] = worker_losses_cum[opid]
+                if kpid is not None:
+                    dsec = sec / 1.4
+                    minute = max(1, int(dsec / 60) + 1)
+                    worker_kills_cum.setdefault(kpid, 0)
+                    worker_kills_cum[kpid] += 1
+                    worker_kills_by_min.setdefault(kpid, {})[minute] = worker_kills_cum[kpid]
+
+            if isinstance(ev, PlayerStatsEvent):
+                pl = getattr(ev, "player", None)
+                pid = getattr(pl, "pid", None) if pl else None
+                if pid is None:
+                    pid = getattr(ev, "pid", None)
+                if pid is None:
+                    continue
+                frame = getattr(ev, "frame", 0)
+                gsec = frame / 16.0
+                dsec = gsec / 1.4
+                minute = int(dsec / 60) + 1
+
+                if pid not in stats_raw:
+                    stats_raw[pid] = {}
+
+                fu = getattr(ev, "food_used", None)
+                fm = getattr(ev, "food_made", None)
+                if isinstance(fu, (int, float)) and fu > 1000:
+                    fu = int(round(fu / 4096))
+                if isinstance(fm, (int, float)) and fm > 1000:
+                    fm = int(round(fm / 4096))
+
+                stats_raw[pid][minute] = {
+                    "workers": getattr(ev, "workers_active_count", 0),
+                    "army_minerals": getattr(ev, "minerals_used_current_army", 0),
+                    "army_vespene": getattr(ev, "vespene_used_current_army", 0),
+                    "minerals_rate": getattr(ev, "minerals_collection_rate", 0),
+                    "vespene_rate": getattr(ev, "vespene_collection_rate", 0),
+                    "food_used": int(fu) if fu is not None else 0,
+                    "food_made": int(fm) if fm is not None else 0,
+                }
+                w_count = int(getattr(ev, "workers_active_count", 0) or 0)
+                sec_i = int(dsec)
+                workers_sec_bucket.setdefault(pid, {})[sec_i] = w_count
+    except Exception as e:
+        print("Stats collection error:", e)
+
+    workers_curve_by_pid = {}
+    for pid, sec_map in workers_sec_bucket.items():
+        if not sec_map:
+            continue
+        smin = min(sec_map.keys())
+        smax = max(sec_map.keys())
+        last = sec_map[smin]
+        curve = []
+        for s in range(smin, smax + 1):
+            if s in sec_map:
+                last = sec_map[s]
+            curve.append({"t": s / 60.0, "w": last})
+        workers_curve_by_pid[pid] = curve
+
+    # Build teams
+    max_minute = 0
+    for pid_s in stats_raw.values():
+        for m in pid_s:
+            if m > max_minute:
+                max_minute = m
 
     for team in replay.teams:
         team_data = {"players": []}
         for player in team.players:
+            st_player = st_data["players"].get(player.pid)
+            if not st_player:
+                continue
             build_order = []
-            supply = 0
-            units = []
-            for unit in getattr(player, "units", []):
-                if unit.hallucinated:
-                    continue
-                if unit.finished_at is None:
-                    continue
-                name = unit.name if hasattr(unit, "name") else (unit._type_class.name if unit._type_class else None)
-                if name and name in EXCLUDE_UNIT_TYPES:
-                    continue
-                if name:
-                    units.append((unit.finished_at, unit, name))
-            units.sort(key=lambda x: (x[0], x[2]))
-            for _, unit, name in units:
-                unit_supply = unit.supply if unit.supply is not None else 0
-                supply += unit_supply
-                finish_time_sec = unit.finished_at >> 4
-                start_time_sec = (unit.started_at >> 4) if getattr(unit, "started_at", None) is not None else finish_time_sec
-                is_building = False
-                _type = getattr(unit, "_type_class", None)
-                if _type is not None:
-                    is_building = bool(getattr(_type, "is_building", False))
+            for item in st_player.get("buildOrder", []):
                 build_order.append({
-                    "start_time": start_time_sec,
-                    "finish_time": finish_time_sec,
-                    "supply": max(0, int(supply)),
-                    "unit": name,
-                    "category": "building" if is_building else "unit",
+                    "start_time": int(item["frame"]) >> 4,
+                    "supply": item["supply"],
+                    "unit": item["name"],
+                    "_kind": "upgrade" if item.get("type") == "Upgrade" else "unit",
+                    "is_worker": item.get("is_worker", False),
                 })
-            race_char = (player.pick_race or "?")[0] if player.pick_race else "?"
+            player_stats = []
+            last_wk = 0
+            last_wl = 0
+            last_ek = None
+            empty_ek = {
+                "workers": 0, "army_minerals": 0, "army_vespene": 0,
+                "minerals_rate": 0, "vespene_rate": 0, "food_used": 0, "food_made": 0,
+            }
+            for m in range(1, max_minute + 1):
+                wk = worker_kills_by_min.get(player.pid, {}).get(m, last_wk)
+                wl = worker_losses_by_min.get(player.pid, {}).get(m, last_wl)
+                last_wk = wk
+                last_wl = wl
+                raw = stats_raw.get(player.pid, {}).get(m)
+                if raw is not None:
+                    entry = dict(raw)
+                    last_ek = entry
+                elif last_ek is not None:
+                    entry = dict(last_ek)
+                else:
+                    entry = dict(empty_ek)
+                entry["minute"] = m
+                entry["workers_killed"] = wk
+                entry["workers_lost"] = wl
+                player_stats.append(entry)
+
+            for rc in recall_events_by_pid.get(player.pid, []):
+                t = int(rc.get("time", 0))
+                tgt = rc.get("target")
+                build_order.append({
+                    "start_time": t,
+                    "supply": None,
+                    "unit": tgt or "",
+                    "_kind": "recall",
+                    "target": tgt,
+                    "is_worker": False,
+                })
+
             team_data["players"].append({
-                "name": player.name or "Unknown",
-                "race": race_char,
+                "name": player.name,
+                "race": (player.pick_race or "?")[0],
                 "build_order": build_order,
-                "upgrades": upgrade_events_by_pid.get(player.pid, []),
-                "recalls": recall_events_by_pid.get(player.pid, []),
-                "ability_units": ability_units_by_pid.get(player.pid, []),
-                "morphs": morph_events_by_pid.get(player.pid, []),
+                "worker_deaths": worker_deaths_by_pid.get(player.pid, []),
+                "workers_curve": workers_curve_by_pid.get(player.pid, []),
+                "stats": player_stats,
             })
         result["teams"].append(team_data)
     return result
-
-def parse_replay(path):
-    replay = sc2reader.load_replay(path, load_level=4)
-    return extract_build_order(replay)
 `;
 
-    async function parseReplayWithPyodide(file) {
-      hideError();
-      loading.classList.add('visible');
-      result.classList.remove('visible');
+    /* ========== Translation / Display ========== */
+    const ABILITY_FALLBACK_ZH = {
+      NexusMassRecall: "星空加速",
+      MassRecallMothership: "星空加速",
+      MothershipMassRecall: "星空加速",
+      MassRecallMothershipCore: "星空加速",
+    };
 
-      const timeModeSelect = document.getElementById('timeModeSelect');
-      const showUpgradesCheckbox = document.getElementById('showUpgrades');
-      const showOriginalCheckbox = document.getElementById('showOriginal');
-      const showInitEventsCheckbox = document.getElementById('showInitEvents');
-      const mergeSameActionsCheckbox = document.getElementById('mergeSameActions');
+    function itemIsTechUpgrade(it) {
+      if (!it || it._kind === "upgrade") return it && it._kind === "upgrade";
+      const u = it.unit || "";
+      if (!u || !translationData?.upgrade) return false;
+      return !!lookupTranslationEntry(translationData.upgrade, u);
+    }
 
-      timeModeSelect.addEventListener('change', (e) => {
-        timeMode = e.target.value || 'start';
-        if (lastData) {
-          displayResult(lastData);
+    function lookupTranslationEntry(table, name) {
+      if (!table || name == null) return null;
+      name = String(name).trim();
+      if (!name) return null;
+      if (table[name]) return table[name];
+      const lower = name.toLowerCase();
+      for (const k of Object.keys(table)) {
+        if (k.toLowerCase() === lower) return table[k];
+      }
+      const stripped = name.replace(/^(Research|Upgrade|研究)\s+/i, "").trim();
+      if (stripped && stripped !== name) {
+        if (table[stripped]) return table[stripped];
+        const sl = stripped.toLowerCase();
+        for (const k of Object.keys(table)) {
+          if (k.toLowerCase() === sl) return table[k];
         }
-      });
-
-      showUpgradesCheckbox.addEventListener('change', (e) => {
-        showUpgrades = !!e.target.checked;
-        if (lastData) {
-          displayResult(lastData);
-        }
-      });
-
-      showOriginalCheckbox.addEventListener('change', (e) => {
-        showOriginal = !!e.target.checked;
-        if (lastData) {
-          displayResult(lastData);
-        }
-      });
-
-      if (showInitEventsCheckbox) {
-        showInitEventsCheckbox.addEventListener('change', (e) => {
-          showInitEvents = !!e.target.checked;
-          if (lastData) {
-            displayResult(lastData);
-          }
-        });
       }
-
-      if (mergeSameActionsCheckbox) {
-        mergeSameActionsCheckbox.addEventListener('change', (e) => {
-          mergeSameActions = !!e.target.checked;
-          if (lastData) {
-            displayResult(lastData);
-          }
-        });
-      }
-
-      if (chatToggle) {
-        chatToggle.addEventListener('click', () => {
-          if (!lastData || !Array.isArray(lastData.chat) || lastData.chat.length === 0) {
-            return;
-          }
-          chatVisible = !chatVisible;
-          chatPanel.style.display = chatVisible ? 'block' : 'none';
-          chatToggle.textContent = chatVisible ? '隐藏对局聊天' : '查看对局聊天';
-        });
-      }
-
-      try {
-        // 记录文件基础信息（目前用于显示录像大小）
-        lastFileMeta = {
-          name: file.name,
-          size: file.size,
-        };
-
-        const buffer = await file.arrayBuffer();
-        const data = new Uint8Array(buffer);
-
-        pyodide.FS.writeFile('/tmp/replay.SC2Replay', data);
-
-        const parseCode = `
-${PARSE_SCRIPT}
-result = parse_replay("/tmp/replay.SC2Replay")
-import json
-json.dumps(result)
-`;
-        const resultJson = await pyodide.runPythonAsync(parseCode);
-        const data2 = JSON.parse(resultJson);
-
-        lastData = data2;
-
-        pyodide.FS.unlink('/tmp/replay.SC2Replay');
-
-        displayResult(data2);
-      } catch (e) {
-        console.error(e);
-        showError(e.message || '解析失败，请检查文件格式');
-      } finally {
-        loading.classList.remove('visible');
-      }
+      return null;
     }
 
     function getDisplayUnitText(item) {
-      const name = item.unit || '';
-      const kind = item._kind || '';
+      const name = item.unit || "";
+      const kind = item._kind || "";
 
-      // 勾选“显示原始英文名称”时，直接返回英文（升级保留前缀）
+      if (kind === "worker_death") return name;
+
       if (showOriginal) {
-        if (kind === 'upgrade') {
-          return `升级完成：${name}`;
-        }
-        if (kind === 'recall') {
-          const target = item.target || name || '';
-          return target ? `星空加速 → ${target}` : '星空加速';
+        if (kind === "recall") {
+          const t = item.target || "";
+          return t ? `${name} → ${t}` : name;
         }
         return name;
       }
-
-      // 未加载翻译表时，尽量保留语义
       if (!translationData) {
-        if (kind === 'upgrade') {
-          return `升级完成：${name}`;
+        if (kind === "recall") {
+          const t = item.target || "";
+          return t ? `星空加速 → ${t}` : (ABILITY_FALLBACK_ZH[name] || "星空加速");
         }
-        if (kind === 'recall') {
-          const target = item.target || name || '';
-          return target ? `星空加速 → ${target}` : '星空加速';
-        }
-        return name;
+               return name;
       }
 
-      // 升级：升级完成：中文名[时间s]
-      if (kind === 'upgrade') {
-        const upInfo =
-          (translationData.upgrade && translationData.upgrade[name]) || null;
-        const zh = (upInfo && upInfo.zh) || name;
-        const t = upInfo && typeof upInfo.time === 'number' ? upInfo.time : 0;
-        const timePart = t > 0 ? `[${t}s]` : '';
-        return `升级完成：${zh}${timePart}`;
-      }
-
-      // 变异 / 升本：优先使用 change 表里的中文（例如 Lair/Hive/GreaterSpire → 二本/三本/大龙塔）
-      if (kind === 'morph') {
-        if (translationData.change) {
-          for (const group of Object.values(translationData.change)) {
-            if (group && group[name]) {
-              return group[name].zh || name;
-            }
+      if (kind === "recall") {
+        const tn = item.target || "";
+        if (tn) {
+          let zh = translationData.unit?.[tn]?.zh || translationData.build?.[tn]?.zh;
+          if (!zh && translationData.change) {
+            for (const g of Object.values(translationData.change)) { if (g?.[tn]) { zh = g[tn].zh; break; } }
           }
+          return `星空加速 → ${zh || tn}`;
         }
-        // 找不到专门的变异翻译时，退回通用逻辑
+        return ABILITY_FALLBACK_ZH[name] || "星空加速";
       }
 
-      // 星空加速：前缀固定 + 目标建筑翻译
-      if (kind === 'recall') {
-        const targetName = item.target || name || '';
-        let zhTarget = null;
-
-        if (translationData.unit && translationData.unit[targetName]) {
-          zhTarget = translationData.unit[targetName].zh;
-        }
-        if (!zhTarget && translationData.build && translationData.build[targetName]) {
-          zhTarget = translationData.build[targetName].zh;
-        }
-        if (!zhTarget && translationData.change) {
-          for (const group of Object.values(translationData.change)) {
-            if (group && group[targetName]) {
-              zhTarget = group[targetName].zh;
-              break;
-            }
-          }
-        }
-
-        const finalTarget = zhTarget || targetName;
-        return finalTarget ? `星空加速 → ${finalTarget}` : '星空加速';
-      }
-
-      // 其它（单位/建筑等）：优先在 unit/build 查找
-      let zh = null;
-
-      if (translationData.unit && translationData.unit[name]) {
-        zh = translationData.unit[name].zh;
-      }
-
-      if (!zh && translationData.build && translationData.build[name]) {
-        zh = translationData.build[name].zh;
-      }
-
-      // change 里的别名等，遍历各个子分组
+      let zh = lookupTranslationEntry(translationData.upgrade, name)?.zh
+        || lookupTranslationEntry(translationData.unit, name)?.zh
+        || lookupTranslationEntry(translationData.build, name)?.zh;
       if (!zh && translationData.change) {
-        for (const group of Object.values(translationData.change)) {
-          if (group && group[name]) {
-            zh = group[name].zh;
-            break;
-          }
-        }
+        for (const g of Object.values(translationData.change)) { if (g?.[name]) { zh = g[name].zh; break; } }
       }
-
       return zh || name;
     }
 
+    /** 与建造列表渲染一致：后端把 recall 追加在 build_order 末尾，必须按时间排序后再播语音 */
+    function compareBuildOrderItems(a, b) {
+      const ta = a.start_time ?? a.time ?? 0;
+      const tb = b.start_time ?? b.time ?? 0;
+      if (ta !== tb) return ta - tb;
+      if (a.supply != null && b.supply != null && a.supply !== b.supply) return a.supply - b.supply;
+      return (a.unit || "").localeCompare(b.unit || "", "en");
+    }
+
+    /* ========== Chat ========== */
     function renderChat(data) {
       if (!chatPanel || !chatToggle) return;
-
       const chats = Array.isArray(data.chat) ? [...data.chat] : [];
-
       if (!chats.length) {
-        chatVisible = false;
-        chatPanel.style.display = 'none';
-        chatPanel.innerHTML = '';
-        chatToggle.style.display = 'none';
-        chatToggle.textContent = '查看对局聊天';
-        return;
+        chatVisible = false; chatPanel.style.display = "none"; chatPanel.innerHTML = "";
+        chatToggle.style.display = "none"; chatToggle.textContent = "查看对局聊天"; return;
       }
-
-      chats.sort((a, b) => {
-        const ta = typeof a.time === 'number' ? a.time : (typeof a.second === 'number' ? a.second : 0);
-        const tb = typeof b.time === 'number' ? b.time : (typeof b.second === 'number' ? b.second : 0);
-        return ta - tb;
-      });
-
-      const rows = chats.map((msg) => {
-        const tRaw = typeof msg.time === 'number' ? msg.time : (typeof msg.second === 'number' ? msg.second : 0);
-        const tStr = formatGameTime(tRaw);
-        const sender = msg.player || (msg.pid != null ? `P${msg.pid}` : '未知玩家');
-        const target = msg.target || '所有人';
-        const text = escapeHtml(msg.text || '');
-        return `
-          <div class="chat-item">
-            <span class="chat-time">[${tStr}]</span>
-            <span class="chat-player">${escapeHtml(sender)}</span>
-            <span class="chat-target">(${escapeHtml(target)})</span>
-            <span class="chat-text">${text}</span>
-          </div>
-        `;
-      }).join('');
-
-      chatPanel.innerHTML = rows;
-      chatToggle.style.display = 'inline-flex';
-      chatVisible = false;
-      chatPanel.style.display = 'none';
-      chatToggle.textContent = '查看对局聊天';
+      chats.sort((a, b) => (a.time || 0) - (b.time || 0));
+      chatPanel.innerHTML = chats.map(msg => {
+        const t = formatGameTime(msg.time || 0);
+        const sender = msg.player || (msg.pid != null ? `P${msg.pid}` : "未知");
+        return `<div class="chat-item"><span class="chat-time">[${t}]</span><span class="chat-player">${escapeHtml(sender)}</span><span class="chat-target">(${escapeHtml(msg.target || "所有人")})</span><span class="chat-text">${escapeHtml(msg.text || "")}</span></div>`;
+      }).join("");
+      chatToggle.style.display = "inline-flex";
+      chatVisible = false; chatPanel.style.display = "none"; chatToggle.textContent = "查看对局聊天";
     }
 
-    // 判断某个条目是否属于「初始化事件」
-    // 简化规则：仅在 start_time 与 finish_time（或 time）都为 0 时视为初始化事件。
-    function isInitEvent(item, race) {
-      if (!item) return false;
-
-      // 0) start_time == finish_time == 0 的单位，一律视为初始化事件
-      const start0 = typeof item.start_time === 'number' ? item.start_time : 0;
-      const finish0 = typeof item.finish_time === 'number' ? item.finish_time : start0;
-      if (start0 === 0 && finish0 === 0) {
-        return true;
-      }
-      return false;
-    }
-
+    /* ========== Display ========== */
     function displayResult(data) {
       const gameLen = data.game_length || 0;
-      const clientVersion = data.client_version || '';
-      const region = data.region || '';
+      const clientVersion = data.client_version || "";
+      const region = data.region || "";
       const startTs = data.start_time || null;
-      const winner = data.winner || '';
-      const startStr = startTs ? formatRealWorldTime(startTs) : '';
-      const fileSizeStr = lastFileMeta ? formatFileSize(lastFileMeta.size) : '';
+      const winner = data.winner || "";
+      const startStr = startTs ? formatRealWorldTime(startTs) : "";
+      const fileSizeStr = lastFileMeta ? formatFileSize(lastFileMeta.size) : "";
 
-      const infoParts = [];
-      infoParts.push(`<span><strong>地图</strong> ${data.map_name || 'Unknown'}</span>`);
-      infoParts.push(`<span><strong>时长</strong> ${formatRealTime(gameLen)}</span>`);
-      if (clientVersion) {
-        infoParts.push(`<span><strong>客户端版本</strong> ${clientVersion}</span>`);
-      }
-      if (region) {
-        infoParts.push(`<span><strong>服务器区域</strong> ${region}</span>`);
-      }
-      if (startStr) {
-        infoParts.push(`<span><strong>开始时间</strong> ${startStr}</span>`);
-      }
-      if (winner) {
-        infoParts.push(`<span><strong>胜者</strong> ${winner}</span>`);
-      }
-      if (fileSizeStr) {
-        infoParts.push(`<span><strong>录像大小</strong> ${fileSizeStr}</span>`);
-      }
-
-      gameInfo.innerHTML = infoParts.join('');
-
-      // 渲染聊天按钮和内容（如果有的话）
+      const info = [];
+      info.push(`<span><strong>地图</strong> ${data.map_name || "Unknown"}</span>`);
+      info.push(`<span><strong>时长</strong> ${formatRealTime(gameLen)}</span>`);
+      if (clientVersion) info.push(`<span><strong>版本</strong> ${clientVersion}</span>`);
+      if (region) info.push(`<span><strong>区域</strong> ${region}</span>`);
+      if (startStr) info.push(`<span><strong>时间</strong> ${startStr}</span>`);
+      if (winner) info.push(`<span><strong>胜者</strong> ${winner}</span>`);
+      if (fileSizeStr) info.push(`<span><strong>大小</strong> ${fileSizeStr}</span>`);
+      gameInfo.innerHTML = info.join("");
       renderChat(data);
 
-      let html = '';
-      const teamClasses = ['team1', 'team2'];
+      let html = "";
+      const tc = ["team1", "team2"];
       data.teams.forEach((team, i) => {
-        team.players.forEach((player) => {
-          const race = (player.race || '?')[0].toUpperCase();
-          const items = [...(player.build_order || [])];
+        team.players.forEach(player => {
+          const race = (player.race || "?")[0].toUpperCase();
+          let items = [...(player.build_order || [])];
 
-          if (showUpgrades && Array.isArray(player.upgrades)) {
-            player.upgrades.forEach((upg) => {
-              const t = typeof upg.time === 'number' ? upg.time : 0;
-              items.push({
-                start_time: t,
-                finish_time: t,
-                supply: null,
-                unit: upg.name, // 只存英文名，展示时再结合 data.json 生成中文+时间
-                _kind: 'upgrade',
-              });
+          if (!showUpgrades) {
+            items = items.filter(it => !itemIsTechUpgrade(it));
+          }
+
+          if (showWorkerDeaths && Array.isArray(player.worker_deaths)) {
+            player.worker_deaths.forEach(wd => {
+              const t = typeof wd.time === "number" ? wd.time : 0;
+              let zhw = wd.unit || "";
+              if (translationData?.unit?.[zhw]) zhw = translationData.unit[zhw].zh || zhw;
+              let txt = `${zhw} 阵亡`;
+              if (wd.killer) txt += `（${wd.killer}）`;
+              items.push({ start_time: t, supply: null, unit: txt, _kind: "worker_death" });
             });
           }
 
-          // 变异 / 升本类事件（UnitTypeChangeEvent），在 Python 侧仅记录时间和新类型名称，
-          // 在前端用 data.json 的 change 区域做翻译。
-          if (Array.isArray(player.morphs)) {
-            player.morphs.forEach((m) => {
-              const t = typeof m.time === 'number' ? m.time : 0;
-              const name = m.name || '';
-              // 像 Baneling / Ravager / LurkerMP 这类“变异出来的战斗单位”，
-              // 只要在 unit 表里有配置，就视为单位，用于后续开始时间回推和橙色高亮。
-              const asUnit =
-                translationData &&
-                translationData.unit &&
-                Object.prototype.hasOwnProperty.call(translationData.unit, name);
-              items.push({
-                start_time: t,
-                finish_time: t,
-                supply: null,
-                unit: name,
-                _kind: 'morph',
-                ...(asUnit ? { category: 'unit' } : {}),
-              });
-            });
+          if (!showWorkers) {
+            for (let j = items.length - 1; j >= 0; j--) { if (items[j].is_worker) items.splice(j, 1); }
           }
 
-          if (Array.isArray(player.recalls)) {
-            player.recalls.forEach((rc) => {
-              const t = typeof rc.time === 'number' ? rc.time : 0;
-              items.push({
-                start_time: t,
-                finish_time: t,
-                supply: null,
-                unit: rc.target || '',
-                target: rc.target || '',
-                _kind: 'recall',
-              });
-            });
-          }
+          items.sort(compareBuildOrderItems);
 
-          if (Array.isArray(player.ability_units)) {
-            player.ability_units.forEach((au) => {
-              const t = typeof au.time === 'number' ? au.time : 0;
-              const name = au.unit || 'Unknown';
-              items.push({
-                start_time: t,
-                finish_time: t,
-                supply: null,
-                unit: name,
-                category: 'unit',
-              });
-            });
-          }
-
-          // 单位开始时间统一回推逻辑：
-          // - sc2reader 对大部分单位没有 started_at（只有 finished_at）
-          // - 当 start_time === finish_time 时，认为是“只有结束时间”，
-          //   用 data.json 里的建造时长（显示秒）回推开始时间
-          // - 适用于三族单位；建筑本身因为有 started_at，不会命中这个条件
-          if (translationData && translationData.unit) {
-            items.forEach((item) => {
-              if (
-                item &&
-                item.category === 'unit' &&
-                typeof item.start_time === 'number' &&
-                typeof item.finish_time === 'number' &&
-                item.start_time === item.finish_time &&
-                item.finish_time > 0
-              ) {
-                const info = translationData.unit[item.unit];
-                const buildTime =
-                  info && typeof info.time === 'number' ? info.time : null;
-                if (!buildTime) return;
-
-                // finish_game（内部秒） -> finish_display（游戏内显示秒）
-                const finishGame = item.finish_time;
-                const finishDisplay = Math.max(
-                  0,
-                  Math.round(finishGame / GAME_TIME_FACTOR)
-                );
-                const startDisplay = Math.max(0, finishDisplay - buildTime);
-                const startGame = Math.round(startDisplay * GAME_TIME_FACTOR);
-
-                item.start_time = startGame;
-              }
-            });
-          }
-
-          // 按配置过滤「初始化事件」
-          const visibleItems = showInitEvents
-            ? items
-            : items.filter((it) => !isInitEvent(it, race));
-
-          // 根据当前模式对条目按时间排序，保证时间轴从小到大
-          visibleItems.sort((a, b) => {
-            const aStart = typeof a.start_time === 'number' ? a.start_time : a.time;
-            const aFinish = typeof a.finish_time === 'number' ? a.finish_time : a.time;
-            const bStart = typeof b.start_time === 'number' ? b.start_time : b.time;
-            const bFinish = typeof b.finish_time === 'number' ? b.finish_time : b.time;
-            const ta = timeMode === 'finish' ? aFinish : aStart;
-            const tb = timeMode === 'finish' ? bFinish : bStart;
-            if (ta !== tb) return ta - tb;
-            if (a.supply !== undefined && b.supply !== undefined && a.supply !== b.supply) {
-              return a.supply - b.supply;
-            }
-            const au = a.unit || '';
-            const bu = b.unit || '';
-            return au.localeCompare(bu, 'en');
+          let rendered = items.map(it => {
+            const t = it.start_time ?? it.time ?? 0;
+            const cls = [];
+            if (itemIsTechUpgrade(it)) cls.push("upgrade");
+            if (it._kind === "recall") cls.push("recall");
+            if (it._kind === "worker_death") cls.push("worker-death");
+            if (it.category === "unit" || (it._kind === "unit" && !it.is_worker)) cls.push("unit");
+            return { timeStr: formatGameTime(t), supplyStr: it.supply ?? "", unitText: getDisplayUnitText(it), extraClass: cls.join(" "), raw: it };
           });
 
-          // 先把条目映射为渲染所需的中间结构，便于后续可选合并
-          const renderedItems = visibleItems.map((item) => {
-            const start = typeof item.start_time === 'number' ? item.start_time : item.time;
-            const finish = typeof item.finish_time === 'number' ? item.finish_time : item.time;
-            const chosen = timeMode === 'finish' ? finish : start;
-            const timeStr = formatGameTime(chosen);
-            const extraClasses = [];
-            if (item._kind === 'upgrade') extraClasses.push('upgrade');
-            if (item._kind === 'recall') extraClasses.push('recall');
-            if (item.category === 'unit') extraClasses.push('unit');
-            const extraClass = extraClasses.join(' ');
-            const unitText = getDisplayUnitText(item);
-            const supplyStr = item.supply ?? '';
-            return {
-              timeStr,
-              supplyStr,
-              unitText,
-              extraClass,
-              raw: item,
-            };
-          });
-
-          let finalItems;
-
-          if (!mergeSameActions) {
-            finalItems = renderedItems;
-          } else {
-            // 合并“同一秒、同一单位”的连续操作：
-            // - 时间：相同 timeStr
-            // - 单位：相同 unitText
-            // - 合并后使用最后一条的 supply，单位名后加 " xN"
-            finalItems = [];
-            let current = null;
-            let count = 0;
-
-            const flush = () => {
-              if (!current) return;
-              const text =
-                count > 1 ? `${current.unitText} x${count}` : current.unitText;
-              finalItems.push({
-                timeStr: current.timeStr,
-                supplyStr: current.supplyStr,
-                unitText: text,
-                extraClass: current.extraClass,
-              });
-              current = null;
-              count = 0;
-            };
-
-            renderedItems.forEach((item) => {
-              if (
-                !current ||
-                current.timeStr !== item.timeStr ||
-                current.unitText !== item.unitText
-              ) {
-                flush();
-                current = item;
-                count = 1;
-              } else {
-                // 同一时间+同一单位，累计数量，并用最新 supply 覆盖
-                count += 1;
-                current.supplyStr = item.supplyStr;
-              }
+          if (mergeSameActions) {
+            const merged = []; let cur = null, cnt = 0;
+            const flush = () => { if (!cur) return; merged.push({ ...cur, unitText: cnt > 1 ? `${cur.unitText} x${cnt}` : cur.unitText }); };
+            rendered.forEach(it => {
+              if (!cur || cur.timeStr !== it.timeStr || cur.unitText !== it.unitText) { flush(); cur = it; cnt = 1; }
+              else { cnt++; cur.supplyStr = it.supplyStr; }
             });
             flush();
+            rendered = merged;
           }
 
-          html += `
-            <div class="player-panel">
-              <div class="player-header ${teamClasses[i]}">
-                <span class="race-badge ${race}">${race}</span>
-                <span class="player-name">${player.name || 'Unknown'}</span>
-                <button type="button" class="export-btn">导出TXT</button>
-              </div>
-              <div class="build-list">
-                ${finalItems
-                  .map(
-                    (it) => `
-                    <div class="build-item ${it.extraClass}">
-                      <span class="time">${it.timeStr}</span>
-                      <span class="supply">${it.supplyStr}</span>
-                      <span class="unit">${it.unitText}</span>
-                    </div>
-                  `,
-                  )
-                  .join('')}
-              </div>
+          html += `<div class="player-panel">
+            <div class="player-header ${tc[i]}">
+              <span class="race-badge ${race}">${race}</span>
+              <span class="player-name">${player.name || "Unknown"}</span>
+              <button type="button" class="export-btn">导出TXT</button>
             </div>
-          `;
+            <div class="build-list">${rendered.map(it => `<div class="build-item ${it.extraClass}"><span class="time">${it.timeStr}</span><span class="supply">${it.supplyStr}</span><span class="unit">${it.unitText}</span></div>`).join("")}</div>
+          </div>`;
         });
       });
 
       buildOrders.innerHTML = html;
-      result.classList.add('visible');
+      result.classList.add("visible");
       setupExportButtons();
+      setupVoiceButtons(data);
+      renderBenchmarks(data);
+
+      const vrDisp = voiceReader.style.display;
+      if (currentVoicePlayer && vrDisp !== "none" && vrDisp !== "") openVoiceReader(currentVoicePlayer);
     }
 
+    /* ========== Export ========== */
     function setupExportButtons() {
-      const panels = buildOrders.querySelectorAll('.player-panel');
-      panels.forEach((panel) => {
-        const btn = panel.querySelector('.export-btn');
+      buildOrders.querySelectorAll(".player-panel").forEach(panel => {
+        const btn = panel.querySelector(".export-btn");
         if (!btn) return;
         btn.onclick = () => {
-          const items = panel.querySelectorAll('.build-item');
           const lines = [];
-          items.forEach((item) => {
-            const timeEl = item.querySelector('.time');
-            const supplyEl = item.querySelector('.supply');
-            const unitEl = item.querySelector('.unit');
-            const t = timeEl ? timeEl.textContent.trim() : '';
-            const s = supplyEl ? supplyEl.textContent.trim() : '';
-            const u = unitEl ? unitEl.textContent.trim() : '';
-            if (!t && !s && !u) return;
-            const parts = [];
-            if (t) parts.push(t);
-            if (s) parts.push(s);
-            if (u) parts.push(u);
-            lines.push(parts.join(' '));
+          panel.querySelectorAll(".build-item").forEach(item => {
+            const t = item.querySelector(".time")?.textContent.trim() || "";
+            const s = item.querySelector(".supply")?.textContent.trim() || "";
+            const u = item.querySelector(".unit")?.textContent.trim() || "";
+            if (t || s || u) lines.push([t, s, u].filter(Boolean).join(" "));
           });
-
-          const nameEl = panel.querySelector('.player-name');
-          const playerName = nameEl ? nameEl.textContent.trim() || 'player' : 'player';
-          const content = lines.join('\n');
-          const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${playerName}_build.txt`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          const name = panel.querySelector(".player-name")?.textContent.trim() || "player";
+          const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `${name}_build.txt`;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
         };
       });
     }
 
-    async function initPyodide() {
+    /* ========== Voice Reader ========== */
+    let voiceSteps = [], voiceCurrentIndex = -1, voiceIsRunning = false;
+    let voiceStartTime = 0, voicePausedTime = 0, voiceTimerId = null, voiceIntervalWindow = null;
+    let currentVoicePlayer = null, pipWindow = null;
+    let voiceTimelineDragging = false;
+    const synth = window.speechSynthesis;
+    const voiceReader = document.getElementById("voiceReader");
+    const voiceClose = document.getElementById("voiceClose");
+    const voicePlayBtn = document.getElementById("voicePlay");
+    const voiceResetBtn = document.getElementById("voiceReset");
+    const voiceTimer = document.getElementById("voice-timer");
+    const voiceStepBar = document.getElementById("voice-step-bar");
+    const voiceTimelineBar = document.getElementById("voice-timeline-bar");
+    const voiceTimeline = document.getElementById("voiceTimeline");
+    const voiceRateInput = document.getElementById("voiceRate");
+    const voicePipFontScaleInput = document.getElementById("voicePipFontScale");
+    const voicePipFontScaleVal = document.getElementById("voicePipFontScaleVal");
+    const voiceLangSelect = document.getElementById("voiceLang");
+    const VOICE_PIP_FONT_LS = "voicePipFontScalePct";
+    const voicePlayerName = document.getElementById("voice-player-name");
+    const pipBtn = document.getElementById("pipBtn");
+    const voiceReaderMain = document.querySelector(".voice-reader-main");
+    const voiceBarsHost = document.getElementById("voiceBarsHost");
+    const voicePipFooterBars = document.querySelector(".voice-pip-footer-bars");
+    const voiceTimerPip = document.getElementById("voice-timer-pip");
+    const voicePipStepTime = document.getElementById("voice-pip-step-time");
+    const voicePipStepText = document.getElementById("voice-pip-step-text");
+    const voicePipContext = document.getElementById("voice-pip-context");
+    const voicePipBtnStart = document.getElementById("voicePipBtnStart");
+    const voicePipBtnPause = document.getElementById("voicePipBtnPause");
+    const vQ_2 = document.getElementById("v-q-2");
+    const vQ_1 = document.getElementById("v-q-1");
+    const vQ0 = document.getElementById("v-q0");
+    const vQ1 = document.getElementById("v-q1");
+    const vQ2 = document.getElementById("v-q2");
+
+    function setVoiceReaderVisibleLayout() {
+      voiceReader.style.display = "flex";
+      voiceReader.style.flexDirection = "column";
+      voiceReader.style.alignItems = "stretch";
+    }
+
+    function applyVoicePipFontScaleFromUI() {
+      if (!voicePipFontScaleInput || !voiceReader) return;
+      let pct = parseInt(voicePipFontScaleInput.value, 10);
+      if (!Number.isFinite(pct)) pct = 100;
+      pct = Math.max(75, Math.min(150, pct));
+      const scale = pct / 100;
+      voiceReader.style.setProperty("--voice-pip-font-scale", String(scale));
+      if (voicePipFontScaleVal) voicePipFontScaleVal.textContent = `${pct}%`;
+      try { localStorage.setItem(VOICE_PIP_FONT_LS, String(pct)); } catch (_) {}
+    }
+
+    function initVoicePipFontScale() {
+      if (!voicePipFontScaleInput || !voiceReader) return;
+      let pct = 100;
       try {
-        setInitStatus('加载 Pyodide 运行时...');
-        const indexURL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
-        pyodide = await loadPyodide({ indexURL });
+        const s = localStorage.getItem(VOICE_PIP_FONT_LS);
+        if (s != null) {
+          const n = parseInt(s, 10);
+          if (Number.isFinite(n)) pct = Math.max(75, Math.min(150, n));
+        }
+      } catch (_) {}
+      voicePipFontScaleInput.value = String(pct);
+      applyVoicePipFontScaleFromUI();
+    }
 
-        setInitStatus('安装 mpyq（从源码）...');
-        const mpyqResp = await fetch('https://cdn.jsdelivr.net/gh/eagleflo/mpyq@master/mpyq.py');
-        if (!mpyqResp.ok) throw new Error('mpyq 下载失败: ' + mpyqResp.status);
-        const mpyqCode = await mpyqResp.text();
-        pyodide.FS.mkdirTree('/tmp');
-        pyodide.FS.writeFile('/tmp/mpyq.py', new TextEncoder().encode(mpyqCode));
-        await pyodide.runPythonAsync(`
-import sys
-sys.path.insert(0, "/tmp")
-import mpyq
-`);
+    function setupVoiceButtons(data) {
+      const panels = buildOrders.querySelectorAll(".player-panel");
+      let count = 0;
+      data.teams.forEach(team => {
+        team.players.forEach(player => {
+          const panel = panels[count];
+          if (panel) {
+            const header = panel.querySelector(".player-header");
+            const btn = document.createElement("button");
+            btn.type = "button"; btn.className = "voice-reader-btn";
+            btn.innerHTML = "<span>🔊</span>语音播报";
+            btn.onclick = () => openVoiceReader(player);
+            header.insertBefore(btn, header.querySelector(".export-btn"));
+          }
+          count++;
+        });
+      });
+    }
 
-        setInitStatus('安装 sc2reader...');
-        await pyodide.loadPackage('micropip');
-        await pyodide.runPythonAsync(`
-import micropip
-await micropip.install('sc2reader', deps=False)
-`);
+    /** 语音用较短读法：星空加速类为「加速加建筑」；英文原名为 Chrono + 目标 */
+    function buildVoiceSpeechLine(it) {
+      let s = String(it.text || "").replace(/^\d+\s+/, "").replace(/\[.*?s\]/, "");
+      if (!it._recall) return s;
+      const chronoZh = s.match(/^\s*星空加速\s*(?:→|->)\s*(.+)$/);
+      if (chronoZh) return `加速加${chronoZh[1].trim()}`;
+      if (/^\s*星空加速\s*$/.test(s)) return "加速";
+      if (showOriginal) {
+        const parts = s.split(/\s*(?:→|->)\s*/);
+        if (parts.length >= 2) return `Chrono ${parts[parts.length - 1].trim()}`;
+        if (it._target && String(it._target).trim()) return `Chrono ${String(it._target).trim()}`;
+      }
+      return s;
+    }
 
-        initStatus.style.display = 'none';
-        dropZone.style.display = 'block';
-      } catch (e) {
-        console.error(e);
-        setInitStatus('');
-        initStatus.innerHTML = `<p style="color:var(--accent-red)">初始化失败: ${e.message}</p><p style="margin-top:0.5rem;font-size:0.85rem">请检查网络连接后刷新重试。若为依赖安装失败，可尝试使用后端版本。</p>`;
+    function openVoiceReader(player) {
+      if (!player) return;
+      currentVoicePlayer = player;
+      voicePlayerName.textContent = `Build Order Reader - ${player.name}`;
+      let items = [...(player.build_order || [])];
+      if (!showWorkers) items = items.filter(it => !it.is_worker);
+      if (!showUpgrades) items = items.filter(it => !itemIsTechUpgrade(it));
+      items.sort(compareBuildOrderItems);
+
+      let processed = items.map(it => ({
+        time: (it.start_time / GAME_TIME_FACTOR) * SC2_FASTER_REAL_FACTOR,
+        text: getDisplayUnitText(it),
+        _recall: it._kind === "recall",
+        _target: it._kind === "recall" ? (it.target || "") : "",
+      }));
+
+      if (mergeSameActions) {
+        const merged = []; let cur = null, cnt = 0;
+        const flush = () => { if (!cur) return; merged.push({ ...cur, text: cnt > 1 ? `${cur.text} ×${cnt}` : cur.text }); };
+        processed.forEach(it => {
+          if (!cur || cur.time !== it.time || cur.text !== it.text) { flush(); cur = it; cnt = 1; } else cnt++;
+        });
+        flush(); processed = merged;
+      }
+
+      voiceSteps = processed.map(it => ({
+        time: it.time,
+        text: it.text,
+        speech: buildVoiceSpeechLine(it),
+      }));
+      resetVoice();
+      setVoiceReaderVisibleLayout();
+    }
+
+    voiceClose.onclick = () => { stopVoice(); voiceReader.style.display = "none"; };
+
+    function speak(content) {
+      if (!content) return;
+      try { synth.cancel(); } catch (_) {}
+      const u = new SpeechSynthesisUtterance(content);
+      u.volume = 1; u.rate = parseFloat(voiceRateInput.value); u.lang = voiceLangSelect.value;
+      synth.speak(u);
+    }
+
+    function voiceStepGameClockStr(idx) {
+      if (idx < 0 || idx >= voiceSteps.length) return "";
+      const rawStart = (voiceSteps[idx].time / SC2_FASTER_REAL_FACTOR) * GAME_TIME_FACTOR;
+      return formatGameTime(rawStart);
+    }
+
+    function updateVoiceUI(currentTime) {
+      const gs = Math.round(currentTime / SC2_FASTER_REAL_FACTOR);
+      const clockStr = `${String(Math.floor(gs / 60)).padStart(2, "0")}:${String(Math.floor(gs % 60)).padStart(2, "0")}`;
+      if (voiceTimer) voiceTimer.textContent = clockStr;
+      if (voiceTimerPip) voiceTimerPip.textContent = clockStr;
+      vQ_2.innerText = voiceCurrentIndex > 1 ? voiceSteps[voiceCurrentIndex - 2].text : "";
+      vQ_1.innerText = voiceCurrentIndex > 0 ? voiceSteps[voiceCurrentIndex - 1].text : "";
+      vQ0.innerText = voiceCurrentIndex === -1 ? "准备就绪" : voiceSteps[voiceCurrentIndex].text;
+      vQ1.innerText = voiceSteps[voiceCurrentIndex + 1]?.text || "";
+      vQ2.innerText = voiceSteps[voiceCurrentIndex + 2]?.text || "";
+      if (voicePipStepText && voicePipStepTime) {
+        if (voiceCurrentIndex === -1) {
+          voicePipStepTime.textContent = "";
+          voicePipStepText.textContent = "准备就绪";
+        } else {
+          voicePipStepTime.textContent = voiceStepGameClockStr(voiceCurrentIndex);
+          voicePipStepText.textContent = voiceSteps[voiceCurrentIndex].text;
+        }
+      }
+      if (voicePipContext) {
+        const chunks = [];
+        if (voiceCurrentIndex > 0) {
+          chunks.push(`${voiceStepGameClockStr(voiceCurrentIndex - 1)} ${voiceSteps[voiceCurrentIndex - 1].text}`);
+        }
+        const nextStart = voiceCurrentIndex === -1 ? 0 : 1;
+        const nextEnd = voiceCurrentIndex === -1 ? 3 : 4;
+        for (let k = nextStart; k < nextEnd; k++) {
+          const idx = voiceCurrentIndex + k;
+          if (idx >= 0 && idx < voiceSteps.length) {
+            chunks.push(`${voiceStepGameClockStr(idx)} ${voiceSteps[idx].text}`);
+          }
+        }
+        voicePipContext.textContent = chunks.join(" · ");
+      }
+      syncVoicePipTransport();
+      if (voiceSteps.length) {
+        const total = voiceSteps[voiceSteps.length - 1].time + 10;
+        voiceTimelineBar.style.width = (currentTime / total) * 100 + "%";
       }
     }
 
-    dropZone.addEventListener('click', () => fileInput.click());
-
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', () => {
-      dropZone.classList.remove('dragover');
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file && file.name.toLowerCase().endsWith('.sc2replay')) {
-        parseReplayWithPyodide(file);
-      } else {
-        showError('请上传 .SC2Replay 文件');
+    function updateVoice() {
+      if (!voiceIsRunning) return;
+      const now = (Date.now() - voiceStartTime) / 1000;
+      for (let i = 0; i < voiceSteps.length; i++) {
+        if (now >= voiceSteps[i].time && voiceCurrentIndex < i) {
+          voiceCurrentIndex = i;
+          speak(voiceSteps[i].speech);
+          updateVoiceUI(now);
+          break;
+        }
       }
+      if (voiceCurrentIndex < voiceSteps.length - 1) {
+        const next = voiceSteps[voiceCurrentIndex + 1].time;
+        const prev = voiceCurrentIndex === -1 ? 0 : voiceSteps[voiceCurrentIndex].time;
+        voiceStepBar.style.width = Math.max(0, Math.min(100, ((now - prev) / (next - prev)) * 100)) + "%";
+      } else voiceStepBar.style.width = "100%";
+      updateVoiceUI(now);
+    }
+
+    function voiceTimerTargetWindow() {
+      try {
+        if (pipWindow && !pipWindow.closed) return pipWindow;
+      } catch (_) {}
+      return window;
+    }
+
+    function startVoiceTimer() {
+      stopVoiceTimer();
+      voiceIntervalWindow = voiceTimerTargetWindow();
+      voiceTimerId = voiceIntervalWindow.setInterval(updateVoice, 50);
+    }
+    function stopVoiceTimer() {
+      if (voiceTimerId != null && voiceIntervalWindow) {
+        try { voiceIntervalWindow.clearInterval(voiceTimerId); } catch (_) {}
+      }
+      voiceTimerId = null;
+      voiceIntervalWindow = null;
+    }
+
+    function rebindVoiceTimerIfRunning() {
+      if (!voiceIsRunning) return;
+      stopVoiceTimer();
+      startVoiceTimer();
+    }
+
+    /** silentSeek：拖动时间轴时为 true，只同步时间与 UI，不播报；松手后再播，避免连续 cancel/speak 导致错乱 */
+    function jumpVoiceTo(t, silentSeek = false) {
+      try { synth.cancel(); } catch (_) {}
+      voicePausedTime = Math.max(0, t);
+      voiceStartTime = Date.now() - voicePausedTime * 1000;
+      voiceCurrentIndex = -1;
+      for (let i = 0; i < voiceSteps.length; i++) {
+        if (voicePausedTime >= voiceSteps[i].time) voiceCurrentIndex = i;
+        else break;
+      }
+      updateVoiceUI(voicePausedTime);
+      if (!silentSeek && voiceIsRunning && voiceCurrentIndex !== -1) speak(voiceSteps[voiceCurrentIndex].speech);
+    }
+
+    function syncVoicePipTransport() {
+      if (!voicePipBtnStart || !voicePipBtnPause) return;
+      const hasSteps = voiceSteps.length > 0;
+      voicePipBtnStart.disabled = voiceIsRunning || !hasSteps;
+      voicePipBtnPause.disabled = !voiceIsRunning;
+    }
+
+    function toggleVoicePlay() {
+      if (voiceIsRunning) {
+        voiceIsRunning = false; voicePausedTime = (Date.now() - voiceStartTime) / 1000;
+        stopVoiceTimer(); voicePlayBtn.innerText = "继续 (Alt+↑)"; synth.pause();
+      } else {
+        voiceStartTime = Date.now() - voicePausedTime * 1000;
+        voiceIsRunning = true; startVoiceTimer(); voicePlayBtn.innerText = "暂停 (Alt+↑)"; synth.resume();
+      }
+      syncVoicePipTransport();
+    }
+    function resetVoice() {
+      voiceIsRunning = false; voicePausedTime = 0; voiceCurrentIndex = -1;
+      stopVoiceTimer(); synth.cancel();
+      voiceStepBar.style.width = "0%"; voicePlayBtn.innerText = "开始 (Alt+↑)"; updateVoiceUI(0);
+    }
+    function stopVoice() { voiceIsRunning = false; stopVoiceTimer(); synth.cancel(); }
+
+    voicePlayBtn.onclick = toggleVoicePlay;
+    voiceResetBtn.onclick = resetVoice;
+    if (voicePipBtnStart) voicePipBtnStart.onclick = () => { if (!voiceIsRunning && voiceSteps.length) toggleVoicePlay(); };
+    if (voicePipBtnPause) voicePipBtnPause.onclick = () => { if (voiceIsRunning) toggleVoicePlay(); };
+    initVoicePipFontScale();
+    if (voicePipFontScaleInput) voicePipFontScaleInput.addEventListener("input", applyVoicePipFontScaleFromUI);
+    if (voicePipFontScaleInput) voicePipFontScaleInput.addEventListener("change", applyVoicePipFontScaleFromUI);
+
+    async function requestPiP() {
+      if ("documentPictureInPicture" in window) {
+        try {
+          if (pipWindow) { pipWindow.close(); return; }
+          pipWindow = await window.documentPictureInPicture.requestWindow({ width: 560, height: 120 });
+          pipWindow.document.documentElement.style.cssText = "height:100%;margin:0;background:#0d1117";
+          pipWindow.document.body.style.cssText = "background:#0d1117;padding:0;margin:0;height:100%;min-height:100%;display:flex;flex-direction:column;overflow:hidden;pointer-events:auto;touch-action:manipulation;-webkit-user-select:text;user-select:text";
+          Array.from(document.styleSheets).forEach(sheet => {
+            try {
+              const rules = Array.from(sheet.cssRules).map(r => r.cssText).join("");
+              const s = document.createElement("style"); s.textContent = rules;
+              pipWindow.document.head.appendChild(s);
+            } catch { if (sheet.href) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = sheet.href; pipWindow.document.head.appendChild(l); } }
+          });
+          const pipCssFallback = document.createElement("style");
+          pipCssFallback.textContent = `:root{--purple:#a855f7;--bg-dark:#0d1117;--border:#30363d;--text:#e6edf3;--text-muted:#8b949e;--accent-blue:#58a6ff;--accent-green:#3fb950;}
+.voice-reader-panel{box-sizing:border-box;color:var(--text);--voice-pip-font-scale:1;}
+.voice-reader-pip-strip{display:none;flex-direction:column;gap:0;width:100%;height:100%;min-height:0;flex:1 1 auto;font-size:calc(var(--voice-pip-font-scale,1) * clamp(13px,min(4vmin,3.5vh),22px));}
+.voice-pip-row{display:flex;align-items:stretch;gap:0;flex:1 1 auto;min-height:0;padding:clamp(4px,0.9vmin,10px) clamp(6px,1.6vmin,12px) clamp(3px,0.7vmin,8px);background:rgba(10,12,16,0.95);border-radius:8px 8px 0 0;}
+.voice-pip-left{display:flex;align-items:center;justify-content:center;flex:0 0 clamp(4.2em,14vmin,7.5em);}
+#voice-timer-pip{font-size:2.35em;font-weight:700;color:#39ff14;font-family:"JetBrains Mono",monospace;line-height:1;text-shadow:0 0 12px rgba(57,255,20,0.35);letter-spacing:-0.02em;}
+.voice-pip-divider{width:2px;flex:0 0 2px;margin:clamp(2px,0.5vmin,6px) clamp(6px,1.4vmin,10px);background:linear-gradient(180deg,transparent,#3fb950 20%,#3fb950 80%,transparent);border-radius:1px;opacity:0.85;}
+.voice-pip-center{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:clamp(2px,0.4vmin,5px);}
+.voice-pip-current{display:flex;align-items:baseline;flex-wrap:wrap;gap:clamp(4px,0.8vmin,8px);line-height:1.2;}
+#voice-pip-step-time{font-family:"JetBrains Mono",monospace;font-size:1.08em;font-weight:600;color:#d29922;flex-shrink:0;}
+#voice-pip-step-text{font-size:1.08em;font-weight:600;color:#f0f6fc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#voice-pip-context{font-size:0.9em;color:#6e7681;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;}
+.voice-pip-actions{display:flex;flex-direction:column;justify-content:center;gap:clamp(3px,0.55vmin,6px);flex:0 0 auto;padding-left:clamp(4px,1vmin,8px);}
+.voice-pip-btn{font-size:0.85em;padding:0.45em 0.65em;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#e6edf3;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap;line-height:1.2;}
+.voice-pip-btn:hover:not(:disabled){background:#30363d;border-color:#484f58;}
+.voice-pip-btn:disabled{opacity:0.38;cursor:not-allowed;}
+.voice-pip-footer-bars{display:flex;flex-direction:column;gap:clamp(2px,0.45vmin,5px);flex-shrink:0;padding:0 clamp(6px,1.6vmin,12px) clamp(5px,1vmin,9px);background:rgba(10,12,16,0.95);border-radius:0 0 8px 8px;}
+.voice-reader-panel.pip-compact{width:100%!important;max-width:none!important;height:100%!important;padding:0!important;border-radius:10px!important;flex:1 1 auto!important;min-height:0!important;flex-direction:column!important;align-items:stretch!important;}
+.voice-reader-panel.pip-compact .voice-reader-main{display:none!important;}
+.voice-reader-panel.pip-compact .voice-reader-pip-strip{display:flex!important;}
+.voice-reader-panel.pip-compact .voice-bars-host{gap:clamp(2px,0.5vmin,6px);margin-bottom:0;flex-shrink:0;}
+.voice-reader-panel.pip-compact .voice-bars-host .voice-timeline{margin:0;height:clamp(4px,0.9vmin,8px);}
+.voice-reader-panel.pip-compact .voice-bars-host .voice-step-progress{margin:0;height:clamp(3px,0.7vmin,6px);}
+.voice-bars-host{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.voice-reader-main{display:flex;flex-direction:column;align-items:stretch;}
+.voice-step-progress{height:4px;background:#21262d;border-radius:2px;overflow:hidden;width:100%;box-sizing:border-box;display:block;flex-shrink:0;}
+.voice-timeline{height:8px;background:#21262d;border-radius:4px;margin:20px 0;cursor:pointer;position:relative;overflow:hidden;}
+#voice-timeline-bar{height:100%;background:var(--accent-blue);width:0%;border-radius:4px;opacity:0.5;}
+#voice-step-bar{height:100%;min-height:4px;display:block;width:0%;box-sizing:border-box;background:linear-gradient(90deg,#eae608 0%,#22c55e 33%,#ef4444 66%,#a855f7 100%);background-size:100% 100%;}`;
+          pipWindow.document.head.appendChild(pipCssFallback);
+          const parent = voiceReader.parentElement, sib = voiceReader.nextElementSibling;
+          pipWindow.document.body.appendChild(voiceReader);
+          pipBtn.style.display = "none";
+          voiceReader.style.position = "static";
+          voiceReader.style.width = "100%";
+          voiceReader.style.height = "100%";
+          voiceReader.style.flex = "1 1 auto";
+          voiceReader.style.minHeight = "0";
+          voiceReader.style.maxHeight = "none";
+          voiceReader.style.boxShadow = "none";
+          voiceReader.style.border = "none";
+          voiceReader.style.background = "transparent";
+          voiceReader.style.pointerEvents = "auto";
+          voiceReader.classList.add("pip-compact");
+          if (voicePipFooterBars && voiceBarsHost) voicePipFooterBars.appendChild(voiceBarsHost);
+          setVoiceReaderVisibleLayout();
+          pipWindow.document.addEventListener("keydown", handleVoiceKeys);
+          try { pipWindow.focus(); } catch (_) {}
+          rebindVoiceTimerIfRunning();
+          const restoreFromPiP = () => {
+            voiceReader.classList.remove("pip-compact");
+            if (voiceReaderMain && voiceBarsHost && voicePlayBtn) {
+              voiceReaderMain.insertBefore(voiceBarsHost, voicePlayBtn.parentElement);
+            }
+            if (parent) { if (sib) parent.insertBefore(voiceReader, sib); else parent.appendChild(voiceReader); }
+            voiceReader.style.position = "fixed";
+            voiceReader.style.bottom = "20px";
+            voiceReader.style.right = "20px";
+            voiceReader.style.width = "340px";
+            voiceReader.style.height = "";
+            voiceReader.style.maxHeight = "";
+            voiceReader.style.flex = "";
+            voiceReader.style.minHeight = "";
+            voiceReader.style.boxShadow = "0 10px 40px rgba(0,0,0,0.6)";
+            voiceReader.style.border = "1px solid #30363d";
+            voiceReader.style.background = "rgba(22,27,34,0.98)";
+            setVoiceReaderVisibleLayout();
+            voiceReader.style.pointerEvents = "";
+            pipBtn.style.display = "";
+            pipWindow = null;
+            rebindVoiceTimerIfRunning();
+          };
+          pipWindow.addEventListener("pagehide", restoreFromPiP, { once: true });
+        } catch { requestVideoPiP(); }
+      } else requestVideoPiP();
+    }
+
+    async function requestVideoPiP() {
+      const canvas = document.createElement("canvas"); canvas.width = 340; canvas.height = 180;
+      const ctx = canvas.getContext("2d"); if (!ctx) return;
+      const video = document.createElement("video"); video.muted = true;
+      video.srcObject = canvas.captureStream(); await video.play();
+      document.body.appendChild(video); video.style.cssText = "position:fixed;top:-1000px";
+      const drawOnce = () => {
+        if (!video.srcObject) return;
+        ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, 340, 180);
+        ctx.fillStyle = "#3fb950"; ctx.font = 'bold 36px "JetBrains Mono", monospace'; ctx.textAlign = "center";
+        ctx.fillText(voiceTimer.innerText, 170, 60);
+        ctx.fillStyle = "#e6edf3"; ctx.font = 'bold 24px "Noto Sans SC", sans-serif';
+        ctx.fillText(vQ0.innerText, 170, 110);
+        ctx.fillStyle = "#8b949e"; ctx.font = '16px "Noto Sans SC", sans-serif';
+        ctx.fillText("Next: " + (vQ1.innerText || "---"), 170, 150);
+      };
+      const videoDrawId = setInterval(drawOnce, 80);
+      drawOnce();
+      try {
+        await video.requestPictureInPicture();
+        video.onleavepictureinpicture = () => { clearInterval(videoDrawId); video.remove(); };
+      } catch {
+        clearInterval(videoDrawId);
+        video.remove();
+        alert("浏览器不支持画中画模式");
+      }
+    }
+
+    pipBtn.onclick = requestPiP;
+
+    function seekVoiceTimeline(clientX, silentSeek) {
+      if (!voiceSteps.length) return;
+      const r = voiceTimeline.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      jumpVoiceTo((voiceSteps[voiceSteps.length - 1].time + 10) * pct, silentSeek);
+    }
+    voiceTimeline.addEventListener("pointerdown", e => {
+      if (!voiceSteps.length) return;
+      voiceTimelineDragging = true;
+      try { voiceTimeline.setPointerCapture(e.pointerId); } catch (_) {}
+      seekVoiceTimeline(e.clientX, true);
+    });
+    voiceTimeline.addEventListener("pointermove", e => {
+      if (voiceTimelineDragging) seekVoiceTimeline(e.clientX, true);
+    });
+    voiceTimeline.addEventListener("pointerup", e => {
+      voiceTimelineDragging = false;
+      try { voiceTimeline.releasePointerCapture(e.pointerId); } catch (_) {}
+      seekVoiceTimeline(e.clientX, false);
+    });
+    voiceTimeline.addEventListener("pointercancel", e => {
+      voiceTimelineDragging = false;
+      try { voiceTimeline.releasePointerCapture(e.pointerId); } catch (_) {}
+      seekVoiceTimeline(e.clientX, false);
     });
 
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) parseReplayWithPyodide(file);
-      e.target.value = '';
+    function handleVoiceKeys(e) {
+      if (!e.altKey) return;
+      if (e.key === "ArrowUp") { e.preventDefault(); toggleVoicePlay(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); resetVoice(); }
+      if (e.key === "ArrowRight") { e.preventDefault(); const n = voiceCurrentIndex + 1; if (n < voiceSteps.length) jumpVoiceTo(voiceSteps[n].time); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); const p = voiceCurrentIndex - 1; if (p >= 0) jumpVoiceTo(voiceSteps[p].time); else resetVoice(); }
+    }
+    window.addEventListener("keydown", handleVoiceKeys);
+
+    /* ========== Benchmarks / Charts ========== */
+    let chartInstances = [];
+
+    function destroyCharts() {
+      chartInstances.forEach(c => c.destroy());
+      chartInstances = [];
+    }
+
+    function renderBenchmarks(data) {
+      destroyCharts();
+      const benchEl = document.getElementById("benchmarks");
+
+      const allPlayers = [];
+      data.teams.forEach(team => team.players.forEach(p => allPlayers.push(p)));
+      const playersWithStats = allPlayers.filter(p => p.stats && p.stats.length);
+      if (!playersWithStats.length) {
+        benchEl.style.display = "none";
+        return;
+      }
+      benchEl.style.display = "block";
+
+      const maxMin = Math.max(0, ...playersWithStats.map(p => p.stats[p.stats.length - 1].minute));
+      const labels = [];
+      for (let m = 1; m <= maxMin; m++) labels.push(`${m} min`);
+
+      function getVal(stats, minute, key) {
+        const e = stats.find(s => s.minute === minute);
+        return e ? (e[key] ?? null) : null;
+      }
+
+      function forwardFill(stats, key) {
+        let last = null;
+        const arr = [];
+        for (let m = 1; m <= maxMin; m++) {
+          const v = getVal(stats, m, key);
+          if (v != null) last = v;
+          arr.push(last != null ? last : 0);
+        }
+        return arr;
+      }
+
+      function playerHue(i) {
+        return (i * 47.618 + 13.7) % 360;
+      }
+
+      function lineDataset(label, data, hue, opts = {}) {
+        const dashed = Array.isArray(opts.borderDash);
+        return {
+          label,
+          data,
+          borderColor: `hsl(${hue}, 70%, ${dashed ? 52 : 58}%)`,
+          backgroundColor: `hsla(${hue}, 70%, 55%, 0.08)`,
+          tension: 0.3,
+          pointRadius: maxMin > 48 ? 0 : 2,
+          borderDash: opts.borderDash,
+          fill: false,
+        };
+      }
+
+      const dsWorkers = playersWithStats.map((p, i) => {
+        const hue = playerHue(i);
+        let dataPts;
+        if (Array.isArray(p.workers_curve) && p.workers_curve.length > 0) {
+          dataPts = p.workers_curve.map(pt => ({ x: pt.t, y: pt.w }));
+        } else {
+          const ser = forwardFill(p.stats, "workers");
+          dataPts = [];
+          for (let m = 1; m <= maxMin; m++) dataPts.push({ x: m, y: ser[m - 1] ?? 0 });
+        }
+        return {
+          label: `${p.name} 农民`,
+          data: dataPts,
+          borderColor: `hsl(${hue}, 70%, 58%)`,
+          backgroundColor: `hsla(${hue}, 70%, 55%, 0.08)`,
+          tension: 0,
+          stepped: "after",
+          pointRadius: dataPts.length > 72 ? 0 : 2,
+          fill: false,
+        };
+      });
+
+      const dsArmy = [];
+      playersWithStats.forEach((p, i) => {
+        const h = playerHue(i);
+        dsArmy.push(lineDataset(`${p.name} 军队(矿)`, forwardFill(p.stats, "army_minerals"), h));
+        dsArmy.push(lineDataset(`${p.name} 军队(气)`, forwardFill(p.stats, "army_vespene"), h, { borderDash: [5, 4] }));
+      });
+
+      const dsCollection = [];
+      playersWithStats.forEach((p, i) => {
+        const h = playerHue(i);
+        dsCollection.push(lineDataset(`${p.name} 矿采集`, forwardFill(p.stats, "minerals_rate"), h));
+        dsCollection.push(lineDataset(`${p.name} 气采集`, forwardFill(p.stats, "vespene_rate"), h, { borderDash: [5, 4] }));
+      });
+
+      const dsSupply = [];
+      playersWithStats.forEach((p, i) => {
+        const h = playerHue(i);
+        dsSupply.push(lineDataset(`${p.name} 已用人口`, forwardFill(p.stats, "food_used"), h));
+        dsSupply.push(lineDataset(`${p.name} 补给上限`, forwardFill(p.stats, "food_made"), h, { borderDash: [5, 4] }));
+      });
+
+      const dsWorkerKD = [];
+      playersWithStats.forEach((p, i) => {
+        const h = playerHue(i);
+        dsWorkerKD.push(lineDataset(`${p.name} 累计击杀工人`, forwardFill(p.stats, "workers_killed"), h));
+        dsWorkerKD.push(lineDataset(`${p.name} 累计损失工人`, forwardFill(p.stats, "workers_lost"), h, { borderDash: [5, 4] }));
+      });
+
+      const defaultOpts = {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { labels: { color: "#e6edf3", font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: "#8b949e", maxRotation: 45 }, grid: { color: "rgba(48,54,61,0.5)" } },
+          y: { ticks: { color: "#8b949e" }, grid: { color: "rgba(48,54,61,0.5)" }, beginAtZero: true },
+        },
+      };
+
+      function makeChart(canvasId, type, datasets) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        const c = new Chart(ctx, {
+          type,
+          data: { labels, datasets },
+          options: JSON.parse(JSON.stringify(defaultOpts)),
+        });
+        chartInstances.push(c);
+      }
+
+      function makeWorkersChart(canvasId, datasets) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        const opts = JSON.parse(JSON.stringify(defaultOpts));
+        opts.scales.x = {
+          type: "linear",
+          ticks: { color: "#8b949e", maxTicksLimit: 14 },
+          grid: { color: "rgba(48,54,61,0.5)" },
+          title: { display: true, text: "游戏分钟 (更快，每秒一点)", color: "#8b949e", font: { size: 11 } },
+        };
+        const c = new Chart(ctx, { type: "line", data: { datasets }, options: opts });
+        chartInstances.push(c);
+      }
+
+      makeWorkersChart("chartWorkers", dsWorkers);
+      makeChart("chartArmy", "line", dsArmy);
+      makeChart("chartCollection", "line", dsCollection);
+      makeChart("chartSupply", "line", dsSupply);
+      makeChart("chartWorkerKD", "line", dsWorkerKD);
+    }
+
+    /* ========== Parse Replay ========== */
+    async function parseReplayWithPyodide(file) {
+      hideError();
+      loading.classList.add("visible");
+      result.classList.remove("visible");
+
+      try {
+        lastFileMeta = { name: file.name, size: file.size };
+        const buffer = await file.arrayBuffer();
+        pyodide.FS.writeFile("/tmp/replay.SC2Replay", new Uint8Array(buffer));
+        const code = `${PARSE_SCRIPT}\nresult = extract_replay_data("/tmp/replay.SC2Replay")\njson.dumps(result)`;
+        const json = await pyodide.runPythonAsync(code);
+        lastData = JSON.parse(json);
+        pyodide.FS.unlink("/tmp/replay.SC2Replay");
+        displayResult(lastData);
+      } catch (e) {
+        console.error(e);
+        showError(e.message || "解析失败，请检查文件格式");
+      } finally {
+        loading.classList.remove("visible");
+      }
+    }
+
+    /* ========== Init ========== */
+    async function initPyodide() {
+      try {
+        setInitStatus("加载 Pyodide 运行时...");
+        pyodide = await loadPyodide({ indexURL: `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/` });
+
+        setInitStatus("安装 mpyq（从源码）...");
+        const mpyqResp = await fetch("https://cdn.jsdelivr.net/gh/eagleflo/mpyq@master/mpyq.py");
+        if (!mpyqResp.ok) throw new Error("mpyq 下载失败: " + mpyqResp.status);
+        pyodide.FS.mkdirTree("/tmp");
+        pyodide.FS.writeFile("/tmp/mpyq.py", new TextEncoder().encode(await mpyqResp.text()));
+        await pyodide.runPythonAsync(`import sys\nsys.path.insert(0, "/tmp")\nimport mpyq`);
+
+        setInitStatus("安装 sc2reader & spawningtool...");
+        await pyodide.loadPackage("micropip");
+        await pyodide.runPythonAsync(`import micropip\nawait micropip.install('sc2reader', deps=False)\nawait micropip.install('spawningtool', deps=False)`);
+
+        initStatus.style.display = "none";
+        dropZone.style.display = "block";
+      } catch (e) {
+        console.error(e);
+        setInitStatus("");
+        initStatus.innerHTML = `<p style="color:var(--accent-red)">初始化失败: ${e.message}</p><p style="margin-top:0.5rem;font-size:0.85rem">请检查网络连接后刷新重试。</p>`;
+      }
+    }
+
+    /* ========== Event Listeners ========== */
+    function bindToggle(id, getter, setter) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("change", e => { setter(!!e.target.checked); if (lastData) displayResult(lastData); });
+    }
+    bindToggle("showUpgrades", () => showUpgrades, v => { showUpgrades = v; });
+    bindToggle("showOriginal", () => showOriginal, v => { showOriginal = v; });
+    bindToggle("showWorkers", () => showWorkers, v => { showWorkers = v; });
+    bindToggle("mergeSameActions", () => mergeSameActions, v => { mergeSameActions = v; });
+    bindToggle("showWorkerDeaths", () => showWorkerDeaths, v => { showWorkerDeaths = v; });
+
+    chatToggle.addEventListener("click", () => {
+      if (!lastData || !Array.isArray(lastData.chat) || !lastData.chat.length) return;
+      chatVisible = !chatVisible;
+      chatPanel.style.display = chatVisible ? "block" : "none";
+      chatToggle.textContent = chatVisible ? "收起对局聊天" : "查看对局聊天";
     });
 
-    // 并行初始化翻译数据与 Pyodide 环境
+    dropZone.addEventListener("click", () => fileInput.click());
+    dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault(); dropZone.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f && f.name.toLowerCase().endsWith(".sc2replay")) parseReplayWithPyodide(f);
+      else showError("请上传 .SC2Replay 文件");
+    });
+    fileInput.addEventListener("change", e => { const f = e.target.files[0]; if (f) parseReplayWithPyodide(f); e.target.value = ""; });
+
     loadTranslationData();
     initPyodide();
   </script>

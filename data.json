@@ -64,6 +64,14 @@
       "zh": "维京",
       "time": 30
     },
+    "VikingFighter": {
+      "zh": "维京",
+      "time": 30
+    },
+    "VikingAssault": {
+      "zh": "维京",
+      "time": 30
+    },
     "Medivac": {
       "zh": "运输机",
       "time": 30
@@ -953,27 +961,27 @@
       "time": 0
     },
     "BarracksReactor": {
-      "zh": "新建双倍挂件[兵营]",
+      "zh": "兵营挂双倍",
       "time": 0
     },
     "BarracksTechLab": {
-      "zh": "新建科技挂件[兵营]",
+      "zh": "兵营挂科技",
       "time": 0
     },
     "StarportTechLab": {
-      "zh": "新建科技挂件[星港]",
+      "zh": "VS挂科技",
       "time": 0
     },
     "StarportReactor": {
-      "zh": "新建双倍挂件[星港]",
+      "zh": "VS挂双倍",
       "time": 0
     },
     "FactoryReactor": {
-      "zh": "新建双倍挂件[重工厂]",
+      "zh": "VF挂双倍",
       "time": 0
     },
     "FactoryTechLab": {
-      "zh": "新建科技挂件[重工厂]",
+      "zh": "VF挂科技",
       "time": 0
     },
     "Reactor": {
@@ -985,15 +993,15 @@
       "time": 0
     },
     "OrbitalCommand": {
-      "zh": "基地",
+      "zh": "星轨",
       "time": 0
     },
     "PlanetaryFortress": {
-      "zh": "基地",
+      "zh": "行星要塞",
       "time": 0
     },
     "CommandCenter": {
-      "zh": "基地",
+      "zh": "指挥中心",
       "time": 0
     },
     "Bunker": {
