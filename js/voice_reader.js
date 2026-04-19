@@ -9,7 +9,25 @@ import {
 
 const synth = window.speechSynthesis;
 
-function voiceReaderEl() { return document.getElementById("voiceReader"); }
+/** 语音面板可能在主页面，也可能在 Document PiP 子窗口（子窗口内须用对应 document 查询） */
+export function voiceReaderEl() {
+  const inMain = document.getElementById("voiceReader");
+  if (inMain) return inMain;
+  try {
+    if (appState.pipWindow && !appState.pipWindow.closed)
+      return appState.pipWindow.document.getElementById("voiceReader");
+  } catch (_) {}
+  return null;
+}
+
+function voiceUiDoc() {
+  const vr = voiceReaderEl();
+  return vr?.ownerDocument || document;
+}
+
+function voiceGet(id) {
+  return voiceUiDoc().getElementById(id);
+}
 
 export function setVoiceReaderVisibleLayout() {
   const voiceReader = voiceReaderEl();
@@ -20,9 +38,9 @@ export function setVoiceReaderVisibleLayout() {
 }
 
 function applyVoicePipFontScaleFromUI() {
-  const voicePipFontScaleInput = document.getElementById("voicePipFontScale");
+  const voicePipFontScaleInput = voiceGet("voicePipFontScale");
   const voiceReader = voiceReaderEl();
-  const voicePipFontScaleVal = document.getElementById("voicePipFontScaleVal");
+  const voicePipFontScaleVal = voiceGet("voicePipFontScaleVal");
   if (!voicePipFontScaleInput || !voiceReader) return;
   let pct = parseInt(voicePipFontScaleInput.value, 10);
   if (!Number.isFinite(pct)) pct = 100;
@@ -34,7 +52,7 @@ function applyVoicePipFontScaleFromUI() {
 }
 
 function initVoicePipFontScale() {
-  const voicePipFontScaleInput = document.getElementById("voicePipFontScale");
+  const voicePipFontScaleInput = voiceGet("voicePipFontScale");
   const voiceReader = voiceReaderEl();
   if (!voicePipFontScaleInput || !voiceReader) return;
   let pct = 100;
@@ -87,7 +105,7 @@ function buildVoiceSpeechLine(it) {
 
 export function openVoiceReader(player) {
   if (!player) return;
-  const voicePlayerName = document.getElementById("voice-player-name");
+  const voicePlayerName = voiceGet("voice-player-name");
   appState.currentVoicePlayer = player;
   if (voicePlayerName) voicePlayerName.textContent = `Build Order Reader - ${player.name}`;
   let items = [...(player.build_order || [])];
@@ -123,8 +141,8 @@ export function openVoiceReader(player) {
 function speak(content) {
   if (!content) return;
   try { synth.cancel(); } catch (_) {}
-  const voiceRateInput = document.getElementById("voiceRate");
-  const voiceLangSelect = document.getElementById("voiceLang");
+  const voiceRateInput = voiceGet("voiceRate");
+  const voiceLangSelect = voiceGet("voiceLang");
   const u = new SpeechSynthesisUtterance(content);
   u.volume = 1; u.rate = parseFloat(voiceRateInput && voiceRateInput.value); u.lang = voiceLangSelect && voiceLangSelect.value;
   synth.speak(u);
@@ -137,8 +155,8 @@ function voiceStepGameClockStr(idx) {
 }
 
 function syncVoicePipTransport() {
-  const voicePipBtnStart = document.getElementById("voicePipBtnStart");
-  const voicePipBtnPause = document.getElementById("voicePipBtnPause");
+  const voicePipBtnStart = voiceGet("voicePipBtnStart");
+  const voicePipBtnPause = voiceGet("voicePipBtnPause");
   if (!voicePipBtnStart || !voicePipBtnPause) return;
   const hasSteps = appState.voiceSteps.length > 0;
   voicePipBtnStart.disabled = appState.voiceIsRunning || !hasSteps;
@@ -146,17 +164,17 @@ function syncVoicePipTransport() {
 }
 
 function updateVoiceUI(currentTime) {
-  const voiceTimer = document.getElementById("voice-timer");
-  const voiceTimerPip = document.getElementById("voice-timer-pip");
-  const vQ_2 = document.getElementById("v-q-2");
-  const vQ_1 = document.getElementById("v-q-1");
-  const vQ0 = document.getElementById("v-q0");
-  const vQ1 = document.getElementById("v-q1");
-  const vQ2 = document.getElementById("v-q2");
-  const voicePipStepText = document.getElementById("voice-pip-step-text");
-  const voicePipStepTime = document.getElementById("voice-pip-step-time");
-  const voicePipContext = document.getElementById("voice-pip-context");
-  const voiceTimelineBar = document.getElementById("voice-timeline-bar");
+  const voiceTimer = voiceGet("voice-timer");
+  const voiceTimerPip = voiceGet("voice-timer-pip");
+  const vQ_2 = voiceGet("v-q-2");
+  const vQ_1 = voiceGet("v-q-1");
+  const vQ0 = voiceGet("v-q0");
+  const vQ1 = voiceGet("v-q1");
+  const vQ2 = voiceGet("v-q2");
+  const voicePipStepText = voiceGet("voice-pip-step-text");
+  const voicePipStepTime = voiceGet("voice-pip-step-time");
+  const voicePipContext = voiceGet("voice-pip-context");
+  const voiceTimelineBar = voiceGet("voice-timeline-bar");
 
   const gs = Math.round(currentTime / SC2_FASTER_REAL_FACTOR);
   const clockStr = `${String(Math.floor(gs / 60)).padStart(2, "0")}:${String(Math.floor(gs % 60)).padStart(2, "0")}`;
@@ -200,7 +218,7 @@ function updateVoiceUI(currentTime) {
 
 function updateVoice() {
   if (!appState.voiceIsRunning) return;
-  const voiceStepBar = document.getElementById("voice-step-bar");
+  const voiceStepBar = voiceGet("voice-step-bar");
   const now = (Date.now() - appState.voiceStartTime) / 1000;
   for (let i = 0; i < appState.voiceSteps.length; i++) {
     if (now >= appState.voiceSteps[i].time && appState.voiceCurrentIndex < i) {
@@ -259,7 +277,7 @@ function jumpVoiceTo(t, silentSeek = false) {
 }
 
 function toggleVoicePlay() {
-  const voicePlayBtn = document.getElementById("voicePlay");
+  const voicePlayBtn = voiceGet("voicePlay");
   if (appState.voiceIsRunning) {
     appState.voiceIsRunning = false; appState.voicePausedTime = (Date.now() - appState.voiceStartTime) / 1000;
     stopVoiceTimer(); if (voicePlayBtn) voicePlayBtn.innerText = "继续 (Alt+↑)"; synth.pause();
@@ -270,8 +288,8 @@ function toggleVoicePlay() {
   syncVoicePipTransport();
 }
 function resetVoice() {
-  const voicePlayBtn = document.getElementById("voicePlay");
-  const voiceStepBar = document.getElementById("voice-step-bar");
+  const voicePlayBtn = voiceGet("voicePlay");
+  const voiceStepBar = voiceGet("voice-step-bar");
   appState.voiceIsRunning = false; appState.voicePausedTime = 0; appState.voiceCurrentIndex = -1;
   stopVoiceTimer(); synth.cancel();
   if (voiceStepBar) voiceStepBar.style.width = "0%"; if (voicePlayBtn) voicePlayBtn.innerText = "开始 (Alt+↑)"; updateVoiceUI(0);
@@ -279,12 +297,13 @@ function resetVoice() {
 function stopVoice() { appState.voiceIsRunning = false; stopVoiceTimer(); synth.cancel(); }
 
 async function requestPiP() {
-  const pipBtn = document.getElementById("pipBtn");
   const voiceReader = voiceReaderEl();
-  const voiceReaderMain = document.querySelector(".voice-reader-main");
-  const voiceBarsHost = document.getElementById("voiceBarsHost");
-  const voicePlayBtn = document.getElementById("voicePlay");
-  const voicePipFooterBars = document.querySelector(".voice-pip-footer-bars");
+  if (!voiceReader) return;
+  const pipBtn = voiceReader.querySelector("#pipBtn");
+  const voiceReaderMain = voiceReader.querySelector(".voice-reader-main");
+  const voiceBarsHost = voiceReader.querySelector("#voiceBarsHost");
+  const voicePlayBtn = voiceReader.querySelector("#voicePlay");
+  const voicePipFooterBars = voiceReader.querySelector(".voice-pip-footer-bars");
   if ("documentPictureInPicture" in window) {
     try {
       if (appState.pipWindow) { appState.pipWindow.close(); return; }
@@ -377,9 +396,9 @@ async function requestPiP() {
 }
 
 async function requestVideoPiP() {
-  const voiceTimer = document.getElementById("voice-timer");
-  const vQ0 = document.getElementById("v-q0");
-  const vQ1 = document.getElementById("v-q1");
+  const voiceTimer = voiceGet("voice-timer");
+  const vQ0 = voiceGet("v-q0");
+  const vQ1 = voiceGet("v-q1");
   const canvas = document.createElement("canvas"); canvas.width = 340; canvas.height = 180;
   const ctx = canvas.getContext("2d"); if (!ctx) return;
   const video = document.createElement("video"); video.muted = true;
@@ -408,7 +427,7 @@ async function requestVideoPiP() {
 }
 
 function seekVoiceTimeline(clientX, silentSeek) {
-  const voiceTimeline = document.getElementById("voiceTimeline");
+  const voiceTimeline = voiceGet("voiceTimeline");
   if (!voiceTimeline || !appState.voiceSteps.length) return;
   const r = voiceTimeline.getBoundingClientRect();
   const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
@@ -424,14 +443,14 @@ function handleVoiceKeys(e) {
 }
 
 export function initVoiceReader() {
-  const voiceClose = document.getElementById("voiceClose");
-  const voicePlayBtn = document.getElementById("voicePlay");
-  const voiceResetBtn = document.getElementById("voiceReset");
-  const voicePipBtnStart = document.getElementById("voicePipBtnStart");
-  const voicePipBtnPause = document.getElementById("voicePipBtnPause");
-  const voicePipFontScaleInput = document.getElementById("voicePipFontScale");
-  const pipBtn = document.getElementById("pipBtn");
-  const voiceTimeline = document.getElementById("voiceTimeline");
+  const voiceClose = voiceGet("voiceClose");
+  const voicePlayBtn = voiceGet("voicePlay");
+  const voiceResetBtn = voiceGet("voiceReset");
+  const voicePipBtnStart = voiceGet("voicePipBtnStart");
+  const voicePipBtnPause = voiceGet("voicePipBtnPause");
+  const voicePipFontScaleInput = voiceGet("voicePipFontScale");
+  const pipBtn = voiceGet("pipBtn");
+  const voiceTimeline = voiceGet("voiceTimeline");
   const voiceReader = voiceReaderEl();
 
   if (voiceClose) voiceClose.onclick = () => { stopVoice(); if (voiceReader) voiceReader.style.display = "none"; };

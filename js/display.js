@@ -13,7 +13,7 @@ import {
 } from "./display_helpers.js";
 import { setupExportButtons } from "./export_build.js";
 import { renderBenchmarks } from "./benchmarks.js";
-import { setupVoiceButtons, openVoiceReader } from "./voice_reader.js";
+import { setupVoiceButtons, openVoiceReader, voiceReaderEl } from "./voice_reader.js";
 
 export function renderChat(data) {
   const chatPanel = document.getElementById("chatPanel");
@@ -38,7 +38,7 @@ export function displayResult(data) {
   const gameInfo = document.getElementById("gameInfo");
   const buildOrders = document.getElementById("buildOrders");
   const result = document.getElementById("result");
-  const voiceReader = document.getElementById("voiceReader");
+  const voiceReader = voiceReaderEl();
 
   const gameLen = data.game_length || 0;
   const clientVersion = data.client_version || "";

@@ -166,7 +166,7 @@ function renderBatchRail() {
   const inner = batchReplayRailInner();
   const rail = batchReplayRail();
   if (!inner || !rail) return;
-  const head = `<div class="batch-replay-rail-head"><strong>批量录像</strong><span class="batch-replay-rail-hint">悬浮窗不占主区域宽度；点击卡片切换详情；右侧边缘拖动调节宽度；文件较多时请耐心等待</span></div>`;
+  const head = `<div class="batch-replay-rail-head"><strong>批量录像</strong><span class="batch-replay-rail-hint">文件较多时请耐心等待</span></div>`;
   const cards = appState.batchItems.map(renderBatchCardHtml).join("");
   inner.innerHTML = head + `<div class="batch-replay-rail-cards">${cards}</div>`;
   rail.querySelectorAll(".batch-replay-card--done").forEach(btn => {
