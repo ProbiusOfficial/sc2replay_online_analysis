@@ -64,6 +64,28 @@ function getMd5FromUrl() {
   }
 }
 
+function sanitizeFilenamePart(text) {
+  return String(text || "")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildReplayDownloadName(item, md5) {
+  const players = Array.isArray(item?.players) ? item.players.filter(Boolean).map(String) : [];
+  const map = sanitizeFilenamePart(item?.map || "UnknownMap") || "UnknownMap";
+  let playersPart = "UnknownA_vs_UnknownB";
+  if (players.length >= 2) {
+    playersPart = `${sanitizeFilenamePart(players[0])}vs${sanitizeFilenamePart(players[1])}`;
+  } else if (players.length === 1) {
+    playersPart = `${sanitizeFilenamePart(players[0])}vsUnknown`;
+  }
+  let base = `${playersPart}+${map}`;
+  if (!base || base === "+") base = String(md5 || "replay").trim();
+  if (base.length > 120) base = base.slice(0, 120);
+  return `${base}.SC2Replay`;
+}
+
 function setLibraryStatus(text, isWarn = false) {
   const statusEl = document.getElementById("libraryStatus");
   if (!statusEl) return;
@@ -195,6 +217,7 @@ function renderLibraryList() {
       <div class="replay-library-item-actions">
         <span class="replay-library-like-count">❤ ${likes}</span>
         <button type="button" data-action="view" data-md5="${md5}">查看解析</button>
+        <button type="button" data-action="download" data-md5="${md5}">下载</button>
         <button type="button" data-action="share" data-md5="${md5}">分享</button>
         <button type="button" data-action="like" data-md5="${md5}" class="replay-library-like-btn">❤ 喜欢</button>
       </div>
@@ -216,6 +239,12 @@ function renderLibraryList() {
     btn.addEventListener("click", () => {
       const md5 = btn.getAttribute("data-md5");
       if (md5) void shareReplay(md5);
+    });
+  });
+  listEl.querySelectorAll("button[data-action='download']").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const md5 = btn.getAttribute("data-md5");
+      if (md5) void downloadReplay(md5);
     });
   });
 }
@@ -333,6 +362,30 @@ async function shareReplay(md5) {
     md5,
     copied,
   });
+}
+
+async function downloadReplay(md5) {
+  const item = libraryState.all.find(row => String(row.md5) === String(md5));
+  const filename = buildReplayDownloadName(item, md5);
+  try {
+    setLibraryStatus("下载中...");
+    const replayUrl = `${getApiBase()}/api/public/replays/${md5}/file`;
+    const resp = await fetch(replayUrl, { cache: "no-cache" });
+    if (!resp.ok) throw new Error(`下载失败（HTTP ${resp.status}）`);
+    const blob = await resp.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+    setLibraryStatus(`已开始下载：${filename}`);
+    trackEvent("library_replay_downloaded", { md5, filename });
+  } catch (err) {
+    setLibraryStatus(err?.message || "下载失败", true);
+  }
 }
 
 function bindSearch() {
