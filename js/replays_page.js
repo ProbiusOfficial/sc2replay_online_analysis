@@ -107,10 +107,25 @@ function currentSort() {
 }
 
 function getApiBase() {
+  const pickBase = () => {
+    try {
+      if (window?.SC2_SHARE_API_BASE_URL) return String(window.SC2_SHARE_API_BASE_URL).trim();
+    } catch (_) {}
+    return String(SHARE_API_BASE_URL || "").trim();
+  };
+  const rawBase = pickBase().replace(/\/$/, "");
+  if (!rawBase) return "";
+  // 兼容 //host:port 这类协议相对写法
+  if (rawBase.startsWith("//")) return `${window.location.protocol}${rawBase}`;
+  // HTTPS 页面禁止请求 HTTP 资源，自动尝试升级协议
+  if (window.location.protocol === "https:" && rawBase.startsWith("http://")) {
+    return `https://${rawBase.slice("http://".length)}`;
+  }
   try {
-    if (window?.SC2_SHARE_API_BASE_URL) return String(window.SC2_SHARE_API_BASE_URL).replace(/\/$/, "");
+    const normalized = new URL(rawBase, window.location.origin);
+    return normalized.toString().replace(/\/$/, "");
   } catch (_) {}
-  return SHARE_API_BASE_URL.replace(/\/$/, "");
+  return rawBase;
 }
 
 function buildPublicListUrl() {

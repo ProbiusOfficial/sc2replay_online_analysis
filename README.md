@@ -72,7 +72,7 @@ python -m http.server 8080
 如需启用“共享上传”，需要额外部署 `server/` 下的 FastAPI 服务。默认以本地持久化为主，GitHub 同步可按开关启用。
 
 - 文档：[`server/README.md`](server/README.md)
-- 默认上传地址：`http://114.66.28.185:13662/api/replays/upload`（可通过前端全局变量覆盖）
+- 默认上传地址：`https://replayapi.s.3q.hair/api/replays/upload`（可通过前端全局变量覆盖）
 
 
 

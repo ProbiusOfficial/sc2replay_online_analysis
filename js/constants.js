@@ -4,5 +4,5 @@ export const SC2_FASTER_REAL_FACTOR = 0.9803;
 export const BATCH_RAIL_WIDTH_LS = "batchRailWidthPx";
 export const DEFAULT_BATCH_RAIL_WIDTH = 320;
 export const VOICE_PIP_FONT_LS = "voicePipFontScalePct";
-export const SHARE_API_BASE_URL = "http://114.66.28.185:13662";
+export const SHARE_API_BASE_URL = "https://replayapi.s.3q.hair";
 export const SHARE_LIST_API = "/api/public/replays";

@@ -1,12 +1,28 @@
 import { SHARE_API_BASE_URL } from "./constants.js";
 
 function buildUploadUrl() {
-  try {
-    if (window?.SC2_SHARE_API_BASE_URL) {
-      return `${String(window.SC2_SHARE_API_BASE_URL).replace(/\/$/, "")}/api/replays/upload`;
+  const pickBase = () => {
+    try {
+      if (window?.SC2_SHARE_API_BASE_URL) {
+        return String(window.SC2_SHARE_API_BASE_URL).trim();
+      }
+    } catch (_) {}
+    return String(SHARE_API_BASE_URL || "").trim();
+  };
+  const rawBase = pickBase().replace(/\/$/, "");
+  if (!rawBase) return "/api/replays/upload";
+  const protocolSafeBase = (() => {
+    if (rawBase.startsWith("//")) return `${window.location.protocol}${rawBase}`;
+    if (window.location.protocol === "https:" && rawBase.startsWith("http://")) {
+      return `https://${rawBase.slice("http://".length)}`;
     }
+    return rawBase;
+  })();
+  try {
+    const normalized = new URL(protocolSafeBase, window.location.origin).toString().replace(/\/$/, "");
+    return `${normalized}/api/replays/upload`;
   } catch (_) {}
-  return `${SHARE_API_BASE_URL}/api/replays/upload`;
+  return `${protocolSafeBase}/api/replays/upload`;
 }
 
 function normalizePlayers(data) {
