@@ -3,6 +3,7 @@ export const appState = {
   pyodide: null,
   lastData: null,
   lastFileMeta: null,
+  lastFile: null,
   showUpgrades: true,
   showOriginal: false,
   showWorkers: true,
@@ -11,6 +12,8 @@ export const appState = {
   chatVisible: false,
   translationData: null,
   batchItems: [],
+  batchSearchKeyword: "",
+  batchRailCollapsed: false,
   batchSelectedId: null,
   batchIdSeq: 0,
 

@@ -3,65 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StarCraft II Replay Analysis Online</title>
+  <title>共享录像库 - StarCraft II Replay Analysis</title>
   <link rel="icon" type="image/png" href="StarCraft.svg" />
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
   <nav class="top-nav" aria-label="站点常驻导航">
-    <a class="top-nav-link top-nav-link--active" href="./index.html">本地解析</a>
-    <a class="top-nav-link" href="./replays.html">共享录像库</a>
+    <a class="top-nav-link" href="./index.html">本地解析</a>
+    <a class="top-nav-link top-nav-link--active" href="./replays.html">共享录像库</a>
   </nav>
   <div class="container">
     <header>
-      <h1>StarCraft II Replay Analysis - Online</h1>
-      <p class="subtitle">拖入 .SC2Replay 文件，本地解析；可选将录像共享到公共库</p>
-      <p class="subtitle" style="font-size:0.8rem;margin-top:0.25rem">
-        By 探姬#51276（国服喵），欢迎关注
-        <a href="https://space.bilibili.com/27109929" target="_blank" rel="noopener noreferrer" style="color:var(--accent-blue);text-decoration:none;">探姬_Official的bilibili</a>
-      </p>
-      <div class="feedback-qq" role="region" aria-label="用户反馈 QQ 群">
-        <div class="feedback-qq-qr-wrap">
-          <a class="feedback-qq-qr" href="https://qm.qq.com/q/H03okJE0oA" target="_blank" rel="noopener noreferrer" title="点击打开加群链接（手机可扫码）">
-            <img
-              src="https://api.qrserver.com/v1/create-qr-code/?size=132x132&amp;margin=10&amp;color=f0f6fc&amp;bgcolor=161b22&amp;data=https%3A%2F%2Fqm.qq.com%2Fq%2FH03okJE0oA"
-              width="120"
-              height="120"
-              alt="QQ 群加群二维码，内容与加群链接一致"
-              loading="lazy"
-              decoding="async"
-            />
-          </a>
-        </div>
-        <div class="feedback-qq-text">
-          <strong>星际2录像分析工具 · 反馈交流群</strong>
-          <span>群号 <code>425641107</code> · 扫码或点击下方链接加入</span>
-          <a class="feedback-qq-link" href="https://qm.qq.com/q/H03okJE0oA" target="_blank" rel="noopener noreferrer">点击加入 QQ 群</a>
-        </div>
-      </div>
+      <h1>StarCraft II Replay 共享录像库</h1>
+      <p class="subtitle">从远端本地共享库检索录像，支持置顶与点赞排序</p>
     </header>
-
-    <aside class="batch-replay-rail" id="batchReplayRail" aria-label="批量录像摘要" hidden>
-      <div class="batch-replay-rail-inner" id="batchReplayRailInner"></div>
-      <div class="batch-replay-rail-resize" id="batchRailResizeHandle" role="separator" aria-orientation="vertical" aria-label="拖动调节侧栏宽度" title="拖动调节侧栏宽度"></div>
-    </aside>
 
     <div class="init-status" id="initStatus">
       <p>正在加载 Python 运行环境...</p>
       <p class="progress" id="initProgress">初始化中</p>
-      <p class="hint" style="margin-top:1rem;font-size:0.8rem">请勿直接双击打开，需通过 HTTP 服务访问</p>
     </div>
 
-    <div class="drop-zone" id="dropZone" style="display:none">
-      <div class="icon">📁</div>
-      <p>将录像文件拖放到此处，或点击选择文件</p>
-      <p class="hint">支持 .SC2Replay 格式 · 可同时选择或拖入多个录像 · 默认仅本地解析，不会自动上传</p>
-      <input type="file" id="fileInput" accept=".SC2Replay,.sc2replay" multiple />
-    </div>
+    <section class="replay-library-panel" aria-label="录像检索">
+      <div class="replay-library-controls">
+        <input id="searchKeyword" type="text" placeholder="关键词搜索（地图/玩家/留言/标签）" />
+        <select id="sortMode">
+          <option value="latest">按最新上传排序</option>
+          <option value="likes">按点赞数排序</option>
+        </select>
+        <button id="searchBtn" type="button">检索</button>
+      </div>
+      <div id="libraryStatus" class="replay-library-status">加载中...</div>
+      <div id="libraryList" class="replay-library-list"></div>
+    </section>
 
     <div class="loading" id="loading">
       <div class="spinner"></div>
-      <p>正在解析录像...</p>
+      <p>正在拉取并解析录像...</p>
     </div>
 
     <div class="error" id="error"></div>
@@ -92,7 +69,6 @@
       </div>
     </div>
 
-    <!-- Voice Reader Panel -->
     <div class="voice-reader-panel" id="voiceReader">
       <div class="voice-reader-pip-strip" aria-hidden="true">
         <div class="voice-pip-row">
@@ -148,6 +124,6 @@
 
   <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/replays_page.js"></script>
 </body>
 </html>

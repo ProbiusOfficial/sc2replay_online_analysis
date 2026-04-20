@@ -100,6 +100,7 @@ function setBatchRailVisible(on) {
     rail.hidden = true;
     rail.classList.remove("batch-replay-rail--visible");
     rail.classList.remove("batch-replay-rail--resizing");
+    rail.classList.remove("batch-replay-rail--collapsed");
     if (inner) inner.innerHTML = "";
   }
 }
@@ -162,13 +163,66 @@ function renderBatchCardHtml(item) {
       </button>`;
 }
 
+function getFilteredBatchItems() {
+  const keyword = String(appState.batchSearchKeyword || "").trim().toLowerCase();
+  if (!keyword) return appState.batchItems;
+  return appState.batchItems.filter(item => {
+    const base = [item.fileName || ""];
+    if (item.status === "done" && item.fullData) {
+      base.push(item.fullData.map_name || "");
+      base.push(item.fullData.winner || "");
+      base.push(formatBatchPlayersList(item.fullData));
+    }
+    const haystack = base.join(" ").toLowerCase();
+    return haystack.includes(keyword);
+  });
+}
+
 function renderBatchRail() {
   const inner = batchReplayRailInner();
   const rail = batchReplayRail();
   if (!inner || !rail) return;
-  const head = `<div class="batch-replay-rail-head"><strong>批量录像</strong><span class="batch-replay-rail-hint">文件较多时请耐心等待</span></div>`;
-  const cards = appState.batchItems.map(renderBatchCardHtml).join("");
-  inner.innerHTML = head + `<div class="batch-replay-rail-cards">${cards}</div>`;
+  const collapsed = !!appState.batchRailCollapsed;
+  rail.classList.toggle("batch-replay-rail--collapsed", collapsed);
+  const filteredItems = getFilteredBatchItems();
+  const head = `<div class="batch-replay-rail-head">
+      <div class="batch-replay-rail-head-top">
+        <strong>批量录像（${appState.batchItems.length}）</strong>
+        <button
+          id="batchRailToggle"
+          class="batch-replay-rail-toggle"
+          type="button"
+          title="${collapsed ? "展开侧栏" : "收起侧栏"}"
+          aria-expanded="${collapsed ? "false" : "true"}"
+        >${collapsed ? "展开" : "收起"}</button>
+      </div>
+      <span class="batch-replay-rail-hint">文件较多时请耐心等待</span>
+      <input
+        id="batchRailSearch"
+        class="batch-replay-rail-search"
+        type="search"
+        value="${escapeHtml(appState.batchSearchKeyword || "")}"
+        placeholder="搜索 文件名/地图/玩家"
+      />
+    </div>`;
+  const cards = filteredItems.map(renderBatchCardHtml).join("");
+  const cardsBody = cards || `<div class="batch-replay-card batch-replay-card--pending"><div class="batch-replay-card-status">无匹配结果</div></div>`;
+  inner.innerHTML = head + `<div class="batch-replay-rail-cards">${cardsBody}</div>`;
+  const toggleBtn = document.getElementById("batchRailToggle");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      appState.batchRailCollapsed = !appState.batchRailCollapsed;
+      renderBatchRail();
+    });
+  }
+  if (collapsed) return;
+  const searchInput = document.getElementById("batchRailSearch");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      appState.batchSearchKeyword = searchInput.value || "";
+      renderBatchRail();
+    });
+  }
   rail.querySelectorAll(".batch-replay-card--done").forEach(btn => {
     btn.addEventListener("click", onBatchCardClick);
   });
@@ -183,6 +237,7 @@ function onBatchCardClick(ev) {
   appState.batchSelectedId = id;
   appState.lastData = item.fullData;
   appState.lastFileMeta = { name: item.fileName, size: item.size };
+  appState.lastFile = item.fileRef || null;
   hideError();
   displayResult(item.fullData);
   renderBatchRail();
@@ -199,10 +254,14 @@ export async function processBatchFiles(files) {
     return;
   }
   hideError();
+  appState.lastFile = null;
+  appState.batchSearchKeyword = "";
+  appState.batchRailCollapsed = false;
   appState.batchItems = replayFiles.map(f => ({
     id: ++appState.batchIdSeq,
     fileName: f.name,
     size: f.size,
+    fileRef: f,
     status: "pending",
     errorMsg: null,
     fullData: null,
@@ -235,8 +294,10 @@ export async function processBatchFiles(files) {
     appState.batchSelectedId = lastSuccess.item.id;
     appState.lastData = lastSuccess.data;
     appState.lastFileMeta = { name: lastSuccess.item.fileName, size: lastSuccess.item.size };
+    appState.lastFile = lastSuccess.item.fileRef || null;
     displayResult(lastSuccess.data);
   } else {
+    appState.lastFile = null;
     showError("全部录像解析失败");
     if (resultEl) resultEl.classList.remove("visible");
   }

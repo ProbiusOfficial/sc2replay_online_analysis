@@ -3,6 +3,29 @@ import { appState } from "./state.js";
 import { PYODIDE_VERSION } from "./constants.js";
 import { setInitStatus } from "./errors_init.js";
 
+const SOFT_REUSE_CACHE_KEY = "sc2PyodideInitCacheV1";
+
+function readSoftReuseCache() {
+  try {
+    const raw = sessionStorage.getItem(SOFT_REUSE_CACHE_KEY);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload || payload.version !== PYODIDE_VERSION) return null;
+    return payload;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeSoftReuseCache() {
+  try {
+    sessionStorage.setItem(SOFT_REUSE_CACHE_KEY, JSON.stringify({
+      version: PYODIDE_VERSION,
+      initializedAt: Date.now(),
+    }));
+  } catch (_) {}
+}
+
 export async function parseReplayBufferToData(buffer) {
   if (!appState.pyodide) throw new Error("解析环境尚未就绪");
   appState.pyodide.FS.writeFile("/tmp/replay.SC2Replay", new Uint8Array(buffer));
@@ -18,8 +41,13 @@ export async function parseReplayBufferToData(buffer) {
 export async function initPyodide() {
   const initStatus = document.getElementById("initStatus");
   const dropZone = document.getElementById("dropZone");
+  const cached = readSoftReuseCache();
   try {
-    setInitStatus("加载 Pyodide 运行时...");
+    if (cached) {
+      setInitStatus("检测到同会话已初始化，将快速重载运行环境...");
+    } else {
+      setInitStatus("加载 Pyodide 运行时...");
+    }
     appState.pyodide = await loadPyodide({ indexURL: `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/` });
 
     setInitStatus("安装 mpyq（从源码）...");
@@ -32,6 +60,7 @@ export async function initPyodide() {
     setInitStatus("安装 sc2reader & spawningtool...");
     await appState.pyodide.loadPackage("micropip");
     await appState.pyodide.runPythonAsync(`import micropip\nawait micropip.install('sc2reader', deps=False)\nawait micropip.install('spawningtool', deps=False)`);
+    writeSoftReuseCache();
 
     if (initStatus) initStatus.style.display = "none";
     if (dropZone) dropZone.style.display = "block";

@@ -14,6 +14,7 @@ import {
 import { setupExportButtons } from "./export_build.js";
 import { renderBenchmarks } from "./benchmarks.js";
 import { setupVoiceButtons, openVoiceReader, voiceReaderEl } from "./voice_reader.js";
+import { renderSharePanel } from "./share_upload.js";
 
 export function renderChat(data) {
   const chatPanel = document.getElementById("chatPanel");
@@ -34,7 +35,7 @@ export function renderChat(data) {
   appState.chatVisible = false; chatPanel.style.display = "none"; chatToggle.textContent = "查看对局聊天";
 }
 
-export function displayResult(data) {
+export function displayResult(data, options = {}) {
   const gameInfo = document.getElementById("gameInfo");
   const buildOrders = document.getElementById("buildOrders");
   const result = document.getElementById("result");
@@ -48,6 +49,8 @@ export function displayResult(data) {
   const startStr = startTs ? formatRealWorldTime(startTs) : "";
   const fileSizeStr = appState.lastFileMeta ? formatFileSize(appState.lastFileMeta.size) : "";
 
+  const hideShareUpload = !!options?.hideShareUpload;
+
   const info = [];
   info.push(`<span><strong>地图</strong> ${data.map_name || "Unknown"}</span>`);
   info.push(`<span><strong>时长</strong> ${formatRealTime(gameLen)}</span>`);
@@ -56,7 +59,12 @@ export function displayResult(data) {
   if (startStr) info.push(`<span><strong>时间</strong> ${startStr}</span>`);
   if (winner) info.push(`<span><strong>胜者</strong> ${winner}</span>`);
   if (fileSizeStr) info.push(`<span><strong>大小</strong> ${fileSizeStr}</span>`);
-  if (gameInfo) gameInfo.innerHTML = info.join("");
+  if (gameInfo) {
+    gameInfo.innerHTML = hideShareUpload
+      ? info.join("")
+      : `${info.join("")}<div id="shareUploadHost" class="share-upload-host"></div>`;
+  }
+  if (!hideShareUpload) renderSharePanel(data);
   renderChat(data);
 
   let html = "";
