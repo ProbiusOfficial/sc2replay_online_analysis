@@ -1,10 +1,7 @@
 /* @ts-self-types="./compute.d.ts" */
 
 /**
- * 解压一段 bzip2 流（不含 MPQ 的压缩类型标记字节）。
- *
- * MPQ 的每个压缩块首字节是压缩类型标记，`bzip2` 为 `0x10`；
- * 调用方需先剥掉该字节再把剩余数据传进来（见 `js/worker/decoder/mpq.ts`）。
+ * wasm 导出层：把纯核心的错误信息转成 `JsValue`。
  *
  * 正确性依据：`scripts/compare-parsers.mjs` 会对 5 个样本的全部 53 个压缩块
  * 逐块比对解压结果的 md5，基准来自 Python 的 `bz2`（即 libbz2）。
