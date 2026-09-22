@@ -153,7 +153,7 @@
           <div class="sbpanel sbpanel-a" id="sbPanelA"></div>
           <div class="sbpanel sbpanel-b" id="sbPanelB"></div>
           <div class="sbres" id="sbRes"></div>
-          <div class="sbhint" id="sbHint">拖动上方时间轴即可定位 · 与全部视图共用同一条游标 · 单位位置为稀疏采样点的直线插值</div>
+          <div class="sbhint" id="sbHint">拖动上方时间轴即可定位 · 与全部视图共用同一条游标</div>
         </div>
         <div class="sblegend" id="sbLegend">
           <span><i class="lg-ring" style="border-color:var(--a)"></i>A 方（图标外圈 = 归属）</span>
@@ -163,22 +163,9 @@
           <span><i class="lg-ring" style="border-color:#3f9e5f"></i>气泉</span>
           <span><i class="lg-ring" style="border-color:#dfe6f0"></i>Xel'Naga 塔</span>
           <span><i class="lg-x" style="color:var(--warn)"></i>阵亡涟漪（精确死亡坐标）</span>
-          <span style="color:var(--ink4)">位置为稀疏采样点的插值 · 图标素材 © Blizzard Entertainment（粉丝非商用）</span>
+          <span style="color:var(--ink4)">图标素材 © Blizzard Entertainment（粉丝非商用）</span>
         </div>
         <div class="sb-hudopts" id="sbHudOpts"></div>
-        <div class="tlbox" style="margin-top:12px">
-          <div class="note">
-            <b>沙盘口径</b> —— 全部数据取自解析管线的 <code>ReplayData.sandbox</code>：
-            单位的出生 / 死亡 / 变形（<code>SUnitBorn / Init / Done / Died / TypeChange</code>）
-            与 <code>SUnitPositionsEvent</code> 的<b>稀疏位置采样</b>（实测每 240 gameloop 一批、
-            按单位索引滚动轮转，开局约 2 分钟后才开始出现）。采样点之间为<b>直线插值</b>，
-            交战的落点是精确的（死亡事件自带坐标），但交战过程中的走位是估计。
-            <br><b>为什么没有地图 / 迷雾 / 血量</b> —— 录像文件里没有这三样：地形不在录像里，
-            沙盘的地图范围由单位坐标极值推出、矿线与出生点来自开局中立单位；
-            tracker 是上帝视角（无「某玩家看不到什么」的信息）；单位血量没有任何事件记录。
-            因此本视图是<b>上帝视角的抽象沙盘</b>，不是拟真小地图回放。
-          </div>
-        </div>
       </div>
 
       <div class="tblbox v-data">
