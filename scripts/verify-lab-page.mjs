@@ -259,6 +259,34 @@ if (cur.clock.startsWith("00:00")) errors.push("hover 图表未推进游标（�
 if (!cur.tblOn) errors.push("hover 后采样表没有高亮行");
 await page.screenshot({ path: join(SHOTS, "01-data-view.png") });
 
+/* ---------------- 4b. 时间轴点击制 ---------------- */
+step("4b", "时间轴为点击制（悬停只出预览、不得移动游标，按下才动）");
+// 探宝反馈：时间轴随悬停扫描太容易误触 —— 鼠标路过就改变查看位置。
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.waitForTimeout(250);
+const baseClock = await page.evaluate(() => document.querySelector("#clock").textContent.trim());
+const tlBox2 = await page.locator("#tl").boundingBox();
+// 悬停（不按键）：时钟必须原地不动，预览浮标必须出现
+await page.mouse.move(tlBox2.x + tlBox2.width * 0.7, tlBox2.y + tlBox2.height * 0.5, { steps: 4 });
+await page.waitForTimeout(300);
+const hoverState = await page.evaluate(() => ({
+  clock: document.querySelector("#clock").textContent.trim(),
+  peekOn: document.querySelector("#tl .tl-peek")?.classList.contains("on") ?? false,
+  peekText: document.querySelector("#tl .tl-peek")?.dataset.t ?? "",
+}));
+console.log("  悬停 → " + JSON.stringify(hoverState));
+if (hoverState.clock !== baseClock) errors.push("时间轴悬停仍移动游标（应为点击制）");
+if (!hoverState.peekOn || !hoverState.peekText) errors.push("时间轴悬停没有显示预览浮标");
+// 按下拖动：游标必须移动
+await page.mouse.down();
+await page.mouse.move(tlBox2.x + tlBox2.width * 0.3, tlBox2.y + tlBox2.height * 0.5, { steps: 4 });
+await page.mouse.up();
+await page.waitForTimeout(300);
+const pressedClock = await page.evaluate(() => document.querySelector("#clock").textContent.trim());
+console.log("  按下 → " + pressedClock);
+if (pressedClock === baseClock) errors.push("时间轴按下后游标未移动（点击制失效）");
+await page.screenshot({ path: join(SHOTS, "04b-timeline-clickseek.png") });
+
 /* ---------------- 5. 视图与模式 ---------------- */
 step(5, "视图切换 / 差值模式 / 指标全选");
 await page.click('#modeSeg button[data-mode="diff"]');

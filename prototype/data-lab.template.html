@@ -85,6 +85,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 .tl .cl{position:absolute;top:0;bottom:8px;width:1px;background:var(--ink);pointer-events:none;z-index:5}
 .tl .cl::after{content:"";position:absolute;top:-3px;left:-3.5px;width:8px;height:8px;border-radius:50%;
                background:#fff;border:2px solid var(--ink)}
+.tl .tl-peek{position:absolute;top:2px;bottom:2px;width:0;border-left:1px dashed var(--line3);pointer-events:none;opacity:0;transition:opacity .12s}
+.tl .tl-peek.on{opacity:1}
+.tl .tl-peek::after{content:attr(data-t);position:absolute;top:1px;left:6px;font-family:var(--mono);font-size:9.5px;
+                    color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0 4px;white-space:nowrap}
+.tl.scrubbing .cl{width:2px;background:var(--accent)}
 .tllegend{display:flex;gap:14px;padding:0 14px 10px;font-size:11px;color:var(--ink3);flex-wrap:wrap}
 .tllegend i{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:-1px;margin-right:5px}
 
@@ -264,7 +269,7 @@ body:not(.boview) .v-bo{display:none}
       <span class="lab">时间轴</span>
       <span class="clock" id="clock"></span>
       <div class="spacer" style="flex:1"></div>
-      <span class="lab" style="color:var(--ink4);font-weight:400">在任意图表或本条时间轴上移动鼠标即可同步全部视图</span>
+      <span class="lab" style="color:var(--ink4);font-weight:400">图表上移动鼠标即可同步全部视图 · 时间轴为点击定位，按住拖动可微调</span>
     </div>
     <div class="tl" id="tl">
       <svg id="tlsvg"></svg>
@@ -899,10 +904,22 @@ $('#btnCsv').onclick = exportCsv;
     S.t = clamp((e.clientX - rect.left - 14) / (rect.width - 28), 0, 1) * rep().duration;
     scheduleSync();
   };
-  tl.addEventListener('pointerdown', e => { drag = true; try { tl.setPointerCapture(e.pointerId); } catch (_) {} seek(e); });
-  tl.addEventListener('pointermove', e => seek(e));
-  tl.addEventListener('pointerup', () => { drag = false; });
-  tl.addEventListener('pointerleave', () => { drag = false; });
+  // ⚠️ 时间轴是「点击 / 拖动」制：悬停只显示预览浮标、不得移动游标（防误触）。
+  // 图表仍保持悬停扫描 —— 两者职责不同，不要「顺手统一」。
+  const peek = document.createElement('div');
+  peek.className = 'tl-peek';
+  tl.appendChild(peek);
+  const hoverPeek = e => {
+    const rect = tl.getBoundingClientRect();
+    const x = clamp(e.clientX - rect.left, 14, rect.width - 14);
+    peek.style.left = x + 'px';
+    peek.dataset.t = mmss(clamp((x - 14) / (rect.width - 28), 0, 1) * rep().duration);
+    peek.classList.add('on');
+  };
+  tl.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = true; try { tl.setPointerCapture(e.pointerId); } catch (_) {} tl.classList.add('scrubbing'); seek(e); });
+  tl.addEventListener('pointermove', e => { if (drag) seek(e); else hoverPeek(e); });
+  tl.addEventListener('pointerup', () => { drag = false; tl.classList.remove('scrubbing'); });
+  tl.addEventListener('pointerleave', () => { drag = false; tl.classList.remove('scrubbing'); peek.classList.remove('on'); });
   window.addEventListener('keydown', e => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();

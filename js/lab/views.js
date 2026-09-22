@@ -557,10 +557,22 @@ $('#btnCsv').onclick = exportCsv;
     S.t = clamp((e.clientX - rect.left - 14) / (rect.width - 28), 0, 1) * rep().duration;
     scheduleSync();
   };
-  tl.addEventListener('pointerdown', e => { drag = true; try { tl.setPointerCapture(e.pointerId); } catch (_) {} seek(e); });
-  tl.addEventListener('pointermove', e => seek(e));
-  tl.addEventListener('pointerup', () => { drag = false; });
-  tl.addEventListener('pointerleave', () => { drag = false; });
+  // ⚠️ 时间轴是「点击 / 拖动」制：悬停只显示预览浮标、不得移动游标（防误触）。
+  // 图表仍保持悬停扫描 —— 两者职责不同，不要「顺手统一」。
+  const peek = document.createElement('div');
+  peek.className = 'tl-peek';
+  tl.appendChild(peek);
+  const hoverPeek = e => {
+    const rect = tl.getBoundingClientRect();
+    const x = clamp(e.clientX - rect.left, 14, rect.width - 14);
+    peek.style.left = x + 'px';
+    peek.dataset.t = mmss(clamp((x - 14) / (rect.width - 28), 0, 1) * rep().duration);
+    peek.classList.add('on');
+  };
+  tl.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = true; try { tl.setPointerCapture(e.pointerId); } catch (_) {} tl.classList.add('scrubbing'); seek(e); });
+  tl.addEventListener('pointermove', e => { if (drag) seek(e); else hoverPeek(e); });
+  tl.addEventListener('pointerup', () => { drag = false; tl.classList.remove('scrubbing'); });
+  tl.addEventListener('pointerleave', () => { drag = false; tl.classList.remove('scrubbing'); peek.classList.remove('on'); });
   window.addEventListener('keydown', e => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
