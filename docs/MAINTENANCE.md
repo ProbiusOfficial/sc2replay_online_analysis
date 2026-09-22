@@ -95,7 +95,10 @@ python -m http.server 8080
 - 改单位/建筑时长表 → `scripts/gen-build-times.py` → `js/worker/decoder/data/build_times.generated.ts`
 - 改技能连线（星空加速等）→ `scripts/gen-ability-links.py` → `data/ability_links.generated.ts`
 - 改主线程解析时序 / Worker 契约 → `js/parse_client.js` + `js/worker/contract.ts`
-- 改单位译名 → `data.json`（会影响建造顺序的分类判定，改完跑一次 `verify-lab-page.mjs`）
+- 改单位译名 → `data.json`（会影响建造顺序的分类判定，改完跑一次 `verify-lab-page.mjs`；
+  跑 `node scripts/research/probe-unit-name-coverage.mjs` 可核对全部样本的建造项是否都有译名与分类。
+  ⚠️ 解析层若在单位名里拼入错误标注（如 spawningtool 的 `(Error on build time)`），
+  `js/lab/data.js` 的 `cleanUnitName()` 会在查表与显示前剥掉它 —— 名表里永远不该出现带标注的键）
 
 ## 数据流（简图）
 

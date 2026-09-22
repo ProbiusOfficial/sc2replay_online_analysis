@@ -24,6 +24,22 @@
       "zh": "幽灵",
       "time": 29
     },
+    "GhostAlternate": {
+      "zh": "幽灵",
+      "time": 29
+    },
+    "Nuke": {
+      "zh": "核弹",
+      "time": 0
+    },
+    "LurkerMP": {
+      "zh": "潜伏虫",
+      "time": 24
+    },
+    "LurkerMPEgg": {
+      "zh": "潜伏虫茧",
+      "time": 24
+    },
     "Hellion": {
       "zh": "火车",
       "time": 21
@@ -249,7 +265,7 @@
       "time": 24
     },
     "Lurker": {
-      "zh": "刺蛇",
+      "zh": "潜伏虫",
       "time": 24
     },
     "LurkerEgg":{
@@ -464,6 +480,18 @@
     },
     "ChitinousPlating": {
       "zh": "牛甲",
+      "time": 79
+    },
+    "RavenCorvidReactor": {
+      "zh": "渡鸦反应堆",
+      "time": 79
+    },
+    "NeosteelFrame": {
+      "zh": "新钢框架",
+      "time": 100
+    },
+    "CycloneRapidFireLaunchers": {
+      "zh": "快速发射器",
       "time": 79
     },
     "AnabolicSynthesis": {

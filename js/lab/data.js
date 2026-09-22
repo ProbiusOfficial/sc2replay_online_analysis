@@ -87,6 +87,15 @@ const RACE_FULL = { T: "Terran", Z: "Zerg", P: "Protoss", R: "Random" };
  */
 const MORPH_NOISE = /(Lowered|Flying|Uprooted|Phased|Burrowed|Cocoon|LiberatorAG|VikingAssault|SiegeMode|AssaultMode)/;
 
+/**
+ * 剥掉旧链路（spawningtool）在 build-time 表缺项时拼进单位名的错误标注，
+ * 如 `GhostAlternate (Error on build time)`、`Frenzy (upgrade missing)`。
+ * 这是解析层的内部状态，不属于单位名 —— 不剥掉会既查不到译名，
+ * 又把报错文本原样显示给用户。
+ */
+const WERROR_NOISE = /\s*\((?:Error on build time|upgrade missing)\)\s*$/i;
+const cleanUnitName = (u) => String(u ?? "").replace(WERROR_NOISE, "");
+
 const r1 = (n) => Math.round(n * 10) / 10;
 
 /* ==========================================================================
@@ -125,7 +134,7 @@ function hasIn(table, name) {
  */
 export function classifyBuildItem(it) {
   if (it._kind === "recall") return "recall";
-  const u = it.unit || "";
+  const u = cleanUnitName(it.unit);
   if (MORPH_NOISE.test(u)) return "morph";
   if (it.is_worker) return "worker";
   if (hasIn("upgrade", u)) return "upgrade";
@@ -210,13 +219,16 @@ function toLabReplay(file, d) {
     }
 
     const buildOrder = (p.build_order ?? [])
-      .map((it) => ({
-        t: Math.max(0, it.start_time ?? 0),
-        supply: it.supply ?? null,
-        unit: it.unit || "",
-        zh: it._kind === "recall" ? "星空加速" : (zhIndex.get(String(it.unit).toLowerCase()) ?? it.unit ?? ""),
-        kind: classifyBuildItem(it),
-      }))
+      .map((it) => {
+        const unit = cleanUnitName(it.unit);
+        return {
+          t: Math.max(0, it.start_time ?? 0),
+          supply: it.supply ?? null,
+          unit,
+          zh: it._kind === "recall" ? "星空加速" : (zhIndex.get(unit.toLowerCase()) ?? unit),
+          kind: classifyBuildItem(it),
+        };
+      })
       .filter((it) => it.kind !== "morph")
       .sort((x, y) => x.t - y.t || (x.supply ?? 0) - (y.supply ?? 0));
 
