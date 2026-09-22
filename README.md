@@ -79,7 +79,9 @@ python -m http.server 8080
   单份解析失败不会影响其余，失败原因在错误条里逐条列出。
 - **无视版本**：只要数据完好就能看（含 2018 年的 HotS 老录像）。
 
-![我就说很有用吧.jpg](./assets/image-20260310011545460.png)
+![录像数据分析台 · 数据分析视图](./assets/screenshot-data.png)
+
+![录像数据分析台 · 建造顺序视图](./assets/screenshot-build-order.png)
 
 ---
 
@@ -110,7 +112,7 @@ python -m http.server 8080
 
 ### 许可证与致谢
 
-- 感谢全科普鲁星区最温柔善良可靠的贝妮小姐w！
+- 感谢 贝妮小姐
 - 致谢 https://github.com/wayne19980/sc2build-tts ，感谢 @wayne19980 老师
 
 

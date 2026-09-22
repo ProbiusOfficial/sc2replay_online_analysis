@@ -381,22 +381,22 @@ const M = [
   P('mProgArmy','支出','军队 · 建造中','Minerals Used In Progress Army',(p,i)=>p.series.mProgArmy[i]),
   P('spendTotal','支出','支出合计','Economy + Tech + Army',
     (p,i)=>p.series.mUsedEco[i]+p.series.mUsedTech[i]+p.series.mUsedArmy[i]),
-  P('gasSpend','支出','气体支出','Vespene Used (all)',
+  P('gasSpend','支出','气体支出','Vespene Used',
     (p,i)=>p.series.vUsedEco[i]+p.series.vUsedTech[i]+p.series.vUsedArmy[i]),
 
-  P('armyValue','军事','军队价值','Army Value (min + gas)',
+  P('armyValue','军事','军队价值','Army Value',
     (p,i)=>p.series.mUsedArmy[i]+p.series.vUsedArmy[i], { main:1 }),
   P('mActive','军事','活跃部队','Minerals Used Active Forces',(p,i)=>p.series.mActive[i]),
 
   P('lostArmy','战损','军队损失','Minerals Lost Army',(p,i)=>p.series.mLostArmy[i]),
   P('lostEco','战损','经济损失','Minerals Lost Economy',(p,i)=>p.series.mLostEco[i]),
   P('lostTech','战损','科技损失','Minerals Lost Technology',(p,i)=>p.series.mLostTech[i]),
-  P('lostTotal','战损','总损失','All Lost (minerals)',
+  P('lostTotal','战损','总损失','All Lost',
     (p,i)=>p.series.mLostEco[i]+p.series.mLostTech[i]+p.series.mLostArmy[i]),
   P('killArmy','战果','击杀军队','Minerals Killed Army',(p,i)=>p.series.mKillArmy[i]),
   P('killEco','战果','击杀经济','Minerals Killed Economy',(p,i)=>p.series.mKillEco[i]),
   P('killTech','战果','击杀科技','Minerals Killed Technology',(p,i)=>p.series.mKillTech[i]),
-  P('killTotal','战果','总战果','All Killed (minerals)',
+  P('killTotal','战果','总战果','All Killed',
     (p,i)=>p.series.mKillEco[i]+p.series.mKillTech[i]+p.series.mKillArmy[i]),
 
   P('ffEco','自伤','经济自伤','Minerals Friendly Fire Economy',(p,i)=>p.series.mFfEco[i]),
@@ -572,7 +572,7 @@ function renderTimeline(){
   merged.forEach(e => {
     const d = el('div', 'ev' + (e.kind === 'battle' ? ' battle' : ''));
     d.style.left = (e.t / D * 100) + '%';
-    d.title = `${e.kind === 'battle' ? '交战' : '工人损失'} @ ${mmss(e.t)}（${e.who === 'a' ? a.name : b.name} 侧）`;
+    d.title = `${e.kind === 'battle' ? '交战' : '工人损失'} @ ${mmss(e.t)} · ${e.who === 'a' ? a.name : b.name}`;
     lay.appendChild(d);
   });
 
@@ -580,8 +580,8 @@ function renderTimeline(){
     `<span><i style="background:${COL.a}"></i>${esc(a.name)} 军队价值领先</span>`,
     `<span><i style="background:${COL.b}"></i>${esc(b.name)} 军队价值领先</span>`,
     `<span><i style="background:var(--warn);width:2px;height:10px;border-radius:1px"></i>工人数单步损失 ≥ 3</span>`,
-    `<span><i style="background:${COL.a};width:2px;height:10px;border-radius:1px;opacity:.6"></i>军队价值单步跌幅超峰值 5%（交战）</span>`,
-    `<span style="color:var(--ink4)">中线上下两片 = 双方军队价值差的镜像包络</span>`,
+    `<span><i style="background:${COL.a};width:2px;height:10px;border-radius:1px;opacity:.6"></i>交战标记 · 军队价值单步跌幅超峰值 5%</span>`,
+    `<span style="color:var(--ink4)">中线上下两部分为双方军队价值差的镜像</span>`,
   ].join('');
 }
 
@@ -611,7 +611,7 @@ function renderReadouts(){
    ========================================================================== */
 function renderSide(){
   const host = $('#side'); host.innerHTML = '';
-  host.appendChild(el('h3', null, '指标（官方 overlay 口径）'));
+  host.appendChild(el('h3', null, '指标'));
   GROUPS.forEach(g => {
     const items = M.filter(m => m.g === g);
     const on = items.filter(m => S.on.has(m.id)).length;
@@ -1103,7 +1103,7 @@ function renderVoiceUi(){
     rows.push(`<div class="qs ${cls}"><span class="t">${mmss(V.steps[k].t)}</span><span>${esc(V.steps[k].text)}</span></div>`);
   }
   $('#vbQueue').innerHTML = rows.join('')
-    || `<div class="qs dim"><span>无可播报项 —— 请到「建造顺序」页勾选类别（当前 ${V.steps.length} 项）</span></div>`;
+    || `<div class="qs dim"><span>无可播报项 —— 请到「建造顺序」页勾选类别，当前 ${V.steps.length} 项</span></div>`;
   $('#vbProg').style.width = (clamp(S.t / (rep().duration || 1), 0, 1) * 100).toFixed(2) + '%';
   renderPip();
 }
@@ -1126,20 +1126,20 @@ function ovSet(state, text){
 /** 探测本地悬浮组件。Chrome 142+ 对「公网页面 → 环回地址」要求 LNA 授权， */
 /** 因此必须显式声明 targetAddressSpace:'local'，否则请求会静默失败。            */
 async function ovProbe(timeoutMs = 1500){
-  ovSet('wait', `正在探测 127.0.0.1:${OV_PORT} …`);
+  ovSet('wait', '正在探测本地悬浮组件…');
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const res = await fetch(OV_ORIGIN + '/health', { signal: ac.signal, targetAddressSpace: 'local' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const info = await res.json();
-    ovSet('ok', `已连接：${info.name || 'overlay-agent'} v${info.version || '?'}（外置置顶窗口）`);
+    ovSet('ok', `已连接本地悬浮组件 ${info.name || 'overlay-agent'} v${info.version || '?'}`);
     return true;
   } catch (err) {
     const denied = err?.name === 'NotAllowedError';
     ovSet('bad', denied
       ? '本地网络访问被拒绝 —— 请在地址栏权限提示里允许访问本地网络后重试'
-      : `未检测到本地悬浮组件（${OV_PORT} 端口无响应）`);
+      : '未检测到本地悬浮组件');
     return false;
   } finally { clearTimeout(timer); }
 }
@@ -1176,7 +1176,7 @@ function renderPip(){
 
 async function openPip(){
   if (pipWin) { try { pipWin.close(); } catch (_) {} pipWin = null; ovSet(ovState, ovTextLast); return; }
-  if (!('documentPictureInPicture' in window)) { alert('当前浏览器不支持 Document 画中画。'); return; }
+  if (!('documentPictureInPicture' in window)) { alert('当前浏览器不支持画中画。'); return; }
   try {
     // ⚠️ Document PiP 的窗口 UI 是**规范强制**的，去不掉：
     //   WICG spec §3.2.2 Origin Visibility —— "required that the user agent makes it clear
@@ -1206,7 +1206,7 @@ async function openPip(){
     doc.getElementById('pipBody').id = 'pipBody';
     pipWin.addEventListener('pagehide', () => { pipWin = null; }, { once: true });
     renderPip();
-    ovSet('wait', '已降级为浏览器内 Document 画中画（非置顶透明窗口）');
+    ovSet('wait', '已降级为浏览器内画中画窗口');
   } catch (err) {
     pipWin = null;
     ovSet('bad', '画中画打开失败：' + (err?.message || err));

@@ -31,10 +31,10 @@
   <!-- ============ 运行态：初始化 / 错误 / 拖放 / 解析中 ============ -->
   <div class="init-status" id="initStatus">
     <div class="spinner"></div>
-    <p>正在加载解析内核（WASM）…</p>
+    <p>正在加载解析内核…</p>
     <p class="progress" id="initProgress">初始化中</p>
-    <p class="hint" style="margin-top:14px;font-size:11.5px;color:var(--ink4)">
-      请勿直接双击打开本文件，需通过 HTTP 服务访问（<code>python3 -m http.server 8080</code>）
+    <p class="hint" id="localHint" style="margin-top:14px;font-size:11.5px;color:var(--ink4);display:none">
+      本地部署需通过 HTTP 服务访问本页，例如执行 python3 -m http.server 8080
     </p>
   </div>
 
@@ -113,8 +113,7 @@
             解放者空对地 / 维京突击模式 …）已过滤，它们不是新建造。
             <br><b>时间口径</b> —— <code>build_order.start_time</code> 的单位是
             <b>Normal 基准游戏秒（gameLoop / 16）</b>，而时间轴按录像自己的帧率常量换算，
-            两者可能不是 1:1。因此列表时间以「完整建造项的起点」为准，
-            若发现整体偏移请以时间轴游标为准并反馈。
+            两者可能不是 1:1。因此列表时间以完整建造项的起点为准；若发现整体偏移，以时间轴游标为准。
           </div>
         </div>
       </div>
@@ -185,7 +184,7 @@
 <!-- 页脚自己承担底部留白（padding-bottom = --vbh + 24px）：
      它是文档最后一个元素，只有它能挡住固定在下方的播报条 -->
 <footer class="pagefoot">
-  By 探姬#51276（国服喵）·
+  By 探姬#51276 ·
   <a href="https://space.bilibili.com/27109929" target="_blank" rel="noopener noreferrer">探姬_Official</a>
   · 反馈交流群 <code>425641107</code>
   · <a href="https://qm.qq.com/q/H03okJE0oA" target="_blank" rel="noopener noreferrer">点击加群</a>

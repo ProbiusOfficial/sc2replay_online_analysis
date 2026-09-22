@@ -210,7 +210,7 @@ async function parseAndMount(files) {
   if (allFailed.length) {
     setError(
       `${allFailed.length} 份录像没能加载`,
-      allFailed.map((x) => `${x.file}：${x.error}`).join("；") + "（其余录像已正常显示）",
+      allFailed.map((x) => `${x.file}：${x.error}`).join("；") + "。其余录像已正常显示",
     );
   }
 
@@ -294,6 +294,12 @@ async function boot() {
   setError(null);
   bindFileInput();
   trackBottomBarHeight();
+
+  // 本地部署提示只在 file:// 打开时出现；经 HTTP 访问的用户不应看到开发期提示
+  if (location.protocol === "file:") {
+    const hint = $("#localHint");
+    if (hint) hint.style.display = "";
+  }
 
   // 译名表与解析内核并行加载：译名表失败不阻塞分析（只是建造顺序显示英文原名）
   loadTranslationData();
