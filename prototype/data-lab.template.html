@@ -1017,7 +1017,7 @@ function renderBo(){
         buf.push(`<div class="borow k-${it.kind}" data-i="${i}" data-t="${it.t}">
           <span class="tm">${mmss(it.t)}</span>
           <span class="sp2">${it.supply == null ? '—' : it.supply}</span>
-          <i class="gly">${BO_GLYPH[it.kind]}</i>
+          <i class="gly">${it.icon ? `<img class="glyimg" src="assets/units/${it.icon}.webp" alt="">` : BO_GLYPH[it.kind]}</i>
           <span class="nm">${esc(boShowEn ? (it.unit || zh) : zh)}${boShowEn ? '' : en}</span>
         </div>`);
       });

@@ -27,6 +27,8 @@
  */
 
 import { appState } from "../state.js";
+import { BUILD_TIMES } from "../worker/decoder/data/build_times.generated.js";
+import { iconKey, hasIcon, upgradeIconKey, hasUpgradeIcon } from "./unit_icons.js";
 
 /** 39 个计分字段的短名。**必须与原型 `build-datalab.mjs` 的 `FIELD_MAP` 完全一致。** */
 export const FIELD_MAP = {
@@ -233,15 +235,21 @@ function toLabReplay(file, d) {
       series[short] = fillToGrid(values, own, grid);
     }
 
+    // `icon`：命中图标集的单位/科技给文件名（视图层直接 <img>），没有的回退类别字符。
+    const iconOf = (kind, unit) =>
+      kind === "upgrade" ? (hasUpgradeIcon(unit) ? upgradeIconKey(unit) : null)
+                         : (hasIcon(unit) ? iconKey(unit) : null);
     const buildOrder = (p.build_order ?? [])
       .map((it) => {
         const unit = cleanUnitName(it.unit);
+        const kind = classifyBuildItem(it);
         return {
           t: Math.max(0, (it.start_time ?? 0) * gameSecFactor),
           supply: it.supply ?? null,
           unit,
           zh: it._kind === "recall" ? "星空加速" : (zhIndex.get(unit.toLowerCase()) ?? unit),
-          kind: classifyBuildItem(it),
+          kind,
+          icon: kind === "recall" ? null : iconOf(kind, unit),
         };
       })
       .filter((it) => it.kind !== "morph")
@@ -287,6 +295,38 @@ function toLabReplay(file, d) {
     playerCount: raw.length,
     sampleCount: grid.length,
     sampleIntervalSec: medianStep(grid),
+    /**
+     * 沙盘模拟数据（`ReplayData.sandbox` 原样透传）。
+     * 时间基准与 `game_length` / 统计网格相同（gameloop / 常量集 fps），
+     * 因此沙盘可以直接用本模型的 `duration` 与全局游标，不需要再换算。
+     * 形状：`{ units:[{n,p,b,x,y,d,dx,dy,done,chg,pos? }], minX, minY, maxX, maxY }`。
+     */
+    sandbox: d.sandbox ?? null,
+    /**
+     * 科技升级时间线（`ReplayData.upgrades` + `zh` 中文名 + `dur` 研究时长实秒）。
+     * `dur` 优先取 worker 的 `BUILD_TIMES[name].loops`（精确研究帧数 ÷16 = 16fps 游戏秒，
+     * 实测 PersonalCloaking：完成 20943 − 1926.4 = 19016.6 ≈ 原站下令帧 19017），
+     * 缺项回落 data.json 升级表的 `time`。用于沙盘 HUD 的「研究中的科技」进度条：
+     * 原始事件只有完成时刻，进行中区间 = [完成−时长, 完成)。
+     * 含 `Spray / RewardDance / GameHeartActive` 等噪声行 —— 由沙盘 HUD 过滤展示。
+     */
+    upgrades: (d.upgrades ?? []).map((u) => {
+      const name = String(u.name ?? "");
+      const tr = appState.translationData?.upgrade ?? {};
+      const rec = tr[name] ?? tr[name.toLowerCase()] ?? null;
+      const loops = BUILD_TIMES[name] && BUILD_TIMES[name].type === "Upgrade" ? BUILD_TIMES[name].loops : null;
+      const dur16 = loops ?? (rec && typeof rec.time === "number" ? rec.time : null);
+      return {
+        p: u.pid,
+        n: u.name,
+        t: u.time,
+        count: u.count ?? 1,
+        zh: zhIndex.get(name.toLowerCase()) ?? u.name,
+        dur: dur16 != null ? Math.max(1, dur16 * gameSecFactor) : null,
+      };
+    }),
+    /** 逐秒 APM/EPM 桶 + 镜头轨迹（`ReplayData.tracks` 原样透传）。 */
+    tracks: d.tracks ?? { commands: {}, cameras: [] },
     /**
      * 对齐信息，全部如实暴露，不藏：
      * - `gridPoints` 并集网格点数

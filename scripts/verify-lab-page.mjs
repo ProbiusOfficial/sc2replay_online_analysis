@@ -41,6 +41,7 @@ await page.goto(BASE, { waitUntil: "load" });
 const REQUIRED_IDS = [
   "viewSeg", "modeSeg", "btnCsv", "samples", "head", "clock", "tl", "tlsvg", "evlay", "tlcl",
   "tllegend", "readouts", "side", "charts", "boFilter", "bo", "boView", "tblInfo", "tblSeg", "tbl",
+  "sandboxView", "sbStage", "sbCanvas", "sbPlay", "sbSpeed", "sbWorkers", "sbLegend", "sbPanelA", "sbPanelB", "sbRes", "sbIso", "sbHudOpts",
   "vb", "vbClock", "vbQueue", "vbProg", "vbPlay", "vbReset", "vbWho", "vbSpeed", "vbRate", "vbLang",
   "ovDot", "ovTxt", "ovBtn", "initStatus", "initProgress", "dropZone", "fileInput", "loading",
   "loadingText", "error", "result", "pickMore", "railNote",
@@ -313,6 +314,7 @@ await page.waitForTimeout(200);
 const bo = await page.evaluate(() => ({
   rowsA: document.querySelectorAll("#bo .bocol.pa .borow").length,
   rowsB: document.querySelectorAll("#bo .bocol.pb .borow").length,
+  icons: document.querySelectorAll("#bo .borow .gly img").length,
   filters: document.querySelector("#boFilter").innerText.replace(/\n/g, " "),
   firstRow: document.querySelector("#bo .bocol.pa .borow")?.innerText.replace(/\n/g, " | "),
   stat: document.querySelector("#bo .bostat")?.textContent,
@@ -320,6 +322,7 @@ const bo = await page.evaluate(() => ({
 console.log("  " + JSON.stringify(bo));
 if (bo.rowsA + bo.rowsB === 0) errors.push("建造顺序两侧都没有行");
 if (!bo.stat) errors.push("建造顺序列表缺少统计行");
+if (bo.icons < 50) errors.push(`建造顺序图标数量异常: ${bo.icons} < 50`);
 await page.screenshot({ path: join(SHOTS, "03-build-order.png") });
 
 const boRows = bo.rowsA;

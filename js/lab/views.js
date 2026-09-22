@@ -1,7 +1,7 @@
 /* ============================================================================
    录像数据分析台 · 视图层
    ⚠️ 本文件由 scripts/extract-lab-views.mjs 从 prototype/data-lab.template.html
-      的内联 <script> **逐字节提取**，只做了 4 处有断言保护的定点替换（见该脚本头部）。
+      的内联 <script> **逐字节提取**，只做了 5 处有断言保护的定点替换（见该脚本头部）。
       它是一份自洽的模块：不 import 任何东西，所有渲染/交互/语音/悬浮探测都在这一层。
 
    为什么是一个文件：这段代码已经过 3 轮真实 Chromium 渲染验收，提取能保证零偏差。
@@ -653,7 +653,7 @@ function renderBo(){
         buf.push(`<div class="borow k-${it.kind}" data-i="${i}" data-t="${it.t}">
           <span class="tm">${mmss(it.t)}</span>
           <span class="sp2">${it.supply == null ? '—' : it.supply}</span>
-          <i class="gly">${BO_GLYPH[it.kind]}</i>
+          <i class="gly">${it.icon ? `<img class="glyimg" src="assets/units/${it.icon}.webp" alt="">` : BO_GLYPH[it.kind]}</i>
           <span class="nm">${esc(boShowEn ? (it.unit || zh) : zh)}${boShowEn ? '' : en}</span>
         </div>`);
       });
@@ -1039,4 +1039,13 @@ export const labState = S;
 export const voiceState = V;
 /** 强制重绘（改过 labState 后调用）。 */
 export function redraw(){ renderAll(); }
+
+/**
+ * 沙盘视图驱动的全局游标入口（唯一被 `js/lab/sandbox.js` 调用的写入口）。
+ * `scheduleSync()` 自带 rAF 节流，沙盘按 60fps 推进也不会造成重绘风暴。
+ */
+export function sandboxSeek(t){
+  S.t = clamp(t, 0, rep().duration);
+  scheduleSync();
+}
 

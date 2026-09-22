@@ -19,7 +19,8 @@
  *   "start_time": 1772479397,         // details.m_timeUTC − real_length（见 startTimeSeconds）
  *   "winner": "Shameless",            // 胜方玩家名；多队用 " / " 拼
  *   "teams": [{ "players": [ ... ] }],
- *   "chat": [{ "time", "player", "pid", "target", "text" }]
+ *   "chat": [{ "time", "player", "pid", "target", "text" }],
+ *   "sandbox": { "units": [...], "minX", "minY", "maxX", "maxY" }
  * }
  * ```
  *
@@ -29,6 +30,7 @@
  * | ---- | ---- | ---- |
  * | `build_order[].start_time`、`worker_deaths[].time`、`chat[].time` | **16 fps** | `frame >> 4` |
  * | `game_length`、`stats[].minute`、`workers_curve[].t` | **fps 由常量集决定**（22.4 / 16） | `frame / fps` |
+ * | `sandbox.units[]` 的 `b / d / done / chg[][0] / pos[]` | **同上（常量集 fps）** | `frame / fps` |
  *
  * 前者沿用 sc2reader 的 `Event.second = frame >> 4`；后者沿用 spawningtool 的
  * `FRAMES_PER_SECOND`（`lotv_constants` = 22.4、`hots_constants` / `coop_constants` = 16）。
@@ -411,6 +413,154 @@ function buildUnitObjects(trackerEvents) {
     return objects;
 }
 // ---------------------------------------------------------------------------
+// 沙盘单位时间线
+// ---------------------------------------------------------------------------
+/**
+ * 中立单位的保留判据：保留**地图锚点**（矿 / 气泉 / Xel'Naga 塔 / 可破坏物）。
+ * 其余中立单位（野怪 CarrionBird、ForceField、LabBot 之类）对沙盘是噪声，丢弃。
+ * 开局 1 秒内的中立单位无条件保留（出生点 / 矿线一定在里面）。
+ */
+const SANDBOX_NEUTRAL_KEEP = /MineralField|Geyser|XelNagaTower|Destructible|Collapsible/;
+/** 开局多少 gameloop 内的中立单位无条件保留。 */
+const SANDBOX_NEUTRAL_START_LOOPS = 16;
+/**
+ * 从 tracker 流重建沙盘单位时间线。
+ *
+ * 与 `buildUnitObjects` 的关键差异：那里只查「名字 / 归属」，这里还要**位置与生死**，
+ * 所以必须维护「unitTagIndex → 活着的单位」活动表 —— `SUnitPositionsEvent` 只带
+ * tag 的 index 部分（没有 recycle），死亡即从活动表摘除，index 复用自然落到新单位。
+ *
+ * 实测对拍结论（`scripts/research/probe-sandbox-poc.mjs`，5 样本 × 含 2018 build 62848）：
+ * 位置事件不包含任何静态单位（矿 / 不可移动建筑 0 命中），映射到的移动轨迹全部合理
+ * （侦察 Probe 走位、凤凰骚扰、军队聚群、同单位相邻采样速度连续）。
+ */
+function buildSandbox(trackerEvents, fps) {
+    const toSec = (loop) => Math.round((loop / Math.max(fps, 1)) * 10) / 10;
+    const units = new Map();
+    const order = [];
+    const byIndex = new Map();
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const trackPoint = (x, y) => {
+        if (x < minX)
+            minX = x;
+        if (y < minY)
+            minY = y;
+        if (x > maxX)
+            maxX = x;
+        if (y > maxY)
+            maxY = y;
+    };
+    for (const event of trackerEvents) {
+        const name = event._event;
+        const loop = num(event._gameloop, 0);
+        if (name.endsWith("SUnitBornEvent") || name.endsWith("SUnitInitEvent")) {
+            const key = tagKey(event.m_unitTagIndex, event.m_unitTagRecycle);
+            if (units.has(key))
+                continue; // 与 buildUnitObjects 同一防重判据
+            const x = num(event.m_x, 0) * 4;
+            const y = num(event.m_y, 0) * 4;
+            const unit = {
+                index: num(event.m_unitTagIndex, -1),
+                n: text(event.m_unitTypeName),
+                p: num(event.m_upkeepPlayerId, 0),
+                bLoop: loop,
+                x,
+                y,
+                dLoop: null,
+                dx: null,
+                dy: null,
+                doneLoop: null,
+                chg: [],
+                pos: [],
+            };
+            units.set(key, unit);
+            order.push(unit);
+            byIndex.set(unit.index, unit);
+            trackPoint(x, y);
+            continue;
+        }
+        if (name.endsWith("SUnitTypeChangeEvent")) {
+            const unit = units.get(tagKey(event.m_unitTagIndex, event.m_unitTagRecycle));
+            if (unit)
+                unit.chg.push([loop, text(event.m_unitTypeName)]);
+            continue;
+        }
+        if (name.endsWith("SUnitOwnerChangeEvent")) {
+            const unit = units.get(tagKey(event.m_unitTagIndex, event.m_unitTagRecycle));
+            if (unit)
+                unit.p = num(event.m_upkeepPlayerId, 0);
+            continue;
+        }
+        if (name.endsWith("SUnitDoneEvent")) {
+            const unit = units.get(tagKey(event.m_unitTagIndex, event.m_unitTagRecycle));
+            if (unit && unit.doneLoop === null)
+                unit.doneLoop = loop;
+            continue;
+        }
+        if (name.endsWith("SUnitDiedEvent")) {
+            const key = tagKey(event.m_unitTagIndex, event.m_unitTagRecycle);
+            const unit = units.get(key);
+            if (unit) {
+                unit.dLoop = loop;
+                unit.dx = num(event.m_x, 0) * 4;
+                unit.dy = num(event.m_y, 0) * 4;
+                trackPoint(unit.dx, unit.dy);
+                if (byIndex.get(unit.index) === unit)
+                    byIndex.delete(unit.index);
+            }
+            continue;
+        }
+        if (name.endsWith("SUnitPositionsEvent")) {
+            const items = event.m_items;
+            if (!Array.isArray(items))
+                continue;
+            let index = num(event.m_firstUnitIndex, 0);
+            for (let i = 0; i + 2 < items.length; i += 3) {
+                index += num(items[i], 0);
+                const x = num(items[i + 1], 0) * 4;
+                const y = num(items[i + 2], 0) * 4;
+                const unit = byIndex.get(index);
+                if (!unit)
+                    continue; // 位置事件指向的单位必须仍活着，否则是映射错误，宁缺毋滥
+                unit.pos.push(toSec(loop), x, y);
+                trackPoint(x, y);
+            }
+            continue;
+        }
+    }
+    const outUnits = [];
+    for (const u of order) {
+        if (u.p === 0 && u.bLoop > SANDBOX_NEUTRAL_START_LOOPS && !SANDBOX_NEUTRAL_KEEP.test(u.n)) {
+            continue;
+        }
+        const rec = {
+            n: u.n,
+            p: u.p,
+            b: toSec(u.bLoop),
+            x: u.x,
+            y: u.y,
+            d: u.dLoop === null ? null : toSec(u.dLoop),
+            dx: u.dx,
+            dy: u.dy,
+            done: u.doneLoop === null ? null : toSec(u.doneLoop),
+            chg: u.chg.map(([loop2, n2]) => [toSec(loop2), n2]),
+        };
+        if (u.pos.length > 0)
+            rec.pos = u.pos;
+        outUnits.push(rec);
+    }
+    return {
+        units: outUnits,
+        minX: Number.isFinite(minX) ? minX : 0,
+        minY: Number.isFinite(minY) ? minY : 0,
+        maxX: Number.isFinite(maxX) ? maxX : 0,
+        maxY: Number.isFinite(maxY) ? maxY : 0,
+    };
+}
+// ---------------------------------------------------------------------------
 // 主流程
 // ---------------------------------------------------------------------------
 export async function extractReplayData(buffer, options = {}) {
@@ -493,6 +643,7 @@ export async function extractReplayData(buffer, options = {}) {
     // 39 字段的原始采样序列（列式）。与 statsRaw 刻意分开放，互不影响：
     // statsRaw 是「按分钟覆盖」，这里是「每个事件一个点、按到达顺序追加」。
     const statsSeries = new Map();
+    const upgrades = [];
     for (const event of tracker) {
         if (event._event.endsWith("SUnitDiedEvent")) {
             const key = tagKey(event.m_unitTagIndex, event.m_unitTagRecycle);
@@ -527,6 +678,17 @@ export async function extractReplayData(buffer, options = {}) {
                 workerKillsCum.set(killerPid, total);
                 upsert(killsByMinute, killerPid, minute, total);
             }
+            continue;
+        }
+        if (event._event.endsWith("SUpgradeEvent")) {
+            // 科技升级完成时间线（沙盘 HUD 的「科技」行）。时间与 game_length 同基准；
+            // `Spray*` / `RewardDance*` / `GameHeartActive` 这类噪声行原样保留，由展示端过滤。
+            upgrades.push({
+                pid: num(event.m_playerId, 0),
+                name: text(event.m_upgradeTypeName),
+                time: Math.round((event._gameloop / Math.max(fps, 1)) * 10) / 10,
+                count: num(event.m_count, 1),
+            });
             continue;
         }
         if (event._event.endsWith("SPlayerStatsEvent")) {
@@ -614,6 +776,64 @@ export async function extractReplayData(buffer, options = {}) {
             text: text(event.m_string),
         });
     }
+    // ---- 沙盘单位时间线（时间与 game_length 同基准：gameloop / fps）----
+    const sandbox = buildSandbox(tracker, fps);
+    // ---- APM/EPM 桶 + 镜头轨迹（走 game 事件流）----
+    // APM 口径对齐 starcraft2.ai（实测对拍）：`SCmdEvent`（下达指令）+
+    // `SCmdUpdate*`（目标更新，一条指令派生 1~3 条）都算「动作」——原站同局平均 APM 97
+    // = (SCmdEvent 1292 + SCmdUpdate 1518) / 29 分钟，逐位吻合。
+    // EPM 近似：同签名（事件名/能力/粗粒度目标）≤16 gameloop 的连点折叠为 1 次；
+    // 业界没有统一 EPM 定义，这是自洽近似，别当官方口径引用。
+    const commandSeries = {};
+    const cameras = [];
+    {
+        let lastSig = null;
+        let lastLoop = -1e9;
+        let lastPid = -1;
+        const bucket = (pid, kind, sec) => {
+            const key = String(pid);
+            commandSeries[key] ??= { apm: [], epm: [] };
+            const arr = commandSeries[key][kind];
+            while (arr.length <= sec)
+                arr.push(0);
+            return arr;
+        };
+        const isCmd = /NNet.Game.S(CmdEvent|CmdUpdateTargetPointEvent|CmdUpdateTargetUnitEvent|CmdUpdateDataEvent)$/;
+        for (const event of game) {
+            const uid = event._userid?.m_userId;
+            const pid = uid === null || uid === undefined ? 0 : num(userToPlayer.get(num(uid)), 0);
+            const loop = num(event._gameloop, 0);
+            const name = event._event;
+            if (name.endsWith("SCameraUpdateEvent")) {
+                const target = event.m_target ?? {};
+                if (target.x == null || target.y == null)
+                    continue;
+                cameras.push(pid, Math.round((loop / Math.max(fps, 1)) * 10) / 10, Math.round(num(target.x) / 64), // 实测世界单位 = 原始值 / 64（含 2018 老 build）
+                Math.round(num(target.y) / 64));
+                continue;
+            }
+            if (!isCmd.test(name))
+                continue;
+            const sec = Math.max(0, Math.floor(loop / Math.max(fps, 1)));
+            bucket(pid, "apm", sec)[sec] += 1;
+            // 签名：能力（SCmdEvent）/ 事件名 + 粗粒度目标（SCmdUpdate*，quantize ≈ 8 world units）
+            let sig;
+            const abil = event.m_abil ?? null;
+            if (abil)
+                sig = `a${num(abil.m_abilLink, 0)}:${num(abil.m_abilCmdIndex, 0)}`;
+            else {
+                const tgt = event.m_target ?? {};
+                const pt = (tgt.m_snapshotPoint ?? tgt);
+                sig = `${name.replace("NNet.Game.S", "")}:${Math.floor(num(pt.x) / 8192)}:${Math.floor(num(pt.y) / 8192)}:${num(tgt.m_tag, 0) % 997}`;
+            }
+            if (pid !== lastPid || sig !== lastSig || loop - lastLoop > 16) {
+                bucket(pid, "epm", sec)[sec] += 1;
+                lastSig = sig;
+                lastLoop = loop;
+                lastPid = pid;
+            }
+        }
+    }
     // ---- teams / winner ----
     const teamIds = [...new Set(players.map((p) => p.teamId).filter((t) => t !== null))].sort((a, b) => a - b);
     const teams = teamIds.map((teamId) => ({
@@ -641,6 +861,9 @@ export async function extractReplayData(buffer, options = {}) {
         winner: winners.length > 0 ? winners.join(" / ") : null,
         teams,
         chat,
+        sandbox,
+        upgrades,
+        tracks: { commands: commandSeries, cameras },
     };
 }
 /** 读一个必需的文件；缺失就抛错（`readFile` 找不到时为 null）。 */

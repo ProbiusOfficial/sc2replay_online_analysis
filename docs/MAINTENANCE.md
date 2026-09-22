@@ -32,6 +32,7 @@ python -m http.server 8080
 | **[js/lab/main.js](../js/lab/main.js)** | 编排层：文件输入 / 进度 / 错误 → 解析 → 适配 → 挂载；并挂 `window.__lab` 调试句柄 |
 | **[js/lab/data.js](../js/lab/data.js)** | **数据适配层**：`ReplayData` → 视图层形状。含 39 字段短名映射、建造项分类（查 `data.json` 名表）、**玩家时间网格对齐** |
 | **[js/lab/views.js](../js/lab/views.js)** | 视图层：全部渲染与交互（数据分析视图 / 建造顺序 / 语音播报 / 悬浮探测降级）。**由脚本提取，见下** |
+| **[js/lab/sandbox.js](../js/lab/sandbox.js)** | **沙盘模拟视图**（手写模块，非提取产物）：读 `ReplayData.sandbox` 在 canvas 上重演对局；经 `sandboxSeek()` 推进全局游标，与 views.js 刻意零侵入（见下） |
 | [js/state.js](../js/state.js) | 跨模块共享状态 `appState`（新页面只用它的 `translationData` 与 `parserReady`） |
 | [js/errors_init.js](../js/errors_init.js) | `loadTranslationData()`（读 `data.json`）、`setInitStatus()` |
 | [js/parse_client.js](../js/parse_client.js) | **主线程解析门面**：`initParser` / `parseReplayBufferToData` / `isParserReady` / `releaseParser` |
@@ -51,7 +52,8 @@ python -m http.server 8080
 ### `js/lab/views.js` 是**提取产物**，不是手写文件
 
 它由 `node scripts/extract-lab-views.mjs` 从 `prototype/data-lab.template.html` 的内联 `<script>`
-**逐字节提取**，只做 4 处**有断言保护**的定点替换（运行期注入数据、空数据守卫、去掉自动启动、追加对外接口）。
+**逐字节提取**，只做 5 处**有断言保护**的定点替换（运行期注入数据、空数据守卫、去掉自动启动、
+追加对外接口、追加 `sandboxSeek()`）。
 
 - **改视图层代码请改原型模板，再重跑提取脚本**。直接改 `views.js` 会在下次提取时被覆盖。
 - 提取脚本自带 8 条自检（无 import、DATA 注入、空守卫、顶层自动启动已移除、导出存在、无残留占位符…），
@@ -59,6 +61,21 @@ python -m http.server 8080
 - 这段代码已过 3 轮真实 Chromium 渲染验收；**后续重构方向**是把 `views.js` 按 section 拆成
   core / metrics / charts / timeline / readouts / table / buildorder / voice / overlay——
   拆完必须重跑 `prototype/shot-datalab.mjs` 与 `scripts/verify-lab-page.mjs`。
+
+### `js/lab/sandbox.js` 与 views.js 的边界（刻意零侵入）
+
+沙盘视图是**手写模块**，不改 views.js 的任何一行，靠三个接缝挂进页面：
+
+1. **读** `labState`（`S.ri` 当前样本 / `S.t` 全局游标）——沙盘每帧读它，天然跟随全局时间轴；
+2. **写** 走 `sandboxSeek()`（提取补丁 5 追加的导出，内部 `scheduleSync()` rAF 节流）——
+   沙盘播放按 60fps 推进游标也不会引发重绘风暴；
+3. **视图切换**：沙盘在 `#viewSeg` 上另挂一个 click 监听切 `body.sandboxview`（与 views.js 的
+   handler 共存），显隐由 lab.css 的 `body.sandboxview` 规则承担。
+
+数据链路：`ReplayData.sandbox`（worker 里已换算成与 `game_length` 同基准的秒）
+→ `js/lab/data.js` 原样透传 → `main.js` 把整份 replays 数组交给 `mountSandbox()`。
+验收：`node scripts/verify-sandbox-view.mjs`（真实 Chromium + 真实录像 + 截图）；
+调试句柄 `window.__sandbox.stats`（与 `window.__lab` 同一模式）。
 
 ### 已删除（2026-09-22 UI 重构）
 
@@ -71,7 +88,7 @@ python -m http.server 8080
 **怎么确认「确实没人用」**：跑 `node scripts/analyze-module-reachability.mjs`。
 它从 `index.html` 的入口脚本出发走完整 import 图，包含 `new Worker(...)` 与
 `new URL("...", import.meta.url)` 这类**字符串路径**的边 —— 后者最容易漏，漏了会把整个
-`js/worker/**` 误判成死代码。当前结果：**js/ 下 44 个模块全部可达，不可达 0**。
+`js/worker/**` 误判成死代码。当前结果：**js/ 下 45 个模块全部可达，不可达 0**。
 删模块前先跑它，别凭肉眼列清单。
 
 仍**保留**的是 [tools/baseline/parse_script.py](../tools/baseline/parse_script.py) ——
@@ -88,6 +105,12 @@ python -m http.server 8080
 - 改主页面渲染 / 交互 / 语音 / 悬浮 → `prototype/data-lab.template.html` → 重跑
   `node scripts/extract-lab-views.mjs`
 - 改数据形状 / 字段映射 / 建造项分类 / 玩家对齐 → `js/lab/data.js`
+- 改沙盘视图（绘制 / 播放 / 分类名表 / 图标归一化）→ `js/lab/sandbox.js`
+  （图标在 `assets/units/`，命名与 tracker 单位名一致，变体走 `iconKey()` 归一化，
+  缺图自动回退矢量点阵；素材版权归 Blizzard Entertainment、粉丝非商用。
+  验收：`node scripts/verify-sandbox-view.mjs`）
+- 改沙盘数据形状（单位记录 / 位置采样语义）→ `js/worker/decoder/replay_data.ts::buildSandbox`
+  （POC 与实测结论见 `scripts/research/probe-sandbox-poc.mjs` 与调研文档 §6.4 附注）
 - 改文件输入、进度、错误提示 → `js/lab/main.js`
 - 改解析字段/逻辑 → `js/worker/decoder/replay_data.ts`（再由 CI 转译）；若改了输出形状，**必须**重跑
   `node scripts/verify-replay-data.mjs`，必要时按下面「重建金标准」流程更新基准

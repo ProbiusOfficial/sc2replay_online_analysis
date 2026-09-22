@@ -14,6 +14,7 @@ import { loadTranslationData, setInitStatus } from "../errors_init.js";
 import { initParser, parseReplayBufferToData, isParserReady } from "../parse_client.js";
 import { toLabReplays, isTranslationReady } from "./data.js";
 import { mountLab, labState, voiceState, redraw } from "./views.js";
+import { initSandbox, mountSandbox } from "./sandbox.js";
 
 /**
  * 调试 / 验收句柄。
@@ -191,6 +192,7 @@ async function parseAndMount(files) {
   show($("#result"), true);
 
   const info = mountLab(replays);
+  mountSandbox(replays); // 沙盘视图吃同一份数据（其中 r.sandbox 由 data.js 透传）
   watchResultWidth();
 
   // 如实报告，不吞掉失败
@@ -294,6 +296,7 @@ async function boot() {
   setError(null);
   bindFileInput();
   trackBottomBarHeight();
+  initSandbox(); // 沙盘视图：绑控件 + 起主循环（无数据时空转，成本为零）
 
   // 本地部署提示只在 file:// 打开时出现；经 HTTP 访问的用户不应看到开发期提示
   if (location.protocol === "file:") {

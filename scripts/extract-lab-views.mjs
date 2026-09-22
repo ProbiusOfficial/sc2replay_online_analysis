@@ -2,12 +2,13 @@
 //
 // 为什么提取而不是手抄：那段代码已经过 3 轮真实 Chromium 渲染验收（含游标联动、
 // 建造顺序滚动、语音状态机、悬浮探测降级）。手抄 900 行必然引入察觉不到的偏差，
-// 而提取是逐字节等价的 —— 只做 4 处**有断言保护**的定点替换：
+// 而提取是逐字节等价的 —— 只做 5 处**有断言保护**的定点替换：
 //
 //   1. `const DATA = /*__DATA__*/null;`  → `let DATA = { replays: [] };`（改为运行期喂数据）
 //   2. `renderAll()` 开头加空数据守卫（原型永不为空，生产页面会先空后满）
 //   3. 去掉底部的自动启动 `renderAll(); ovProbe();`
-//   4. 追加对外接口 `mountLab() / focusReplay() / labState / voiceState`
+//   4. 追加对外接口 `mountLab() / focusReplay() / labState / voiceState / redraw()`
+//   5. 追加 `sandboxSeek()` —— 沙盘视图（js/lab/sandbox.js，非提取产物）推进全局游标的唯一入口
 //
 //   node scripts/extract-lab-views.mjs
 import { readFileSync, writeFileSync } from "node:fs";
@@ -106,13 +107,22 @@ export const labState = S;
 /** 只读的播报状态。 */
 export const voiceState = V;
 /** 强制重绘（改过 labState 后调用）。 */
-export function redraw(){ renderAll(); }`,
+export function redraw(){ renderAll(); }
+
+/**
+ * 沙盘视图驱动的全局游标入口（唯一被 \`js/lab/sandbox.js\` 调用的写入口）。
+ * \`scheduleSync()\` 自带 rAF 节流，沙盘按 60fps 推进也不会造成重绘风暴。
+ */
+export function sandboxSeek(t){
+  S.t = clamp(t, 0, rep().duration);
+  scheduleSync();
+}`,
 );
 
 const header = `/* ============================================================================
    录像数据分析台 · 视图层
    ⚠️ 本文件由 scripts/extract-lab-views.mjs 从 prototype/data-lab.template.html
-      的内联 <script> **逐字节提取**，只做了 4 处有断言保护的定点替换（见该脚本头部）。
+      的内联 <script> **逐字节提取**，只做了 5 处有断言保护的定点替换（见该脚本头部）。
       它是一份自洽的模块：不 import 任何东西，所有渲染/交互/语音/悬浮探测都在这一层。
 
    为什么是一个文件：这段代码已经过 3 轮真实 Chromium 渲染验收，提取能保证零偏差。

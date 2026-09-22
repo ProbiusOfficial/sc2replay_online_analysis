@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>星际争霸 II 录像分析</title>
-<meta name="description" content="纯客户端的星际争霸 II 录像分析：官方回放 overlay 口径的 28 张指标图、建造顺序、语音播报。录像不上传。">
+<meta name="description" content="纯客户端的星际争霸 II 录像分析：官方回放 overlay 口径的 28 张指标图、建造顺序、沙盘模拟回放、语音播报。录像不上传。">
 <link rel="icon" type="image/png" href="StarCraft.svg">
 <link rel="stylesheet" href="css/lab.css">
 </head>
@@ -15,6 +15,7 @@
   <div class="seg" id="viewSeg" style="margin-left:6px">
     <button data-view="data" class="on">数据分析</button>
     <button data-view="bo">建造顺序</button>
+    <button data-view="sandbox">沙盘模拟</button>
     <button data-view="chat">对局聊天</button>
   </div>
   <div class="spacer"></div>
@@ -127,6 +128,56 @@
             <span class="lab" style="color:var(--ink4);font-weight:400">消息按时间排序 · 点击任意消息可将时间轴定位到该时刻 · 随游标推进逐条点亮</span>
           </div>
           <div class="chatlist" id="chatList"></div>
+        </div>
+      </div>
+
+      <div class="v-sandbox" id="sandboxView">
+        <div class="tlbox sb-tools">
+          <span class="lab">沙盘模拟</span>
+          <select id="sbReplay" class="sb-select" title="切换录像"></select>
+          <span class="sb-mapinfo" id="sbMapInfo"></span>
+          <div class="spacer" style="flex:1"></div>
+          <button class="tbtn sb-play" id="sbPlay" type="button">▶ 播放</button>
+          <div class="seg" id="sbSpeed">
+            <button data-s="1">1×</button>
+            <button data-s="4">4×</button>
+            <button data-s="8" class="on">8×</button>
+            <button data-s="16">16×</button>
+          </div>
+          <label class="sbopt"><input type="checkbox" id="sbWorkers" checked>农民</label>
+          <button class="tbtn sb-toggle on" id="sbIso" type="button" title="斜视角：45° 菱形等距投影；关闭回到平面俯视">斜视角</button>
+          <button class="tbtn" id="sbFull" type="button">⛶ 全屏</button>
+        </div>
+        <div class="sbstage" id="sbStage">
+          <canvas id="sbCanvas"></canvas>
+          <div class="sbpanel sbpanel-a" id="sbPanelA"></div>
+          <div class="sbpanel sbpanel-b" id="sbPanelB"></div>
+          <div class="sbres" id="sbRes"></div>
+          <div class="sbhint" id="sbHint">拖动上方时间轴即可定位 · 与全部视图共用同一条游标 · 单位位置为稀疏采样点的直线插值</div>
+        </div>
+        <div class="sblegend" id="sbLegend">
+          <span><i class="lg-ring" style="border-color:var(--a)"></i>A 方（图标外圈 = 归属）</span>
+          <span><i class="lg-ring" style="border-color:var(--b)"></i>B 方</span>
+          <span><i class="lg-sq" style="background:var(--ink3)"></i>建筑（虚线圈 = 建造中）</span>
+          <span><i class="lg-di" style="background:#d8a531"></i>晶体矿</span>
+          <span><i class="lg-ring" style="border-color:#3f9e5f"></i>气泉</span>
+          <span><i class="lg-ring" style="border-color:#dfe6f0"></i>Xel'Naga 塔</span>
+          <span><i class="lg-x" style="color:var(--warn)"></i>阵亡涟漪（精确死亡坐标）</span>
+          <span style="color:var(--ink4)">位置为稀疏采样点的插值 · 图标素材 © Blizzard Entertainment（粉丝非商用）</span>
+        </div>
+        <div class="sb-hudopts" id="sbHudOpts"></div>
+        <div class="tlbox" style="margin-top:12px">
+          <div class="note">
+            <b>沙盘口径</b> —— 全部数据取自解析管线的 <code>ReplayData.sandbox</code>：
+            单位的出生 / 死亡 / 变形（<code>SUnitBorn / Init / Done / Died / TypeChange</code>）
+            与 <code>SUnitPositionsEvent</code> 的<b>稀疏位置采样</b>（实测每 240 gameloop 一批、
+            按单位索引滚动轮转，开局约 2 分钟后才开始出现）。采样点之间为<b>直线插值</b>，
+            交战的落点是精确的（死亡事件自带坐标），但交战过程中的走位是估计。
+            <br><b>为什么没有地图 / 迷雾 / 血量</b> —— 录像文件里没有这三样：地形不在录像里，
+            沙盘的地图范围由单位坐标极值推出、矿线与出生点来自开局中立单位；
+            tracker 是上帝视角（无「某玩家看不到什么」的信息）；单位血量没有任何事件记录。
+            因此本视图是<b>上帝视角的抽象沙盘</b>，不是拟真小地图回放。
+          </div>
         </div>
       </div>
 
