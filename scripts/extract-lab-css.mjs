@@ -60,11 +60,10 @@ const shell = `
    content box 被固定成视口高，超出的内容会**穿过** padding 区域，那条 padding
    不产生任何滚动空间（实测页脚仍被条盖住 69px）。
    margin 同样不可靠：末尾元素的下外边距不计入 scrollHeight。 */
-.wrap{padding-bottom:26px}
-.pagefoot{max-width:1600px;margin:0 auto;color:var(--ink4);font-size:11.5px;line-height:1.9;
-          padding:0 18px calc(var(--vbh,84px) + 24px)}
-.pagefoot a{color:var(--accent)}
-.pagefoot code{font-family:var(--mono)}
+.wrap{padding-bottom:calc(var(--vbh,84px) + 24px)}
+.infobar{text-align:center;color:var(--ink4);font-size:11.5px;line-height:1.9;padding:0 16px}
+.infobar a{color:var(--accent)}
+.infobar code{font-family:var(--mono);background:var(--bg);padding:1px 5px;border-radius:4px}
 /* 内部指标侧栏同理：原规则只扣了顶部，没扣底部条，会钻到条下面去 */
 .side{max-height:calc(100vh - var(--vbh,84px) - 96px)}
 
@@ -149,7 +148,7 @@ const MUST = [
   ["#result 显隐", "#result{display:none}"],
   ["底部条外层退化为背景层", ".vb{display:block;padding:0}"],
   ["底部条内容与主体同宽居中", ".vbin{"],
-  ["body 底部留白跟随 --vbh", ".pagefoot{max-width:1600px;margin:0 auto"],
+  ["body 底部留白跟随 --vbh", ".wrap{padding-bottom:calc(var(--vbh,84px) + 24px)"],
   ["页脚留白用 --vbh 计算", "calc(var(--vbh,84px) + 24px)"],
   [".wrap 内容间距", ".wrap{padding-bottom:26px}"],
   ["内部侧栏扣掉底部条", ".side{max-height:calc(100vh - var(--vbh"],
