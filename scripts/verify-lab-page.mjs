@@ -163,6 +163,53 @@ await page.screenshot({ path: join(SHOTS, "01b-layout-bottom.png") });
 await page.evaluate(() => window.scrollTo(0, 0));
 await page.waitForTimeout(250);
 
+/* ---------------- 2c. SVG 等比 + 窗口缩放重绘 ---------------- */
+step("2c", "SVG viewBox 必须与显示尺寸等比（防刻度文字被拉伸）");
+// 曾经 mountLab 在 #result 还是 display:none 时就渲染：clientWidth=0 → viewBox 停在
+// 最小值兜底（时间轴 420 / 图表 320），叠加 preserveAspectRatio="none" 后整个内容
+// 被横向拉宽 ~3 倍，刻度文字明显变形。这条防线以后任何「viewBox 过期」都拦得住。
+const svgCheck = await page.evaluate(() => {
+  let worst = 1;
+  for (const svg of document.querySelectorAll("svg")) {
+    const m = svg.getScreenCTM();
+    if (!m || svg.getBoundingClientRect().width === 0) continue;
+    const sx = Math.hypot(m.a, m.b);
+    const sy = Math.hypot(m.c, m.d);
+    if (!sy || !sx) continue;
+    worst = Math.max(worst, sx / sy, sy / sx);
+  }
+  const tl = document.querySelector("#tlsvg");
+  return {
+    worstXOverY: +worst.toFixed(4),
+    tlViewBoxW: +(tl.getAttribute("viewBox") || "0 0 0 0").split(" ")[2],
+    tlShownW: Math.round(tl.getBoundingClientRect().width),
+  };
+});
+console.log("  " + JSON.stringify(svgCheck));
+if (svgCheck.worstXOverY > 1.01) errors.push(`存在非等比缩放的 SVG（最大 x/y = ${svgCheck.worstXOverY}），文字会被拉变形`);
+if (Math.abs(svgCheck.tlViewBoxW - svgCheck.tlShownW) > 4)
+  errors.push(`时间轴 viewBox 宽 ${svgCheck.tlViewBoxW} ≠ 实际宽 ${svgCheck.tlShownW}`);
+
+// 缩窄到 ≤1180px：媒体查询会让侧栏转横排、容器变宽 → 必须触发 resize 重绘拉回 viewBox
+await page.setViewportSize({ width: 1100, height: 900 });
+await page.waitForTimeout(650);
+const rs = await page.evaluate(() => {
+  const s = document.querySelector("#tlsvg");
+  const m = s.getScreenCTM();
+  return {
+    viewBoxW: +(s.getAttribute("viewBox") || "0 0 0 0").split(" ")[2],
+    shownW: Math.round(s.getBoundingClientRect().width),
+    xOverY: m ? +(Math.hypot(m.a, m.b) / Math.hypot(m.c, m.d)).toFixed(4) : null,
+  };
+});
+console.log("  缩到 1100 宽后：" + JSON.stringify(rs));
+if (Math.abs(rs.viewBoxW - rs.shownW) > 4)
+  errors.push(`窗口缩放后 viewBox 宽 ${rs.viewBoxW} ≠ 实际宽 ${rs.shownW}（watchResultWidth 重绘没生效）`);
+if (Math.abs((rs.xOverY ?? 1) - 1) > 0.01) errors.push(`窗口缩放后出现非等比缩放 x/y=${rs.xOverY}`);
+await page.screenshot({ path: join(SHOTS, "01c-resized-1100.png") });
+await page.setViewportSize({ width: 1600, height: 1100 });
+await page.waitForTimeout(400);
+
 /* ---------------- 3. 逐份切换 ---------------- */
 step(3, `逐份切换（共 ${SAMPLES.length} 份，验证跨样本重建）`);
 const perFile = [];

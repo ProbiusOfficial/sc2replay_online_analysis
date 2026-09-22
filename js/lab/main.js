@@ -13,7 +13,7 @@
 import { loadTranslationData, setInitStatus } from "../errors_init.js";
 import { initParser, parseReplayBufferToData, isParserReady } from "../parse_client.js";
 import { toLabReplays, isTranslationReady } from "./data.js";
-import { mountLab, labState, voiceState } from "./views.js";
+import { mountLab, labState, voiceState, redraw } from "./views.js";
 
 /**
  * 调试 / 验收句柄。
@@ -84,6 +84,42 @@ function trackBottomBarHeight() {
 }
 
 /* ==========================================================================
+   结果区宽度变化 → 重绘
+   ========================================================================== */
+
+/** 观测器与上一次宽度（-1 表示尚未记录首帧）。 */
+let resultRO = null;
+let lastResultW = -1;
+let redrawTimer = 0;
+
+/**
+ * 结果区宽度变化时重绘整块视图。
+ *
+ * 为什么必须做：视图层把每个 SVG 的 `viewBox` 设成「**渲染那一刻**的容器实宽」，
+ * 而它们都带 `preserveAspectRatio="none"` —— 一旦 viewBox 与显示尺寸不再匹配，
+ * 内容就会被**非等比拉伸**（实测错位时横向拉伸 3.05~3.24 倍，刻度文字明显变形）。
+ * 容器宽度会因窗口缩放、媒体查询切换（≤1180px 侧栏转横排）而变化，必须跟着重算。
+ *
+ * 只对**宽度**变化重绘：结果区高度随内容频繁变动，全都响应会形成重绘风暴。
+ */
+function watchResultWidth() {
+  const host = $("#result");
+  if (!host || resultRO) return;
+  resultRO = new ResizeObserver((entries) => {
+    const w = Math.round(entries[0].contentRect.width);
+    if (lastResultW < 0) {
+      lastResultW = w; // 首帧只记录：刚 mountLab 完，宽度就是最新的
+      return;
+    }
+    if (Math.abs(w - lastResultW) < 2) return;
+    lastResultW = w;
+    clearTimeout(redrawTimer);
+    redrawTimer = setTimeout(() => redraw(), 140);
+  });
+  resultRO.observe(host);
+}
+
+/* ==========================================================================
    解析一批文件
    ========================================================================== */
 
@@ -144,7 +180,18 @@ async function parseAndMount(files) {
     return { ok: 0, failed: allFailed };
   }
 
+  // ⚠️ 顺序很关键：必须**先让结果区可见，再 mountLab()**。
+  // 视图层渲染 SVG 时要读容器 clientWidth 来定 viewBox，而 `display:none` 的元素
+  // clientWidth 恒为 0 → viewBox 会停在代码里的最小值兜底（时间轴 420、图表 320），
+  // 再叠加 `preserveAspectRatio="none"` → 整个内容（含刻度文字）被**横向拉伸 3 倍**。
+  // 拖放区不能用 `show()`（那是切 class `on`）—— 它的显隐由 `parse_client.js` 直接写
+  // `style.display` 控制，两套机制必须统一，否则加载完了拖放区还杵在上面。
+  const dz = $("#dropZone");
+  if (dz) dz.style.display = "none";
+  show($("#result"), true);
+
   const info = mountLab(replays);
+  watchResultWidth();
 
   // 如实报告，不吞掉失败
   const parts = [`已加载 ${info.count} 份录像`];
@@ -167,11 +214,6 @@ async function parseAndMount(files) {
     );
   }
 
-  // ⚠️ 拖放区不能用 `show()`（那是切 class `on`）—— 它的显隐由 `parse_client.js`
-  // 直接写 `style.display` 控制，两套机制必须统一，否则加载完了拖放区还杵在上面。
-  const dz = $("#dropZone");
-  if (dz) dz.style.display = "none";
-  show($("#result"), true);
   return { ok: replays.length, failed: allFailed };
 }
 
