@@ -306,6 +306,30 @@ if (boRows > 5) {
   console.log("  点行跳转 → " + JSON.stringify(jumped));
   if (jumped.nowA !== 1 || jumped.nowB !== 1) errors.push(`点行后两侧高亮数 ${jumped.nowA}/${jumped.nowB} ≠ 1/1`);
   if (jumped.clock.startsWith("00:00")) errors.push("点行未跳转时间轴");
+
+  // 老录像（HotS 2018，Eastwatch LE）专项：译名走基础表，状态名不得泄漏。
+  // 曾经 buildZhIndex 把 change 表（状态名，如「兵营落地」）放在基础表之后展平，
+  // 同名键被状态名覆盖 —— 探宝一眼看到兵营行显示「兵营落地」。
+  await page.click("#samples .smp:nth-child(4)");
+  await page.waitForTimeout(500);
+  const oldBo = await page.evaluate(() => {
+    const txt = document.querySelector("#bo").innerText;
+    return {
+      hasBarracks: /兵营/.test(txt),
+      hasStateNames: /落地|起飞/.test(txt),
+      hasErrorNotes: /Error on build time|upgrade missing/.test(txt),
+      hasDerelictNicknames: /火蟑螂|眼虫|三本|二本|地刺|大龙(?!塔)|毒爆(?=虫?[^发])/.test(txt),
+      sample: document.querySelector("#samples .smp:nth-child(4) span")?.textContent,
+    };
+  });
+  console.log("  老录像（HotS）→ " + JSON.stringify(oldBo));
+  if (!oldBo.hasBarracks) errors.push("老录像建造顺序找不到「兵营」—— Barracks 译名链路有问题");
+  if (oldBo.hasStateNames) errors.push("老录像建造顺序出现状态名（落地/起飞）—— change 表覆盖了基础表");
+  if (oldBo.hasErrorNotes) errors.push("老录像建造顺序出现解析错误标注（Error on build time / upgrade missing）");
+  if (oldBo.hasDerelictNicknames) errors.push("老录像建造顺序出现社区俗称（应使用正式译名）");
+  await page.click('#viewSeg button[data-view="data"]');
+  await page.click("#samples .smp:nth-child(1)");
+  await page.waitForTimeout(400);
 }
 
 /* ---------------- 7. 语音播报 ---------------- */

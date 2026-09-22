@@ -37,15 +37,19 @@ for (const p of probe) {
   console.log(`  ${p.padEnd(18)} → ${hits.length ? hits.join("/") + "：" + JSON.stringify(tr[hits[0]][p]) : "四表都没有"}`);
 }
 
-/** 与生产 `data.js` 完全一致的查找逻辑。 */
-const tables = ["unit", "build", "upgrade"];
+/** 与生产 `data.js` 的 `buildZhIndex` 一致：change 表先展平作兜底，三张基础表覆盖。 */
+const tables = ["upgrade", "unit", "build"];
 const lookup = (name) => {
   const target = String(name).toLowerCase();
+  let fallback = null;
+  for (const [k, v] of Object.entries(tr.change ?? {})) {
+    if (k.toLowerCase() === target) { fallback = String(v?.zh ?? k); break; }
+  }
   for (const table of tables) {
     const hit = Object.entries(tr[table] ?? {}).find(([k]) => k.toLowerCase() === target);
     if (hit) return { table, zh: String(hit[1]?.zh ?? hit[1]) };
   }
-  return null;
+  return fallback ? { table: "change", zh: fallback } : null;
 };
 
 const MORPH_NOISE = /Lowered|Flying|Uprooted|Phased|Burrowed|Cocoon|LiberatorAG|VikingAssault/;

@@ -104,16 +104,22 @@ const r1 = (n) => Math.round(n * 10) / 10;
 
 let zhIndex = null;
 
-/** 中文名索引：`data.json` 的 unit / build / upgrade / change 四张表展平。 */
+/**
+ * 中文名索引：`data.json` 的 unit / build / upgrade / change 四张表展平。
+ *
+ * ⚠️ 顺序即优先级：change 表（状态名，如「兵营落地」「星轨起飞」）必须**先**展平，
+ * 再让三张基础表覆盖它 —— 与旧 UI `display_helpers.js` 的「先查基础表、change 兜底」
+ * 同一优先级。展平顺序写反（change 最后）会让建造顺序的兵营全部显示成「兵营落地」。
+ */
 function buildZhIndex() {
   const tr = appState.translationData;
   const m = new Map();
   if (!tr) return m;
-  for (const table of ["upgrade", "unit", "build"]) {
-    for (const [k, v] of Object.entries(tr[table] ?? {})) m.set(k.toLowerCase(), String(v?.zh ?? k));
-  }
   for (const group of Object.values(tr.change ?? {})) {
     for (const [k, v] of Object.entries(group ?? {})) m.set(k.toLowerCase(), String(v?.zh ?? k));
+  }
+  for (const table of ["upgrade", "unit", "build"]) {
+    for (const [k, v] of Object.entries(tr[table] ?? {})) m.set(k.toLowerCase(), String(v?.zh ?? k));
   }
   return m;
 }

@@ -221,11 +221,11 @@
       "time": 17
     },
     "Baneling": {
-      "zh": "跳虫",
+      "zh": "毒爆虫",
       "time": 17
     },
     "BanelingBurrowed": {
-      "zh": "跳虫",
+      "zh": "毒爆虫",
       "time": 17
     },
     "Roach": {
@@ -233,7 +233,7 @@
       "time": 19
     },
     "Ravager": {
-      "zh": "蟑螂",
+      "zh": "破坏者",
       "time": 19
     },
     "RoachBurrowed": {
@@ -245,7 +245,7 @@
       "time": 19
     },
     "RavagerCocoon": {
-      "zh": "蟑螂",
+      "zh": "破坏者茧",
       "time": 19
     },
     "Queen": {
@@ -273,7 +273,7 @@
       "time": 24
     },
     "LurkerBurrowed": {
-      "zh": "刺蛇",
+      "zh": "潜伏虫",
       "time": 24
     },
     "Infestor": {
@@ -305,7 +305,7 @@
       "time": 18
     },
     "Overseer": {
-      "zh": "王虫",
+      "zh": "监督者",
       "time": 18
     },
     "OverseerSiegeMode": {
@@ -313,7 +313,7 @@
       "time": 18
     },
     "OverlordTransport": {
-      "zh": "王虫",
+      "zh": "载货王虫",
       "time": 18
     },
     "Egg": {
@@ -325,7 +325,7 @@
       "time": 29
     },
     "BroodLord": {
-      "zh": "腐化",
+      "zh": "虫群领主",
       "time": 29
     },
     "Changeling": {
@@ -789,15 +789,15 @@
       "time": 0
     },
     "GreaterSpire": {
-      "zh": "龙塔",
+      "zh": "大龙塔",
       "time": 0
     },
     "Lair": {
-      "zh": "孵化场",
+      "zh": "兽穴",
       "time": 0
     },
     "Hive": {
-      "zh": "孵化场",
+      "zh": "蜂巢",
       "time": 0
     },
     "InfestationPit": {
