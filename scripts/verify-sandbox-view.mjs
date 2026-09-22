@@ -145,7 +145,74 @@ ok(st2 && st2.units > 50, `新样本动态单位 ${st2?.units} > 50`);
 const selVal = await page.evaluate(() => document.getElementById("sbReplay").value);
 ok(selVal === "1", "下拉值与当前样本同步");
 
-step(11, "截图产物");
+step(11, "滚轮缩放（光标焦点）+ 拖拽平移 + 双击复位");
+const cvBox = await page.locator("#sbCanvas").boundingBox();
+const canvasSum = () => page.evaluate(() => {
+  const cv = document.getElementById("sbCanvas");
+  const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+  let s = 0;
+  for (let i = 0; i < d.length; i += 997 * 4) s += d[i] + d[i + 1] + d[i + 2];
+  return s;
+});
+const sumFit = await canvasSum();
+await page.mouse.move(cvBox.x + cvBox.width * 0.35, cvBox.y + cvBox.height * 0.5);
+await page.mouse.wheel(0, -600);
+await page.waitForTimeout(300);
+let zst = await page.evaluate(() => window.__sandbox.stats);
+ok(zst.zoom > 1.3, `滚轮缩放生效（zoom=${zst?.zoom?.toFixed(2)}）`);
+const sumZoom = await canvasSum();
+ok(sumZoom !== sumFit, "画布确实按新缩放重绘（像素校验和变化）");
+const pan0 = { ...zst.pan };
+await page.mouse.move(cvBox.x + cvBox.width * 0.35, cvBox.y + cvBox.height * 0.5);
+await page.mouse.down();
+await page.mouse.move(cvBox.x + cvBox.width * 0.55, cvBox.y + cvBox.height * 0.62, { steps: 6 });
+await page.mouse.up();
+await page.waitForTimeout(300);
+zst = await page.evaluate(() => window.__sandbox.stats);
+ok(zst.pan.x !== pan0.x || zst.pan.y !== pan0.y, `拖拽平移生效（pan=${JSON.stringify(zst.pan)}）`);
+await page.mouse.dblclick(cvBox.x + cvBox.width * 0.5, cvBox.y + cvBox.height * 0.5);
+await page.waitForTimeout(300);
+zst = await page.evaluate(() => window.__sandbox.stats);
+ok(zst.zoom === 1 && zst.pan.x === 0 && zst.pan.y === 0, "双击复位回整图适配");
+
+// 深缩放：图标必须随 zoom 明显生长（对标原站 ≈zoom^0.75 实测曲线）
+// （Chromium 会把 Playwright 的 wheel deltaY 缩小约 1/3，这里给足量）
+await page.mouse.move(cvBox.x + cvBox.width * 0.5, cvBox.y + cvBox.height * 0.5);
+await page.mouse.wheel(0, -1600);
+await page.waitForTimeout(400);
+zst = await page.evaluate(() => window.__sandbox.stats);
+ok(zst.zoom > 3, `深缩放就位（zoom=${zst?.zoom?.toFixed(1)}）`);
+ok(zst.iconBoost > 2.2, `图标随缩放生长（boost=${zst?.iconBoost?.toFixed(2)} > 2.2）`);
+
+// 极限拖拽（四向贴墙）：旧版把「投影包围盒与画布重叠」当钳制，斜视角菱形的包围盒
+// 四角是空的——高倍下拖进空角会贴墙在整屏空黑上（实测地面占比 2%）。新钳制把
+// 「画布中心的逆投影点」钳在地图矩形内：贴墙画面必须仍以地图地面为主。
+const groundRatio = () => page.evaluate(() => {
+  const cv = document.getElementById("sbCanvas");
+  const img = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+  let g = 0;
+  for (let i = 0; i < img.length; i += 4) {
+    const d1 = Math.abs(img[i] - 13) + Math.abs(img[i + 1] - 18) + Math.abs(img[i + 2] - 25);
+    const d2 = Math.abs(img[i] - 14) + Math.abs(img[i + 1] - 20) + Math.abs(img[i + 2] - 29);
+    if (d1 <= 3 || d2 <= 3) g++;
+  }
+  return g / (img.length / 4);
+});
+for (const [dir, dx, dy] of [["左", -1, 0], ["右", 1, 0], ["上", 0, -1], ["下", 0, 1]]) {
+  for (let k = 0; k < 10; k++) {
+    await page.mouse.move(cvBox.x + cvBox.width * 0.5, cvBox.y + cvBox.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(cvBox.x + cvBox.width * (0.5 + dx * 0.45), cvBox.y + cvBox.height * (0.5 + dy * 0.45), { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(50);
+  }
+  const g = await groundRatio();
+  ok(g > 0.2, `${dir}向拖到墙：贴墙画面地面占比 ${(g * 100).toFixed(0)}%（不会拖进整屏空黑）`);
+}
+await page.mouse.dblclick(cvBox.x + cvBox.width * 0.5, cvBox.y + cvBox.height * 0.5);
+await page.waitForTimeout(300);
+
+step(12, "截图产物");
 await page.selectOption("#sbReplay", "3"); // Eastwatch LE 2018（starcraft2.ai 同一场）
 await page.waitForTimeout(300);
 await page.evaluate(() => {
@@ -176,6 +243,17 @@ ok(!/科技 \d+/.test(panelNoTech), "取消勾选后科技行隐藏");
 await page.locator('#sbHudOpts input[data-k="tech"]').check();
 await page.screenshot({ path: join(SHOTS, "sandbox-midgame.png"), clip: { x: 0, y: 0, width: 1600, height: 1100 } });
 console.log("  → tests/screenshots-lab/sandbox-midgame.png");
+
+// 放大截图：核对「纯图标」观感（无黑框）+ 缩放后网格/标记不糊
+await page.mouse.move(cvBox.x + cvBox.width * 0.35, cvBox.y + cvBox.height * 0.5);
+await page.mouse.wheel(0, -1200);
+await page.waitForTimeout(500);
+const zt = await page.evaluate(() => window.__sandbox.stats.zoom);
+ok(zt > 2, `放大到 ${zt.toFixed(1)}× 供截图检查`);
+await page.screenshot({ path: join(SHOTS, "sandbox-zoomed.png"), clip: { x: 0, y: 0, width: 1600, height: 1100 } });
+console.log(`  → tests/screenshots-lab/sandbox-zoomed.png（${zt.toFixed(1)}×）`);
+await page.click("#sbFit"); // 复位，避免影响后续步骤
+await page.waitForTimeout(200);
 
 await browser.close();
 

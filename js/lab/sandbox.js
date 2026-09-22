@@ -13,6 +13,11 @@
 
    - **斜视角**（默认开）：地图做 45° 菱形等距投影 + 基地椭圆平台；关闭回到平面俯视。
      投影只影响坐标（proj()），图标保持直立；斜视角下按深度（x+y）排序绘制。
+   - **缩放/平移**：滚轮以光标为焦点缩放（1–10×，触控板捏合同路），拖拽平移
+     （钳「画布中心的逆投影点在地图矩形内」——贴墙不空屏、任意点可居中，见 clampPan），
+     双击画布 / 工具条「适配」复位；倍率画在右缘中部（右上被 HUD 面板占用）。
+     底图随 zoom/pan 变化整体重建（staticDirty）；图标按 ≈zoom^0.75 生长
+     （对标原站实测曲线：1×→20px、2.7×→43px、8.5×→90px），单位/建筑分别封顶。
    - **左上/右上 HUD**：玩家名 + 单位/农民/建筑实时计数 + 编成 chips（活体军队按类型
      计数，icon+数量）+ 生产条（建造中建筑带进度条 + 最近 12s 出生单位）+ 外侧色条。
    - **底部资源条**：双方 矿/气（含采集率）+ 人口，取自 stats_series（与图表同口径）。
@@ -21,7 +26,8 @@
 
    `assets/units/<Name>.webp`（256×256，共 222 张，命名与 tracker 单位名一致，
    来自 starcraft2.ai 的图标集，素材版权归 Blizzard Entertainment、粉丝非商用）。
-   懒加载 + 36px 预缩放缓存；iconKey() 归一化变体；缺失或加载失败回退矢量点阵。
+   素材本身无 alpha（黑底），加载时按亮度→alpha 抠底得纯图标；懒加载 + 64px
+   预缩放缓存；iconKey() 归一化变体；缺失或加载失败回退矢量点阵。
 
    ## 与 views.js 的关系（刻意零侵入）
 
@@ -73,14 +79,18 @@ const neutralStyle = (n) => {
 
 /* ---------- 单位图标 ---------- */
 
-const ICON_CACHE = new Map(); // 归一化名 → 36px 预缩放 canvas；null = 加载中/失败
+const ICON_CACHE = new Map(); // 归一化名 → 128px 预缩放 canvas（已抠黑底）；null = 加载中/失败
 let iconsLoaded = 0;
 
 /** tracker 名 → 图标文件名。图标集与 tracker 同名，只有少数变体要归一。 */
 /** 非科技的升级流噪声：游戏厅喷漆、公会奖励动作、老录像的幽灵单位残影。 */
 const NOISE_UPGRADE = /^(Spray|RewardDance)|^GameHeartActive$|^GhostAlternate$/i;
 
-/** 懒加载：首次请求触发加载，就绪后换入 36px 缓存；失败永久 null（矢量兜底）。 */
+/**
+ * 懒加载：首次请求触发加载，就绪后换入 128px 缓存；失败永久 null（矢量兜底）。
+ * 素材本身是无 alpha 的黑底图（与 starcraft2.ai 同一批文件），直接画会带黑框——
+ * 加载时按「亮度→alpha」抠底（max(r,g,b) 作透明度、RGB 反预乘），得到纯图标。
+ */
 function iconFor(name) {
   const key = iconKey(name);
   if (!key || !hasIconKey(key)) return null;
@@ -88,9 +98,25 @@ function iconFor(name) {
   ICON_CACHE.set(key, null);
   const img = new Image();
   img.onload = () => {
+    const full = document.createElement("canvas");
+    full.width = img.naturalWidth; full.height = img.naturalHeight;
+    const fc = full.getContext("2d", { willReadFrequently: true });
+    fc.drawImage(img, 0, 0);
+    const d = fc.getImageData(0, 0, full.width, full.height);
+    const p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const a = Math.max(p[i], p[i + 1], p[i + 2]);
+      p[i + 3] = a;
+      if (a > 0 && a < 255) { // 反预乘：半透明像素提亮，叠在任何底色上都不发灰
+        p[i] = Math.min(255, (p[i] * 255) / a);
+        p[i + 1] = Math.min(255, (p[i + 1] * 255) / a);
+        p[i + 2] = Math.min(255, (p[i + 2] * 255) / a);
+      }
+    }
+    fc.putImageData(d, 0, 0);
     const cv = document.createElement("canvas");
-    cv.width = 36; cv.height = 36;
-    cv.getContext("2d").drawImage(img, 0, 0, 36, 36);
+    cv.width = 128; cv.height = 128;
+    cv.getContext("2d").drawImage(full, 0, 0, 128, 128);
     ICON_CACHE.set(key, cv);
     iconsLoaded++;
     lastT = -1; // 图标是绘制那一帧才请求的：就绪后标脏，下一帧立刻换掉点阵兜底
@@ -103,6 +129,14 @@ function iconFor(name) {
 /** 像素级缩放系数：跟随地图缩放（s = 世界单位→CSS px），但有上下限。 */
 const zoomK = (s) => clamp(0.72 + s * 0.16, 0.9, 1.35);
 
+/**
+ * 用户缩放下图标的额外生长，对标原站实测曲线 ≈ zoom^0.75
+ * （原站建筑图标 1×→约20px、2.7×→约43px、8.5×→约90px，两点回归都是 0.75 次幂）。
+ * 单位封顶略低（过大喧宾夺主），建筑可以长到接近 1:1 的观感。
+ */
+const iconBoostUnit = () => Math.min(Math.pow(zoom, 0.75), 3.6);
+const iconBoostBuilding = () => Math.min(Math.pow(zoom, 0.75), 4);
+
 /* ---------- 模块状态 ---------- */
 
 let replays = [];          // 与 views.js 的 DATA.replays 同一数组（main.js 注入）
@@ -114,7 +148,10 @@ let showWorkers = true;
 let iso = true;            // 斜视角（默认开，对标原站）
 let lastT = -1;
 let lastW = -1, lastH = -1;
-let staticLayer = null;    // 离屏 canvas：底图 + 中立单位（切样本/缩放/切换视角时重建）
+let staticLayer = null;    // 离屏 canvas：底图 + 中立单位（切样本/缩放/平移/切换视角时重建）
+let staticDirty = true;    // zoom/pan/iso 变化 → 下一帧重建底图
+let zoom = 1;              // 用户缩放倍率（1 = 整图适配，对标原站 1.0×）
+let panX = 0, panY = 0;    // 用户平移（画布 CSS 像素）
 let hudAt = -1;            // HUD 上次更新时刻（节流用）
 let hudCacheT = -1;        // HUD 数据对应的游标时刻
 
@@ -196,8 +233,9 @@ function buildModel(r) {
 /**
  * 世界坐标 → 画布 CSS 像素。iso=true 时为 45° 菱形等距投影：
  * X = (x−y)、Y = (x+y)/2，再统一缩放平移到画布内。
+ * baseTransform 只算「整图适配」的基準；用户缩放/平移由 computeTF 叠加。
  */
-function fitTransform(w, h) {
+function baseTransform(w, h) {
   const { minX, minY, maxX, maxY } = model.sb;
   const corner = (x, y) => (iso ? [x - y, (x + y) * 0.5] : [x, y]);
   const cs = [corner(minX, minY), corner(maxX, minY), corner(minX, maxY), corner(maxX, maxY)];
@@ -211,10 +249,77 @@ function fitTransform(w, h) {
   };
 }
 
-let TF = null; // 当前帧的变换 { s, ox, oy }
+let TF = null; // 当前帧的变换 { s, ox, oy }（已含用户缩放/平移）
+const ZOOM_MAX = 10;
+
+/** 基準适配 × 用户缩放/平移 → TF。screen = world·s0·zoom + o0·zoom + pan。 */
+function computeTF(w, h) {
+  const b = baseTransform(w, h);
+  TF = { s: b.s * zoom, ox: b.ox * zoom + panX, oy: b.oy * zoom + panY };
+}
+
+/**
+ * 平移钳制：把「画布中心的逆投影点」钳在地图世界矩形内（零余量）。
+ * 这样画布中心永远压在真实地图上——贴墙时看到的最多是半屏图外空黑，
+ * 不会整屏空黑；同时任何地图点都能被拖到画布中心，可达性与观感兼得。
+ * ⚠️ 两个反例都实测过：钳「地图中心在画布内」→ 边缘区域拖不进来；
+ * 钳「投影包围盒与画布重叠」→ 高倍下会拖进包围盒空角（斜视角菱形四角是空的），
+ * 贴墙时地面占比跌到 2%，探针 scripts/research/probe-sandbox-pan.mjs 可复现。
+ */
+function clampPan(w, h) {
+  if (!model?.sb) return;
+  const b = baseTransform(w, h);
+  const sz = b.s * zoom, ozX = b.ox * zoom + panX, ozY = b.oy * zoom + panY;
+  const { minX, minY, maxX, maxY } = model.sb;
+  // 画布中心 → 投影坐标 → 逆投影回世界坐标（iso: P=(x−y,(x+y)/2)）
+  const p0 = (w / 2 - ozX) / sz, p1 = (h / 2 - ozY) / sz;
+  const wx = iso ? (p0 + 2 * p1) / 2 : p0;
+  const wy = iso ? (2 * p1 - p0) / 2 : p1;
+  // 余量必须为 0：任何正余量在高倍下都会把画布中心推出菱形尖角之外
+  // （8 世界单位 @10× ≈ 上百 px，贴墙地面占比会跌到 25% 以下）
+  const nx = clamp(wx, minX, maxX) - wx;
+  const ny = clamp(wy, minY, maxY) - wy;
+  if (!nx && !ny) return;
+  panX -= sz * (iso ? nx - ny : nx);
+  panY -= sz * (iso ? (nx + ny) * 0.5 : ny);
+}
+
+/** 复位到整图适配。 */
+function resetView() {
+  zoom = 1; panX = 0; panY = 0;
+  staticDirty = true;
+  hudCacheT = -1;
+}
+
+/**
+ * 以光标为焦点缩放：f 处的世界点在缩放前后保持在同一屏幕位置。
+ * f = world·s0·z0 + o0·z0 + p0（缩放前），要求的 p1 满足 f = world·s0·z1 + o0·z1 + p1。
+ */
+function zoomAt(fx, fy, z1) {
+  z1 = clamp(z1, 1, ZOOM_MAX);
+  if (!model?.sb || z1 === zoom) return;
+  const z0 = zoom;
+  panX = fx - (z1 / z0) * (fx - panX);
+  panY = fy - (z1 / z0) * (fy - panY);
+  zoom = z1;
+  const w = els.stage?.clientWidth ?? 0, h = els.stage?.clientHeight ?? 0;
+  clampPan(w, h);
+  staticDirty = true;
+}
+
 const projX = (x, y) => (iso ? (x - y) : x) * TF.s + TF.ox;
 const projY = (x, y) => (iso ? (x + y) * 0.5 : y) * TF.s + TF.oy;
 const depthOf = (x, y) => (iso ? x + y : y);
+
+/** 地图投影中心的屏幕坐标（验收断言钳制行为用；TF 未就绪时返回 null）。 */
+function mapCenterScreen() {
+  if (!TF || !model?.sb) return null;
+  const { minX, minY, maxX, maxY } = model.sb;
+  return {
+    x: projX((minX + maxX) / 2, (minY + maxY) / 2),
+    y: projY((minX + maxX) / 2, (minY + maxY) / 2),
+  };
+}
 
 /** 位置采样点之间的线性插值（pos 扁平 [t,x,y,...]）。 */
 function posAt(u, t) {
@@ -245,7 +350,7 @@ function buildStaticLayer(w, h, dpr) {
   staticLayer.height = Math.round(h * dpr);
   const c = staticLayer.getContext("2d");
   c.scale(dpr, dpr);
-  TF = fitTransform(w, h);
+  computeTF(w, h);
   const X = (x, y) => projX(x, y), Y = (x, y) => projY(x, y);
 
   c.fillStyle = "#0b0f15";
@@ -266,16 +371,18 @@ function buildStaticLayer(w, h, dpr) {
   c.closePath();
   c.fill();
   c.stroke();
-  c.strokeStyle = "rgba(120,140,170,.07)";
-  c.beginPath();
-  for (let gx = minX - (minX % 40); gx <= maxX; gx += 40) { c.moveTo(X(gx, minY - pad), Y(gx, minY - pad)); c.lineTo(X(gx, maxY + pad), Y(gx, maxY + pad)); }
-  for (let gy = minY - (minY % 40); gy <= maxY; gy += 40) { c.moveTo(X(minX - pad, gy), Y(minX - pad, gy)); c.lineTo(X(maxX + pad, gy), Y(maxX + pad, gy)); }
-  c.stroke();
+  if (40 * TF.s > 7) { // 网格线距 <7px 时跳过，避免高倍缩放下糊成一片
+    c.strokeStyle = "rgba(120,140,170,.07)";
+    c.beginPath();
+    for (let gx = minX - (minX % 40); gx <= maxX; gx += 40) { c.moveTo(X(gx, minY - pad), Y(gx, minY - pad)); c.lineTo(X(gx, maxY + pad), Y(gx, maxY + pad)); }
+    for (let gy = minY - (minY % 40); gy <= maxY; gy += 40) { c.moveTo(X(minX - pad, gy), Y(minX - pad, gy)); c.lineTo(X(maxX + pad, gy), Y(maxX + pad, gy)); }
+    c.stroke();
+  }
 
   // 基地平台：矿线簇 → 椭圆底座（斜视角下的「立体平台」观感来源）
   for (const b of model.bases) {
     const x = X(b.x, b.y), y = Y(b.x, b.y);
-    const rx = 15 * TF.s + 6, ry = iso ? rx * 0.5 : rx;
+    const rx = Math.min(15 * TF.s + 6, 40 + 36 * zoom), ry = iso ? rx * 0.5 : rx;
     c.fillStyle = "rgba(150,170,200,.07)";
     c.strokeStyle = "rgba(150,170,200,.16)";
     c.lineWidth = 1;
@@ -287,19 +394,20 @@ function buildStaticLayer(w, h, dpr) {
   // 出生点圈
   for (const loc of model.startLocs) {
     const x = X(loc.x, loc.y), y = Y(loc.x, loc.y);
+    const rr = Math.min(22 * Math.max(TF.s, 0.6), 40 + 40 * zoom);
     c.strokeStyle = loc.p === 1 ? COL.a : loc.p === 2 ? COL.b : "#8792a5";
     c.globalAlpha = 0.4;
     c.lineWidth = 1.5;
     c.beginPath();
-    c.ellipse(x, y, 22 * Math.max(TF.s, 0.6), (iso ? 0.5 : 1) * 22 * Math.max(TF.s, 0.6), 0, 0, Math.PI * 2);
+    c.ellipse(x, y, rr, (iso ? 0.5 : 1) * rr, 0, 0, Math.PI * 2);
     c.stroke();
     c.globalAlpha = 1;
   }
 
-  // 中立地图锚点：矿 / 气泉 / Xel'Naga 塔 / 可破坏物
+  // 中立地图锚点：矿 / 气泉 / Xel'Naga 塔 / 可破坏物（上限随缩放放宽，高倍下近似线性生长）
   for (const st of model.statics) {
     const x = X(st.x, st.y), y = Y(st.x, st.y);
-    const r = Math.max(1.6, st.st.r * TF.s);
+    const r = clamp(Math.max(1.6, st.st.r * TF.s), 1.6, 20 + 6 * zoom);
     c.fillStyle = st.st.c;
     c.globalAlpha = 0.9;
     if (st.st.shape === "diamond") {
@@ -340,16 +448,19 @@ function render() {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
-  if (!staticLayer || lastW !== w || lastH !== h) {
+  if (!staticLayer || staticDirty || lastW !== w || lastH !== h) {
     buildStaticLayer(w, h, dpr);
+    staticDirty = false;
     lastW = w; lastH = h;
   }
   const t = labState.t;
   const c = canvas.getContext("2d");
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.imageSmoothingQuality = "high"; // 缓存 128px 按目标尺寸缩绘，高质量采样不糊
   c.drawImage(staticLayer, 0, 0, w, h);
 
   const z = zoomK(TF.s); // 图标的像素缩放：跟随地图大小，但有上下限
+  const bu = iconBoostUnit(), bb = iconBoostBuilding();
   const X = (x, y) => projX(x, y), Y = (x, y) => projY(x, y);
 
   // 可见单位收集 → 按深度排序（斜视角下右上方的单位压在左下方之上）
@@ -374,7 +485,7 @@ function render() {
     if (it.isB) {
       const underConstruction = it.u.done != null && t < it.u.done;
       if (icon) {
-        const size = clamp(buildingSize(it.n) * TF.s * 0.92, 13, 30);
+        const size = clamp(buildingSize(it.n) * TF.s * 0.92, 13, 30) * bb;
         c.globalAlpha = underConstruction ? 0.55 : 0.95;
         c.drawImage(icon, x - size / 2, y - size / 2, size, size);
         c.globalAlpha = 1;
@@ -386,7 +497,7 @@ function render() {
         c.stroke();
         if (underConstruction) c.setLineDash([]);
       } else {
-        const size = Math.max(3, buildingSize(it.n) * TF.s);
+        const size = Math.max(3, clamp(buildingSize(it.n) * TF.s * 0.92, 13, 30) * bb);
         if (underConstruction) {
           c.strokeStyle = col;
           c.globalAlpha = 0.55;
@@ -403,7 +514,7 @@ function render() {
         }
       }
     } else if (icon) {
-      const size = (it.isW ? 12 : 17) * z;
+      const size = (it.isW ? 12 : 17) * z * bu;
       const r = size * 0.46 + 1.5;
       c.fillStyle = col;
       c.globalAlpha = 0.9;
@@ -411,7 +522,7 @@ function render() {
       c.globalAlpha = 1;
       c.drawImage(icon, x - size / 2, y - size / 2, size, size);
     } else {
-      const r = Math.max(1.6, (it.isW ? 3.5 : 5) * Math.min(TF.s, 1.4));
+      const r = Math.max(1.6, (it.isW ? 3.5 : 5) * Math.min(TF.s, 1.4) * bu);
       c.fillStyle = col;
       c.beginPath(); c.ellipse(x, y, r, iso ? r * 0.75 : r, 0, 0, Math.PI * 2); c.fill();
     }
@@ -436,8 +547,9 @@ function render() {
     }
   }
 
-  // 阵亡闪光：最后 1.5 秒内的死亡，在精确死亡坐标上画外扩淡出的圈
+  // 阵亡闪光：最后 1.5 秒内的死亡，在精确死亡坐标上画外扩淡出的圈（随缩放适度长大）
   const flash = 1.5;
+  const rb = Math.min(Math.sqrt(zoom), 3);
   for (let i = model.deaths.length - 1; i >= 0; i--) {
     const u = model.deaths[i];
     if (u.d > t) continue;
@@ -448,16 +560,21 @@ function render() {
     c.globalAlpha = 0.65 * (1 - age);
     c.lineWidth = 1.4;
     c.beginPath();
-    c.ellipse(X(u.dx ?? u.x), Y(u.dy ?? u.y), 2 + age * 9, (2 + age * 9) * (iso ? 0.55 : 1), 0, 0, Math.PI * 2);
+    c.ellipse(X(u.dx ?? u.x), Y(u.dy ?? u.y), (2 + age * 9) * rb, (2 + age * 9) * rb * (iso ? 0.55 : 1), 0, 0, Math.PI * 2);
     c.stroke();
     c.globalAlpha = 1;
   }
 
-  // 右上角的进度水印（帮助定位当前时刻）
+  // 右上角的进度水印（帮助定位当前时刻）；缩放倍率放右缘中部——右上被 HUD 面板占用
   c.fillStyle = "rgba(200,212,230,.5)";
   c.font = "600 13px ui-monospace,Menlo,monospace";
   c.textAlign = "right";
   c.fillText(mmss(t), w - 14, 24);
+  if (zoom !== 1) {
+    c.fillStyle = "rgba(200,212,230,.75)";
+    c.font = "650 15px ui-monospace,Menlo,monospace";
+    c.fillText(`${zoom.toFixed(1)}×`, w - 12, Math.round(h * 0.52));
+  }
 }
 
 /* ---------- HUD（左上/右上面板 + 底部资源条，对标原站 overview 播放器） ---------- */
@@ -663,14 +780,14 @@ function tick() {
   const visible = document.body.classList.contains("sandboxview");
   if (!visible) { lastT = labState.t; return; }
 
-  // 切样本：重建模型与底图，同步工具条
+  // 切样本：重建模型与底图，同步工具条（换图复位缩放，回到整图适配）
   if (labState.ri !== modelRi) {
     modelRi = labState.ri;
     model = replays[modelRi] ? buildModel(replays[modelRi]) : null;
     staticLayer = null;
     lastW = -1; lastH = -1;
     lastT = -1;
-    hudCacheT = -1;
+    resetView();
     renderMapInfo();
     if (els.replay && els.replay.value !== String(modelRi)) els.replay.value = String(modelRi);
   }
@@ -689,7 +806,7 @@ function tick() {
 
   const t = labState.t;
   const w = els.stage?.clientWidth ?? -1, h = els.stage?.clientHeight ?? -1;
-  if (!playing && t === lastT && w === lastW && h === lastH) return; // 无变化不重绘
+  if (!playing && t === lastT && w === lastW && h === lastH && !staticDirty) return; // 无变化不重绘（缩放/平移置 staticDirty）
   lastT = t;
   render();
   renderHud();
@@ -729,6 +846,7 @@ function bindOnce() {
   els.replay = $("#sbReplay");
   els.full = $("#sbFull");
   els.iso = $("#sbIso");
+  els.fit = $("#sbFit");
 
   // 视图切换：views.js 的 #viewSeg 处理器照常跑（v=sandbox 落到它的 else 分支，
   // 只是多渲染一次隐藏的建造顺序，无害）；这里负责 body 类与首次进入的重绘。
@@ -737,7 +855,7 @@ function bindOnce() {
     if (!btn) return;
     const on = btn.dataset.view === "sandbox";
     document.body.classList.toggle("sandboxview", on);
-    if (on) { lastW = -1; lastH = -1; } // 强制下一帧重建底图（容器刚从 display:none 里出来）
+    if (on) { lastW = -1; lastH = -1; staticDirty = true; } // 强制下一帧重建底图（容器刚从 display:none 里出来）
   });
 
   els.play?.addEventListener("click", togglePlay);
@@ -752,10 +870,45 @@ function bindOnce() {
   els.iso?.addEventListener("click", () => {
     iso = !iso;
     els.iso.classList.toggle("on", iso);
-    staticLayer = null; // 底图（网格/平台/矿线）跟视角走，必须重建
-    lastW = -1; lastH = -1;
+    staticDirty = true; // 底图（网格/平台/矿线）跟视角走，必须重建
     hudCacheT = -1;
   });
+  els.fit?.addEventListener("click", resetView);
+
+  // 滚轮缩放（光标为焦点）；触控板捏合走 ctrlKey+wheel，同一处理。
+  // passive:false 才能 preventDefault 拦下页面滚动。
+  els.canvas?.addEventListener("wheel", (e) => {
+    if (!model?.sb) return;
+    e.preventDefault();
+    const r = els.canvas.getBoundingClientRect();
+    zoomAt(e.clientX - r.left, e.clientY - r.top, zoom * Math.exp(-e.deltaY * (e.ctrlKey ? 0.012 : 0.0018)));
+  }, { passive: false });
+
+  // 拖拽平移 + 双击复位
+  const drag = { on: false, x: 0, y: 0 };
+  els.canvas?.addEventListener("pointerdown", (e) => {
+    if (!model?.sb || e.button !== 0) return;
+    drag.on = true; drag.x = e.clientX; drag.y = e.clientY;
+    els.stage?.classList.add("panning");
+    els.canvas?.setPointerCapture(e.pointerId);
+  });
+  els.canvas?.addEventListener("pointermove", (e) => {
+    if (!drag.on) return;
+    panX += e.clientX - drag.x;
+    panY += e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY;
+    clampPan(els.stage.clientWidth, els.stage.clientHeight);
+    staticDirty = true;
+  });
+  const endDrag = (e) => {
+    if (!drag.on) return;
+    drag.on = false;
+    els.stage?.classList.remove("panning");
+    try { els.canvas?.releasePointerCapture(e.pointerId); } catch (_) { /* 已释放 */ }
+  };
+  els.canvas?.addEventListener("pointerup", endDrag);
+  els.canvas?.addEventListener("pointercancel", endDrag);
+  els.canvas?.addEventListener("dblclick", () => { if (model?.sb) resetView(); });
 
   // 全屏：对 .wrap 申请（时间轴 + 工具条 + 画布一起放大，:fullscreen 规则接管高度）
   els.full?.addEventListener("click", () => {
@@ -833,6 +986,10 @@ export function initSandbox() {
             },
             hud: { ...hudOpts },
             iso,
+            zoom,
+            pan: { x: panX, y: panY },
+            iconBoost: iconBoostUnit(),
+            centerScreen: mapCenterScreen(),
           }
         : null;
     },

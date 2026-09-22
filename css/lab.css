@@ -192,7 +192,8 @@ body.sandboxview .v-sandbox{margin-top:0}
 /* 高度构成：100vh − 顶栏52 − 工具条~44 − 时间轴盒~150 − 页边距~34 */
 .sbstage{position:relative;background:#0b0f15;height:calc(100vh - 282px);min-height:420px;
          overflow:hidden;border-radius:var(--r)}
-.sbstage canvas{display:block;width:100%;height:100%}
+.sbstage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.sbstage.panning canvas{cursor:grabbing}
 .sbhint{position:absolute;bottom:8px;left:0;right:0;text-align:center;pointer-events:none;
         font-size:11px;color:rgba(180,195,215,.55);font-family:var(--mono)}
 
@@ -201,7 +202,8 @@ body.sandboxview .v-sandbox{margin-top:0}
 .sb-toggle.on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);font-weight:600}
 
 /* 左上/右上面板：玩家名 + 实时计数 + 编成 chips + 生产条（对标原站 overview 播放器） */
-.sbpanel{position:absolute;top:12px;left:14px;width:310px;max-width:44%;
+/* 纯展示层：点击穿透，不挡画布拖拽/缩放 */
+.sbpanel{position:absolute;top:12px;left:14px;width:310px;max-width:44%;pointer-events:none;
          background:rgba(13,18,26,.82);border:1px solid rgba(120,140,170,.25);
          border-left:3px solid var(--a);border-radius:8px;padding:8px 10px;
          font-size:11.5px;color:#d7deea;backdrop-filter:blur(4px)}
@@ -220,12 +222,13 @@ body.sandboxview .v-sandbox{margin-top:0}
 .chip{position:relative;display:inline-flex;align-items:center;gap:2px;background:rgba(40,50,66,.85);
       border:1px solid rgba(120,140,170,.28);border-radius:4px;padding:1px 4px 1px 2px;
       font-family:var(--mono);font-size:10px;color:#dfe6f0;line-height:1.3}
-.chip img{width:15px;height:15px;display:block;image-rendering:auto}
+/* 图标素材是黑底图：screen 混合让黑底融进 chip 深色底（同沙盘画布的抠底思路） */
+.chip img{width:15px;height:15px;display:block;image-rendering:auto;mix-blend-mode:screen}
 .chip.prod{padding-bottom:3px}
 .chip.prod i{position:absolute;left:2px;right:2px;bottom:1px;height:2px;background:var(--accent);border-radius:1px}
 
-/* 底部资源条：双方 矿/气（含采集率）+ 人口 */
-.sbres{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);max-width:92%;
+/* 底部资源条：双方 矿/气（含采集率）+ 人口（纯展示，点击穿透不挡拖拽） */
+.sbres{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);max-width:92%;pointer-events:none;
        display:flex;align-items:center;gap:8px;background:rgba(13,18,26,.82);
        border:1px solid rgba(120,140,170,.25);border-radius:7px;padding:4px 12px;
        font-family:var(--mono);font-size:11px;color:#c3cddb;white-space:nowrap;backdrop-filter:blur(4px)}
