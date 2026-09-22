@@ -360,6 +360,43 @@ if (boRows > 5) {
   await page.waitForTimeout(400);
 }
 
+/* ---------------- 6b. 对局聊天视图 ---------------- */
+step("6b", "对局聊天视图");
+await page.click("#samples .smp:nth-child(2)"); // CN_ZVP：15 条真实聊天
+await page.waitForTimeout(400);
+await page.click('#viewSeg button[data-view="chat"]');
+await page.waitForTimeout(400);
+const chatState = await page.evaluate(() => ({
+  rows: document.querySelectorAll("#chatList .chatrow").length,
+  hasKnownText: /要干嘛/.test(document.querySelector("#chatList").innerText),
+  allyTagged: document.querySelectorAll("#chatList .who em").length,
+}));
+console.log("  " + JSON.stringify(chatState));
+if (chatState.rows !== 15) errors.push(`聊天消息 ${chatState.rows} 条 ≠ 15（CN_ZVP 基准）`);
+if (!chatState.hasKnownText) errors.push("聊天视图没渲染出已知消息文本（要干嘛）");
+// 点击消息 → 时间轴定位。⚠️ CN_ZVP 前 9 条都挤在开局 0s，必须点时间非零的行。
+const clicked = await page.evaluate(() => {
+  const rows = document.querySelectorAll("#chatList .chatrow");
+  const row = rows[rows.length - 1];
+  row.click();
+  return { t: +row.dataset.t, text: row.querySelector(".tx")?.textContent };
+});
+await page.waitForTimeout(300);
+const chatClock = await page.evaluate(() => document.querySelector("#clock").textContent.trim());
+const mm = chatClock.match(/(\d+):(\d+)/);
+const gotSec = mm ? +mm[1] * 60 + +mm[2] : -1;
+console.log(`  点击「${clicked.text}」（${clicked.t}s）→ ${chatClock}`);
+if (Math.abs(gotSec - clicked.t) > 2) errors.push(`点击聊天消息未定位时间轴（期望 ${clicked.t}s，得到 ${chatClock}）`);
+// 空态：无聊天录像应显示占位文案
+await page.click("#samples .smp:nth-child(1)"); // CN_PVT：0 条
+await page.waitForTimeout(400);
+const emptyChat = await page.evaluate(() => document.querySelector("#chatList").innerText);
+console.log("  空态 → " + JSON.stringify(emptyChat));
+if (!/没有聊天消息/.test(emptyChat)) errors.push("无聊天录像未显示空态文案");
+await page.click('#viewSeg button[data-view="data"]');
+await page.click("#samples .smp:nth-child(1)");
+await page.waitForTimeout(300);
+
 /* ---------------- 7. 语音播报 ---------------- */
 step(7, "语音播报");
 const voice = await page.evaluate(() => ({

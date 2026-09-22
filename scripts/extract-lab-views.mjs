@@ -78,8 +78,9 @@ patch(
 /**
  * 喂入解析结果并重绘全部视图。
  * @param {object[]} replays 每项形如原型里的 \`DATA.replays[i]\`：
- *   \`{ file, map, duration, build, region, playedAt, winner, players[] }\`，
- *   每个 player 需要 \`{ name, clan, race, raceFull, t[], series{}, buildOrder[], workerDeaths[] }\`。
+ *   \`{ file, map, duration, build, region, playedAt, winner, players[], chat[] }\`，
+ *   每个 player 需要 \`{ name, clan, race, raceFull, t[], series{}, buildOrder[], workerDeaths[] }\`；
+ *   \`chat[]\` 每项 \`{ t, player, ally, text }\`（对局聊天视图用，可为空数组）。
  *   形状由 \`js/lab/data.js\` 的 \`toLabReplays()\` 保证，两边是一份契约。
  */
 export function mountLab(replays){

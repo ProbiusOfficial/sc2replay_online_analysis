@@ -15,6 +15,7 @@
   <div class="seg" id="viewSeg" style="margin-left:6px">
     <button data-view="data" class="on">数据分析</button>
     <button data-view="bo">建造顺序</button>
+    <button data-view="chat">对局聊天</button>
   </div>
   <div class="spacer"></div>
   <div class="seg v-data" id="modeSeg" style="margin-left:6px">
@@ -23,7 +24,7 @@
     <button data-mode="a">只看 A</button>
     <button data-mode="b">只看 B</button>
   </div>
-  <button class="tbtn" id="btnCsv">导出 CSV</button>
+  <button class="tbtn v-data" id="btnCsv">导出 CSV</button>
 </div>
 
 <div class="wrap">
@@ -115,6 +116,17 @@
             <b>Normal 基准游戏秒（gameLoop / 16）</b>，而时间轴按录像自己的帧率常量换算，
             两者可能不是 1:1。因此列表时间以完整建造项的起点为准；若发现整体偏移，以时间轴游标为准。
           </div>
+        </div>
+      </div>
+
+      <div class="v-chat" id="chatView">
+        <div class="tlbox">
+          <div class="tlhead">
+            <span class="lab">对局聊天</span>
+            <div class="spacer" style="flex:1"></div>
+            <span class="lab" style="color:var(--ink4);font-weight:400">消息按时间排序 · 点击任意消息可将时间轴定位到该时刻 · 随游标推进逐条点亮</span>
+          </div>
+          <div class="chatlist" id="chatList"></div>
         </div>
       </div>
 

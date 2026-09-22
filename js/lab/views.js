@@ -499,6 +499,7 @@ function renderTable(){
   }
   $('#tbl tbody').innerHTML = rows.join('');
   $('#tblInfo').textContent = `${m.label} · ${n} 个采样点 · 间隔 ${r.sampleIntervalSec}s`;
+  if (document.body.classList.contains('chatview')) highlightChatRow();
   highlightRow();
 }
 function highlightRow(){
@@ -691,6 +692,50 @@ function syncBo(){
     if (rel < list.scrollTop + 34 || rel + rh > list.scrollTop + list.clientHeight - 34)
       list.scrollTop = Math.max(0, rel - list.clientHeight * 0.42);
   });
+}
+
+/* ==========================================================================
+   对局聊天视图
+   ========================================================================== */
+function renderChat(){
+  const host = $('#chatList'); if (!host) return;
+  const r = rep(), [a, b] = r.players;
+  const msgs = r.chat ?? [];
+  if (!msgs.length){
+    host.innerHTML = '<div class="chatempty">本局没有聊天消息</div>';
+    return;
+  }
+  host.innerHTML = msgs.map(m => {
+    const side = m.player === a.name ? 'a' : m.player === b.name ? 'b' : 'n';
+    const col = side === 'n' ? 'var(--ink2)' : `var(--${side})`;
+    return `<div class="chatrow" data-t="${m.t}" style="--pc:${col}">
+      <span class="tm">${mmss(m.t)}</span>
+      <span class="who">${esc(m.player)}${m.ally ? ' <em>队友</em>' : ''}</span>
+      <span class="tx">${esc(m.text)}</span>
+    </div>`;
+  }).join('');
+  host.querySelectorAll('.chatrow').forEach(row => {
+    row.onclick = () => { S.t = clamp(+row.dataset.t, 0, rep().duration); syncCursor(); };
+  });
+  highlightChatRow();
+}
+
+/** 随游标点亮已送达的消息（滚动跟随用矩形相对量，别用 offsetTop）。 */
+function highlightChatRow(){
+  const box = $('#chatList'); if (!box) return;
+  const rows = box.querySelectorAll('.chatrow');
+  let last = -1;
+  rows.forEach((row, i) => {
+    const on = +row.dataset.t <= S.t + 1e-6;
+    row.classList.toggle('past', on);
+    if (on) last = i;
+  });
+  rows.forEach((r, i) => r.classList.toggle('now', i === last));
+  const cur = rows[last];
+  if (!cur) return;
+  const rel = cur.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  if (rel < box.scrollTop + 32 || rel + cur.offsetHeight > box.scrollTop + box.clientHeight - 32)
+    box.scrollTop = rel - box.clientHeight * 0.4;
 }
 
 /* ==========================================================================
@@ -904,7 +949,9 @@ $('#viewSeg').onclick = e => {
   const v = btn.dataset.view;
   [...$('#viewSeg').children].forEach(c => c.classList.toggle('on', c === btn));
   document.body.classList.toggle('boview', v === 'bo');
+  document.body.classList.toggle('chatview', v === 'chat');
   if (v === 'data') { renderTimeline(); renderCharts(); }
+  else if (v === 'chat') { renderChat(); }
   else { renderBo(); }
   syncCursor();
 };
@@ -948,6 +995,7 @@ function renderAll(){
   if (V.who >= rep().players.length) V.who = 0;
   renderBoFilter();
   if (document.body.classList.contains('boview')) renderBo();
+  if (document.body.classList.contains('chatview')) renderChat();
   fillWho();
   voiceRebuild();
   S.t = clamp(S.t, 0, rep().duration);
@@ -962,8 +1010,9 @@ function renderAll(){
 /**
  * 喂入解析结果并重绘全部视图。
  * @param {object[]} replays 每项形如原型里的 `DATA.replays[i]`：
- *   `{ file, map, duration, build, region, playedAt, winner, players[] }`，
- *   每个 player 需要 `{ name, clan, race, raceFull, t[], series{}, buildOrder[], workerDeaths[] }`。
+ *   `{ file, map, duration, build, region, playedAt, winner, players[], chat[] }`，
+ *   每个 player 需要 `{ name, clan, race, raceFull, t[], series{}, buildOrder[], workerDeaths[] }`；
+ *   `chat[]` 每项 `{ t, player, ally, text }`（对局聊天视图用，可为空数组）。
  *   形状由 `js/lab/data.js` 的 `toLabReplays()` 保证，两边是一份契约。
  */
 export function mountLab(replays){

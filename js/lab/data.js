@@ -207,6 +207,15 @@ function toLabReplay(file, d) {
   const grid = unionGrid(players.map((p) => p.stats_series?.t ?? []));
   if (grid.length === 0) throw new Error("录像里没有玩家统计事件（SPlayerStatsEvent），无法做数据分析");
 
+  // ⚠️ 时间口径换算：build_order / worker_deaths / chat 的时间都是 **16fps 基准游戏秒**
+  // （gameloop / 16），而时间轴用的是 gameloop / 实际 fps（Normal 16、Faster 22.4，
+  // 由录像自己的对局速度决定，**不能写死 1.4**）。stats 事件每 160 gameloop 一个采样点，
+  // 所以实际 fps = 160 / 采样间隔秒 —— 按样本实测。
+  // 实测：人机局 fps=16.0（因子 1.0），全部对战局 fps=22.54（因子 0.710）；
+  // 换算后建造末条落点 82%~99%，不换算则 LotV 对局的建造/聊天时间整体偏长 40%。
+  const med = medianStep(grid);
+  const gameSecFactor = med > 0 ? 16 / (160 / med) : 1;
+
   // 对齐统计。⚠️ 不要用「Σ(网格长 - 该玩家长度)」来算补点数 —— 那会出负数，
   // 因为**同一玩家的序列里可能有重复时刻**（实测存在），并集去重后比单方还短。
   const ownLens = players.map((p) => p.stats_series?.t?.length ?? 0);
@@ -228,7 +237,7 @@ function toLabReplay(file, d) {
       .map((it) => {
         const unit = cleanUnitName(it.unit);
         return {
-          t: Math.max(0, it.start_time ?? 0),
+          t: Math.max(0, (it.start_time ?? 0) * gameSecFactor),
           supply: it.supply ?? null,
           unit,
           zh: it._kind === "recall" ? "星空加速" : (zhIndex.get(unit.toLowerCase()) ?? unit),
@@ -249,12 +258,21 @@ function toLabReplay(file, d) {
       t: grid,
       series,
       buildOrder,
-      workerDeaths: (p.worker_deaths ?? []).map((w) => ({ t: Math.max(0, w.time ?? 0), unit: w.unit || "" })),
+      workerDeaths: (p.worker_deaths ?? []).map((w) => ({ t: Math.max(0, (w.time ?? 0) * gameSecFactor), unit: w.unit || "" })),
     };
   });
 
   // `ReplayData.winner` 是**名字**不是 id；视图层的 WIN 徽标要的是玩家序号。
   const winnerPid = d.winner ? (shaped.find((p) => p.name === d.winner)?.pid ?? null) : null;
+
+  // 聊天：`chat[].pid` 是协议里的槽位原值，别拿它对位玩家 —— 侧别按**名字**匹配
+  // （观察者的名字不在两名玩家里，自然落成中性色）。
+  const chat = (d.chat ?? []).map((m) => ({
+    t: Math.max(0, (m.time ?? 0) * gameSecFactor),
+    player: m.player || "—",
+    ally: (m.target ?? 0) !== 0,
+    text: m.text || "",
+  }));
 
   return {
     file,
@@ -265,6 +283,7 @@ function toLabReplay(file, d) {
     playedAt: d.start_time ?? null,
     winner: d.winner ?? null,
     winnerPid,
+    chat,
     playerCount: raw.length,
     sampleCount: grid.length,
     sampleIntervalSec: medianStep(grid),
