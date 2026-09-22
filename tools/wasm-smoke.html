@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P0 冒烟 · compute.wasm + 解析 Worker</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; padding: 32px;
+    font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #f6f7f9; color: #1f2328;
+  }
+  main { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.lead { color: #57606a; margin: 0 0 20px; }
+  .card { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed #eaeef2; }
+  .row:last-child { border-bottom: 0; }
+  .label { flex: 0 0 240px; color: #57606a; }
+  .value { flex: 1 1 auto; word-break: break-all; }
+  .ok { color: #1a7f37; font-weight: 700; }
+  .bad { color: #cf222e; font-weight: 700; }
+  .note { font-size: 12px; color: #6e7781; margin-top: 8px; }
+  code { background: #eff1f3; border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>P0 冒烟：compute.wasm + 解析 Worker 骨架</h1>
+  <p class="lead">
+    开发用页面，用于验证 P0 的「CI 编译 wasm → 页面调用成功」闭环。P0 验收后可删除。
+    必须通过 HTTP 服务打开（<code>python3 -m http.server 8080</code>），<code>file://</code> 下 ES Module 与 wasm 加载都会失败。
+  </p>
+
+  <div class="card">
+    <div class="row"><span class="label">主线程直连 wasm</span><span class="value" id="direct">…</span></div>
+    <div class="row"><span class="label">Worker 内加载 wasm</span><span class="value" id="viaWorker">…</span></div>
+    <div class="row"><span class="label">未实现请求的返回</span><span class="value" id="notImpl">…</span></div>
+    <div class="row"><span class="label">解析 Worker</span><span class="value" id="workerInfo">…</span></div>
+    <p class="note">
+      前两项分别验证 glue 直接可用、以及在 Worker 上下文里可用（P3 的实际运行环境是后者）。
+      第三项用于确认 P0 阶段尚未实现的 <code>parse</code> 请求会如实报错，而不是假装成功。
+    </p>
+  </div>
+</main>
+
+<script type="module">
+  const directEl = document.getElementById("direct");
+  const viaWorkerEl = document.getElementById("viaWorker");
+  const notImplEl = document.getElementById("notImpl");
+  const workerInfoEl = document.getElementById("workerInfo");
+
+  window.__p0Smoke = { done: false, results: {} };
+
+  function set(el, ok, text) {
+    el.innerHTML = `<span class="${ok ? "ok" : "bad"}">${ok ? "OK" : "FAIL"}</span> ${text}`;
+  }
+
+  async function run() {
+    // 1) 主线程直连 wasm
+    let directMessage = "";
+    try {
+      const initCompute = (await import("../wasm/pkg/compute.js")).default;
+      const { ping } = await import("../wasm/pkg/compute.js");
+      await initCompute();
+      directMessage = ping();
+      set(directEl, directMessage.startsWith("compute.wasm pong"), `<code>${directMessage}</code>`);
+      window.__p0Smoke.results.direct = directMessage;
+    } catch (err) {
+      set(directEl, false, String(err && err.message ? err.message : err));
+      window.__p0Smoke.results.direct = null;
+    }
+
+    // 2) 经 Worker（worker 内部再加载同一份 wasm）
+    try {
+      const { ping: pingWorker } = await import("../js/worker/index.js");
+      const pong = await pingWorker();
+      const ok = pong.type === "pong" && pong.message.startsWith("compute.wasm pong");
+      set(viaWorkerEl, ok, `<code>${pong.message ?? JSON.stringify(pong)}</code>`);
+      window.__p0Smoke.results.viaWorker = ok ? pong.message : null;
+    } catch (err) {
+      set(viaWorkerEl, false, String(err && err.message ? err.message : err));
+      window.__p0Smoke.results.viaWorker = null;
+    }
+
+    // 3) 尚未实现的 parse 请求必须明确失败
+    try {
+      const { parseReplay } = await import("../js/worker/index.js");
+      const res = await parseReplay(new ArrayBuffer(16), "smoke");
+      const ok = res.type === "error" && res.code === "NOT_IMPLEMENTED";
+      set(notImplEl, ok, `<code>${ok ? res.code : JSON.stringify(res)}</code>`);
+      window.__p0Smoke.results.notImplemented = ok;
+    } catch (err) {
+      set(notImplEl, false, String(err && err.message ? err.message : err));
+      window.__p0Smoke.results.notImplemented = false;
+    }
+
+    workerInfoEl.textContent = `module worker + wasm 复用（PARSER_VERSION 见 js/worker/contract.ts）`;
+    window.__p0Smoke.done = true;
+  }
+
+  run();
+</script>
+</body>
+</html>

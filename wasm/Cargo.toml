@@ -1,0 +1,41 @@
+[package]
+name = "compute"
+version = "0.1.0"
+edition = "2021"
+description = "SC2 replay compute kernels: position interpolation, trail reconstruction, heatmap aggregation"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+# 纯 Rust 的 bzip2 解码器。SC2 录像的数据流是 bzip2 压缩（实测 5 个样本共 53 个块全部为 bzip2），
+# 而浏览器没有原生 bzip2；它位于解析热路径上，故放在 wasm 侧。
+# 不选 `bzip2` crate：那个绑定 libbz2（C），在 wasm32-unknown-unknown 上需要额外交叉编译 bzlib。
+# 正确性已用 53 个真实压缩块与 libbz2 逐块比对通过。
+bzip2-rs = "0.1"
+
+# 体积优先：本 crate 只做数值计算，产物通过 CI 提交入仓供 GitHub Pages 使用。
+# 体积门禁见 .github/workflows/build-wasm.yml（预算 500KB）。
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# wasm-pack 自带的 wasm-opt（117）默认不开启 bulk memory 等目标特性校验，
+# 而 rustc 1.92 的 wasm32-unknown-unknown 默认就会发出 memory.copy / memory.fill，
+# 不加这组开关会在优化阶段直接 "Fatal: error validating input"。
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+  "-Oz",
+  "--enable-bulk-memory",
+  "--enable-nontrapping-float-to-int",
+  "--enable-sign-ext",
+  "--enable-mutable-globals",
+  "--enable-reference-types",
+  "--enable-multivalue",
+]

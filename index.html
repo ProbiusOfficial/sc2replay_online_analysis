@@ -1,153 +1,197 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StarCraft II Replay Analysis Online</title>
-  <link rel="icon" type="image/png" href="StarCraft.svg" />
-  <link rel="stylesheet" href="css/app.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星际争霸 II 录像分析</title>
+<meta name="description" content="纯客户端的星际争霸 II 录像分析：官方回放 overlay 口径的 28 张指标图、建造顺序、语音播报。录像不上传。">
+<link rel="icon" type="image/png" href="StarCraft.svg">
+<link rel="stylesheet" href="css/lab.css">
 </head>
 <body>
-  <nav class="top-nav" aria-label="站点常驻导航">
-    <a class="top-nav-link top-nav-link--active" href="./index.html">本地解析</a>
-    <a class="top-nav-link" href="./replays.html">共享录像库</a>
-  </nav>
-  <div class="container">
-    <header>
-      <h1>StarCraft II Replay Analysis - Online</h1>
-      <p class="subtitle">拖入 .SC2Replay 文件，本地解析；可选将录像共享到公共库</p>
-      <p class="subtitle" style="font-size:0.8rem;margin-top:0.25rem">
-        By 探姬#51276（国服喵），欢迎关注
-        <a href="https://space.bilibili.com/27109929" target="_blank" rel="noopener noreferrer" style="color:var(--accent-blue);text-decoration:none;">探姬_Official的bilibili</a>
-      </p>
-      <div class="feedback-qq" role="region" aria-label="用户反馈 QQ 群">
-        <div class="feedback-qq-qr-wrap">
-          <a class="feedback-qq-qr" href="https://qm.qq.com/q/H03okJE0oA" target="_blank" rel="noopener noreferrer" title="点击打开加群链接（手机可扫码）">
-            <img
-              src="https://api.qrserver.com/v1/create-qr-code/?size=132x132&amp;margin=10&amp;color=f0f6fc&amp;bgcolor=161b22&amp;data=https%3A%2F%2Fqm.qq.com%2Fq%2FH03okJE0oA"
-              width="120"
-              height="120"
-              alt="QQ 群加群二维码，内容与加群链接一致"
-              loading="lazy"
-              decoding="async"
-            />
-          </a>
-        </div>
-        <div class="feedback-qq-text">
-          <strong>星际2录像分析工具 · 反馈交流群</strong>
-          <span>群号 <code>425641107</code> · 扫码或点击下方链接加入</span>
-          <a class="feedback-qq-link" href="https://qm.qq.com/q/H03okJE0oA" target="_blank" rel="noopener noreferrer">点击加入 QQ 群</a>
-        </div>
-      </div>
-    </header>
 
-    <aside class="batch-replay-rail" id="batchReplayRail" aria-label="批量录像摘要" hidden>
-      <div class="batch-replay-rail-inner" id="batchReplayRailInner"></div>
-      <div class="batch-replay-rail-resize" id="batchRailResizeHandle" role="separator" aria-orientation="vertical" aria-label="拖动调节侧栏宽度" title="拖动调节侧栏宽度"></div>
-    </aside>
+<div class="top">
+  <div class="brand"><i>SC</i>录像数据分析台<small>纯客户端 · 录像不上传</small></div>
+  <div class="seg" id="viewSeg" style="margin-left:6px">
+    <button data-view="data" class="on">数据分析</button>
+    <button data-view="bo">建造顺序</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg v-data" id="modeSeg" style="margin-left:6px">
+    <button data-mode="overlay" class="on">叠加对比</button>
+    <button data-mode="diff">差值 |A−B|</button>
+    <button data-mode="a">只看 A</button>
+    <button data-mode="b">只看 B</button>
+  </div>
+  <button class="tbtn" id="btnCsv">导出 CSV</button>
+</div>
 
-    <div class="init-status" id="initStatus">
-      <p>正在加载 Python 运行环境...</p>
-      <p class="progress" id="initProgress">初始化中</p>
-      <p class="hint" style="margin-top:1rem;font-size:0.8rem">请勿直接双击打开，需通过 HTTP 服务访问</p>
-    </div>
+<div class="wrap">
 
-    <div class="drop-zone" id="dropZone" style="display:none">
-      <div class="icon">📁</div>
-      <p>将录像文件拖放到此处，或点击选择文件</p>
-      <p class="hint">支持 .SC2Replay 格式 · 可同时选择或拖入多个录像 · 默认仅本地解析，不会自动上传</p>
-      <input type="file" id="fileInput" accept=".SC2Replay,.sc2replay" multiple />
-    </div>
-
-    <div class="loading" id="loading">
-      <div class="spinner"></div>
-      <p>正在解析录像...</p>
-    </div>
-
-    <div class="error" id="error"></div>
-
-    <div class="result" id="result">
-      <div class="game-info" id="gameInfo"></div>
-      <div class="time-mode-toggle">
-        <label><input type="checkbox" id="showUpgrades" checked /> 显示科技升级</label>
-        <label><input type="checkbox" id="showOriginal" /> 显示英文名称</label>
-        <label><input type="checkbox" id="showWorkers" checked /> 显示农民</label>
-        <label><input type="checkbox" id="mergeSameActions" checked /> 合并同秒操作</label>
-        <label><input type="checkbox" id="showWorkerDeaths" /> 显示工人阵亡</label>
-      </div>
-      <div class="chat-toggle-row">
-        <button id="chatToggle" class="chat-toggle-btn" type="button">查看对局聊天</button>
-      </div>
-      <div class="chat-panel" id="chatPanel"></div>
-      <div class="build-orders" id="buildOrders"></div>
-      <div id="benchmarks" class="benchmarks-section" style="display:none">
-        <h2 class="section-title">对局分析 (Benchmarks)</h2>
-        <div class="benchmarks-grid">
-          <div class="benchmark-card"><h3>农民数量 (每秒采样 · 更快)</h3><canvas id="chartWorkers"></canvas></div>
-          <div class="benchmark-card"><h3>军队价值 (Army Value)</h3><canvas id="chartArmy"></canvas></div>
-          <div class="benchmark-card"><h3>采集速率 (Collection Rate)</h3><canvas id="chartCollection"></canvas></div>
-          <div class="benchmark-card"><h3>人口 / 补给 (已用人口 &amp; 补给上限)</h3><canvas id="chartSupply"></canvas></div>
-          <div class="benchmark-card"><h3>工人战损 (累计击杀 / 累计损失)</h3><canvas id="chartWorkerKD"></canvas></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Voice Reader Panel -->
-    <div class="voice-reader-panel" id="voiceReader">
-      <div class="voice-reader-pip-strip" aria-hidden="true">
-        <div class="voice-pip-row">
-          <div class="voice-pip-left"><div id="voice-timer-pip">00:00</div></div>
-          <div class="voice-pip-divider"></div>
-          <div class="voice-pip-center">
-            <div class="voice-pip-current">
-              <span id="voice-pip-step-time"></span>
-              <span id="voice-pip-step-text">准备就绪</span>
-            </div>
-            <div id="voice-pip-context"></div>
-          </div>
-          <div class="voice-pip-actions">
-            <button type="button" class="voice-pip-btn" id="voicePipBtnStart">开始</button>
-            <button type="button" class="voice-pip-btn" id="voicePipBtnPause">暂停</button>
-          </div>
-        </div>
-        <div class="voice-pip-footer-bars"></div>
-      </div>
-      <div class="voice-reader-main">
-        <div class="voice-reader-header">
-          <h3 id="voice-player-name">Build Order Reader</h3>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button type="button" id="pipBtn" title="打开悬浮小窗（浏览器 Document 画中画）">悬浮模式</button>
-            <button class="voice-reader-close" id="voiceClose">&times;</button>
-          </div>
-        </div>
-        <div id="voice-timer">00:00</div>
-        <div class="voice-queue">
-          <div class="voice-step past" id="v-q-2"></div>
-          <div class="voice-step past" id="v-q-1"></div>
-          <div class="voice-step active" id="v-q0">准备就绪</div>
-          <div class="voice-step future" id="v-q1"></div>
-          <div class="voice-step future" id="v-q2"></div>
-        </div>
-        <div class="voice-bars-host" id="voiceBarsHost">
-          <div class="voice-step-progress"><div id="voice-step-bar"></div></div>
-          <div class="voice-timeline" id="voiceTimeline"><div id="voice-timeline-bar"></div></div>
-        </div>
-        <div class="voice-controls">
-          <button class="voice-btn voice-btn-play" id="voicePlay">开始 (Alt+↑)</button>
-          <button class="voice-btn voice-btn-reset" id="voiceReset">重置 (Alt+↓)</button>
-        </div>
-        <div class="voice-settings">
-          <div class="voice-setting-row"><span>语速</span><input type="range" id="voiceRate" min="1" max="4" step="0.2" value="2.0" /></div>
-          <div class="voice-setting-row"><span>画中画字号</span><input type="range" id="voicePipFontScale" min="75" max="150" step="5" value="100" /><span class="voice-pip-font-val" id="voicePipFontScaleVal">100%</span></div>
-          <div class="voice-setting-row"><span>语言</span><select id="voiceLang"><option value="zh-CN">中文 (简体)</option><option value="en-US">English (US)</option></select></div>
-          <div style="font-size:0.65rem;margin-top:0.25rem">Alt+↑/↓ 播放/重置 | Alt+←/→ 跳步</div>
-        </div>
-      </div>
-    </div>
+  <!-- ============ 运行态：初始化 / 错误 / 拖放 / 解析中 ============ -->
+  <div class="init-status" id="initStatus">
+    <div class="spinner"></div>
+    <p>正在加载解析内核（WASM）…</p>
+    <p class="progress" id="initProgress">初始化中</p>
+    <p class="hint" style="margin-top:14px;font-size:11.5px;color:var(--ink4)">
+      请勿直接双击打开本文件，需通过 HTTP 服务访问（<code>python3 -m http.server 8080</code>）
+    </p>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <script type="module" src="js/app.js"></script>
+  <div class="errorbar" id="error"></div>
+
+  <div class="drop-zone" id="dropZone" style="display:none">
+    <div class="icon">📁</div>
+    <p>把 .SC2Replay 拖到这里，或点击选择文件</p>
+    <p class="hint">可一次拖入多个录像 · 全部在本地解析，不会上传任何文件</p>
+    <input type="file" id="fileInput" accept=".SC2Replay,.sc2replay" multiple>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div><span id="loadingText">正在解析…</span>
+  </div>
+
+  <!-- ============ 分析结果 ============ -->
+  <div id="result">
+
+   <!-- 左：录像列表（本地批量的唯一入口） · 右：全部分析视图 -->
+   <div class="layout">
+
+    <aside class="rail">
+      <div class="railhead">
+        <span class="lab">录像列表</span>
+        <button class="tbtn" id="pickMore" type="button">＋ 添加录像</button>
+        <div class="grow"></div>
+        <span class="lab" id="railNote"></span>
+      </div>
+      <div class="samples" id="samples"></div>
+    </aside>
+
+    <div class="main">
+
+      <div class="head" id="head"></div>
+
+      <div class="tlbox">
+        <div class="tlhead">
+          <span class="lab">时间轴</span>
+          <span class="clock" id="clock"></span>
+          <div class="spacer" style="flex:1"></div>
+          <span class="lab" style="color:var(--ink4);font-weight:400">在任意图表或本条时间轴上移动鼠标即可同步全部视图</span>
+        </div>
+        <div class="tl" id="tl">
+          <svg id="tlsvg"></svg>
+          <div class="evlay" id="evlay"></div>
+          <div class="cl" id="tlcl" style="left:14px"></div>
+        </div>
+        <div class="tllegend" id="tllegend"></div>
+      </div>
+
+      <div class="readouts v-data" id="readouts"></div>
+
+      <div class="body v-data">
+        <aside class="side" id="side"></aside>
+        <div class="charts" id="charts"></div>
+      </div>
+
+      <div class="v-bo" id="boView">
+        <div class="tlbox">
+          <div class="tlhead">
+            <span class="lab">显示</span>
+            <div class="bofilter" id="boFilter"></div>
+            <div class="spacer" style="flex:1"></div>
+            <span class="lab" style="color:var(--ink4);font-weight:400">行左色条 = 建造类别 · 与上方时间轴同步高亮，点任意行可跳转</span>
+          </div>
+        </div>
+        <div class="bo" id="bo"></div>
+        <div class="tlbox" style="margin-top:0">
+          <div class="note" style="border-top:0">
+            <b>建造顺序口径</b> —— 两侧列表取自解析管线的
+            <code>extractReplayData().teams[].players[].build_order</code>，与本页其余视图同一条链路。
+            原始行的 <code>_kind</code> <b>只有 <code>unit</code> / <code>recall</code> 两种</b>，
+            「建筑 / 单位 / 升级」是用 <code>data.json</code> 的名表反查出来的。
+            变形与模式切换类行（<code>*Flying</code> / <code>*Lowered</code> / <code>*Burrowed</code> /
+            解放者空对地 / 维京突击模式 …）已过滤，它们不是新建造。
+            <br><b>时间口径</b> —— <code>build_order.start_time</code> 的单位是
+            <b>Normal 基准游戏秒（gameLoop / 16）</b>，而时间轴按录像自己的帧率常量换算，
+            两者可能不是 1:1。因此列表时间以「完整建造项的起点」为准，
+            若发现整体偏移请以时间轴游标为准并反馈。
+          </div>
+        </div>
+      </div>
+
+      <div class="tblbox v-data">
+        <header>
+          <b>原始采样表</b>
+          <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)" id="tblInfo"></span>
+          <div class="sp"></div>
+          <span style="font-size:11px;color:var(--ink3);white-space:nowrap">指标</span>
+          <div class="seg" id="tblSeg" style="max-width:540px;overflow-x:auto"></div>
+        </header>
+        <div class="tblwrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+        <div class="note">
+          <b>口径说明</b> —— 全部序列取自回放 tracker 流的 <code>SPlayerStatsEvent</code>，
+          即官方客户端回放 overlay（Resources / Income / Spending / Army / Losses）所用的同一张表。
+          这个事件里有 <b>39 个 <code>m_scoreValue*</code> 计分字段</b>，
+          本页把它们呈现为 <b>28 张可视图表</b>（少数做了合并或求和，如「军队价值 = 矿 + 气」、
+          「支出合计 = 经济 + 科技 + 军队」）。
+          <br><b>采样密度由录像自身决定</b> —— 每 160 gameLoop 一个采样点，LotV 下约 <b>7.1 实秒</b>；
+          因此曲线是<b>折线</b>而不是逐秒精度，请不要按「某一秒」去读某个值。
+          <br><b>数值口径</b> —— 只有 <code>人口</code> 是 1/4096 定点、已还原；
+          其余字段都是<b>原始计分值</b>，尚未做单位换算（矿/分、气/分等）。
+          请以<b>双方对比与趋势</b>为准，不要直接读绝对值。
+          总时长取解析管线的 <code>game_length</code>。
+          <br><b>两名玩家对齐</b> —— 真实录像里两名玩家的采样点数常差 1~2 个（少的一方通常先被推平），
+          为保证跨玩家同索引比较，本页把双方对齐到<b>采样时刻的并集</b>并在缺口处前向填充；
+          补点数量见录像列表的提示。
+        </div>
+      </div>
+
+    </div><!-- /.main -->
+
+   </div><!-- /.layout -->
+  </div><!-- /#result -->
+
+  <!-- ============ 语音播报 + 悬浮（播放器条） ============ -->
+  <!-- .vb 只画「横跨视口的背景 + 分隔线」；.vbin 负责排版并与主体 .wrap 同宽居中。
+       上一版 .vb 自己是 flex 容器，内容从视口左缘起排 —— 1920 屏上比主体偏左 142px。 -->
+  <div class="vb" id="vb">
+   <div class="vbin">
+    <div class="clock2" id="vbClock">00:00</div>
+    <div class="queue">
+      <div id="vbQueue"></div>
+      <div class="prog"><i id="vbProg"></i></div>
+    </div>
+    <div class="ctl">
+      <button class="vbbtn primary" id="vbPlay">开始</button>
+      <button class="vbbtn" id="vbReset">重置</button>
+      <div class="vbset"><span>播报</span><select id="vbWho"></select></div>
+      <div class="vbset"><span>倍速</span>
+        <select id="vbSpeed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select>
+      </div>
+      <div class="vbset"><span>语速</span><input type="range" id="vbRate" min="1" max="4" step="0.2" value="2"></div>
+      <div class="vbset"><select id="vbLang"><option value="zh-CN">中文</option><option value="en-US">English</option></select></div>
+    </div>
+    <div class="ov">
+      <span class="ovdot" id="ovDot"></span>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button class="vbbtn" id="ovBtn" style="align-self:flex-start">悬浮到桌面</button>
+        <div class="ovtxt" id="ovTxt">探测本地悬浮组件中…</div>
+      </div>
+    </div>
+   </div><!-- /.vbin -->
+  </div>
+</div><!-- /.wrap -->
+
+<!-- 页脚自己承担底部留白（padding-bottom = --vbh + 24px）：
+     它是文档最后一个元素，只有它能挡住固定在下方的播报条 -->
+<footer class="pagefoot">
+  By 探姬#51276（国服喵）·
+  <a href="https://space.bilibili.com/27109929" target="_blank" rel="noopener noreferrer">探姬_Official</a>
+  · 反馈交流群 <code>425641107</code>
+  · <a href="https://qm.qq.com/q/H03okJE0oA" target="_blank" rel="noopener noreferrer">点击加群</a>
+  <br>全部解析在浏览器本地完成，录像文件不会离开你的电脑。
+</footer>
+
+<script type="module" src="js/lab/main.js"></script>
 </body>
 </html>

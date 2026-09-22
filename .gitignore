@@ -4,4 +4,19 @@ sc2_parser
 __pycache__
 10000 Feet LE (7).SC2Replay
 server
-docs
+
+# 本地归档：上一代 UI 快照（index/replays 旧版）与被叫停的 prototype 方案（ui-v2 + 其 8MB 截图）。
+# 不入仓 —— 需要回退时从 git 历史取（被删模块都是 git rm，历史完整）。
+prototype/_legacy/
+
+# 路线 C（P0）新增：Rust 编译中间产物不入仓；wasm/pkg/ 的产物**要**入仓供 Pages 使用
+/wasm/target
+/node_modules
+
+# 路线 C（P1）新增：协议 codegen 的上游文件缓存（官方 s2protocol 的 .py 与版本列表）。
+# 运行时不需要它 —— 产物 js/worker/decoder/protocols/*.ts 已入仓。
+/.protocol-cache
+
+# 路线 C（P1c）新增：冻结基线时缓存的上游依赖（sc2reader / spawningtool 的 sdist/wheel）。
+# 运行时不需要它 —— 验收基准 tests/baseline/*.json 已入仓。
+/.baseline-cache

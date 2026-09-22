@@ -1,0 +1,902 @@
+{
+ "CN_PVT_T-AI.SC2Replay": {
+  "rawSize": 37433,
+  "rawMd5": "b5e406738dd759eb4e453a869bfee39d",
+  "header": {
+   "magic": "4d50511a",
+   "headerSize": 208,
+   "archiveSize": 36409,
+   "formatVersion": 3,
+   "sectorSizeShift": 5,
+   "hashTableOffset": 35625,
+   "blockTableOffset": 36137,
+   "hashTableEntries": 32,
+   "blockTableEntries": 17,
+   "offset": 1024
+  },
+  "userDataHeader": {
+   "magic": "4d50511b",
+   "userDataSize": 512,
+   "mpqHeaderOffset": 1024,
+   "userDataHeaderSize": 114,
+   "contentMd5": "8e7478baed4ead82744ead8e3048da2d",
+   "contentLength": 114
+  },
+  "hashTableEntryCount": 32,
+  "blockTableEntryCount": 17,
+  "listfile": [
+   "replay.attributes.events",
+   "replay.details",
+   "replay.details.backup",
+   "replay.game.events",
+   "replay.gamemetadata.json",
+   "replay.initData",
+   "replay.initData.backup",
+   "replay.load.info",
+   "replay.message.events",
+   "replay.resumable.events",
+   "replay.server.battlelobby",
+   "replay.smartcam.events",
+   "replay.sync.events",
+   "replay.sync.history",
+   "replay.tracker.events"
+  ],
+  "files": {
+   "replay.attributes.events": {
+    "blockIndex": 13,
+    "offset": 34034,
+    "archivedSize": 559,
+    "size": 2115,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "3f440852333e1f7981dc5b22845a8da3"
+   },
+   "replay.details": {
+    "blockIndex": 0,
+    "offset": 1232,
+    "archivedSize": 618,
+    "size": 618,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "d4d7c62e70bfecc06260486bbcb4ba73"
+   },
+   "replay.details.backup": {
+    "blockIndex": 1,
+    "offset": 1866,
+    "archivedSize": 545,
+    "size": 545,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "769ad2d6c0649ae118acb7167d430d52"
+   },
+   "replay.game.events": {
+    "blockIndex": 6,
+    "offset": 20754,
+    "archivedSize": 7124,
+    "size": 11863,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "1a6b537e17b87336ef2e5dd5c410581c"
+   },
+   "replay.gamemetadata.json": {
+    "blockIndex": 2,
+    "offset": 2427,
+    "archivedSize": 291,
+    "size": 608,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "1c9b53d327c2884398cd8aed1958e9e4"
+   },
+   "replay.initData": {
+    "blockIndex": 3,
+    "offset": 2734,
+    "archivedSize": 1671,
+    "size": 4232,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "dbec460d2f9bcf487d16ee3edb4a6fdc"
+   },
+   "replay.initData.backup": {
+    "blockIndex": 4,
+    "offset": 4421,
+    "archivedSize": 1610,
+    "size": 4153,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "58b3919ce71ce99ba3bd08417ba9db84"
+   },
+   "replay.load.info": {
+    "blockIndex": 8,
+    "offset": 27952,
+    "archivedSize": 40,
+    "size": 52,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "469aa816010c9c8639a9176f625189af"
+   },
+   "replay.message.events": {
+    "blockIndex": 7,
+    "offset": 27894,
+    "archivedSize": 42,
+    "size": 42,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "df6f88a23cbdab8cdd2cd344ea1cb260"
+   },
+   "replay.resumable.events": {
+    "blockIndex": 14,
+    "offset": 34609,
+    "archivedSize": 12,
+    "size": 12,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "8ce36e75b4676138979471d6b0583119"
+   },
+   "replay.server.battlelobby": {
+    "blockIndex": 5,
+    "offset": 6047,
+    "archivedSize": 14691,
+    "size": 29974,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "cc6a428444b10ebb2794919eb63f1ee3"
+   },
+   "replay.smartcam.events": {
+    "blockIndex": 12,
+    "offset": 33345,
+    "archivedSize": 673,
+    "size": 1078,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "0a5499faab6b06557fbec61894135005"
+   },
+   "replay.sync.events": {
+    "blockIndex": 9,
+    "offset": 28008,
+    "archivedSize": 391,
+    "size": 490,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "f55d2912cbc672cdf77196f2a54c5340"
+   },
+   "replay.sync.history": {
+    "blockIndex": 10,
+    "offset": 0,
+    "archivedSize": 0,
+    "size": 0,
+    "flags": 2147484160,
+    "compression": "none",
+    "md5Unpacked": null
+   },
+   "replay.tracker.events": {
+    "blockIndex": 11,
+    "offset": 28415,
+    "archivedSize": 4914,
+    "size": 29510,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "0380d200d92698c978ce609b87fabd63"
+   }
+  }
+ },
+ "CN_ZVP.SC2Replay": {
+  "rawSize": 39409,
+  "rawMd5": "3370fb1fe4264e6ce159a8a51a0f617b",
+  "header": {
+   "magic": "4d50511a",
+   "headerSize": 208,
+   "archiveSize": 38385,
+   "formatVersion": 3,
+   "sectorSizeShift": 5,
+   "hashTableOffset": 37601,
+   "blockTableOffset": 38113,
+   "hashTableEntries": 32,
+   "blockTableEntries": 17,
+   "offset": 1024
+  },
+  "userDataHeader": {
+   "magic": "4d50511b",
+   "userDataSize": 512,
+   "mpqHeaderOffset": 1024,
+   "userDataHeaderSize": 114,
+   "contentMd5": "c8c10003f6099629ae81861293272e1c",
+   "contentLength": 114
+  },
+  "hashTableEntryCount": 32,
+  "blockTableEntryCount": 17,
+  "listfile": [
+   "replay.attributes.events",
+   "replay.details",
+   "replay.details.backup",
+   "replay.game.events",
+   "replay.gamemetadata.json",
+   "replay.initData",
+   "replay.initData.backup",
+   "replay.load.info",
+   "replay.message.events",
+   "replay.resumable.events",
+   "replay.server.battlelobby",
+   "replay.smartcam.events",
+   "replay.sync.events",
+   "replay.sync.history",
+   "replay.tracker.events"
+  ],
+  "files": {
+   "replay.attributes.events": {
+    "blockIndex": 13,
+    "offset": 35986,
+    "archivedSize": 556,
+    "size": 2115,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "0ebf10f2e65a2227a66bbde203aaa80c"
+   },
+   "replay.details": {
+    "blockIndex": 0,
+    "offset": 1232,
+    "archivedSize": 573,
+    "size": 573,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "f5351de24f10d487175b8447e95e28b3"
+   },
+   "replay.details.backup": {
+    "blockIndex": 1,
+    "offset": 1821,
+    "archivedSize": 545,
+    "size": 545,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "1063613416deb222665c490f3621b962"
+   },
+   "replay.game.events": {
+    "blockIndex": 6,
+    "offset": 24826,
+    "archivedSize": 6858,
+    "size": 15223,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "5569ab66e870625bfd774d890cfd5218"
+   },
+   "replay.gamemetadata.json": {
+    "blockIndex": 2,
+    "offset": 2382,
+    "archivedSize": 293,
+    "size": 605,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "4694d317e3b6a27dd73055e2fa8f4704"
+   },
+   "replay.initData": {
+    "blockIndex": 3,
+    "offset": 2691,
+    "archivedSize": 1735,
+    "size": 4721,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "66e8a2513ab9ee7239f9d3db89a56965"
+   },
+   "replay.initData.backup": {
+    "blockIndex": 4,
+    "offset": 4442,
+    "archivedSize": 1679,
+    "size": 4637,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "e3bd69e59f1257e7dfc6d9977644e2b4"
+   },
+   "replay.load.info": {
+    "blockIndex": 8,
+    "offset": 31919,
+    "archivedSize": 40,
+    "size": 52,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "469aa816010c9c8639a9176f625189af"
+   },
+   "replay.message.events": {
+    "blockIndex": 7,
+    "offset": 31700,
+    "archivedSize": 203,
+    "size": 237,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "50b39b335634888825a50fed9f421fb3"
+   },
+   "replay.resumable.events": {
+    "blockIndex": 14,
+    "offset": 36558,
+    "archivedSize": 34,
+    "size": 34,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "85a508e13c37ac76d24668ed33c48857"
+   },
+   "replay.server.battlelobby": {
+    "blockIndex": 5,
+    "offset": 6137,
+    "archivedSize": 18657,
+    "size": 35050,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "900b475b824919682237af33d944b913"
+   },
+   "replay.smartcam.events": {
+    "blockIndex": 12,
+    "offset": 35709,
+    "archivedSize": 261,
+    "size": 390,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "41b05b573ce5cfa3c1ba23df8084020b"
+   },
+   "replay.sync.events": {
+    "blockIndex": 9,
+    "offset": 31975,
+    "archivedSize": 195,
+    "size": 205,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "fb041187fa584f1da6a3f51c3f755aa0"
+   },
+   "replay.sync.history": {
+    "blockIndex": 10,
+    "offset": 0,
+    "archivedSize": 0,
+    "size": 0,
+    "flags": 2147484160,
+    "compression": "none",
+    "md5Unpacked": null
+   },
+   "replay.tracker.events": {
+    "blockIndex": 11,
+    "offset": 32186,
+    "archivedSize": 3507,
+    "size": 22737,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "f60fc55a391e96552cc1e858b167ccf0"
+   }
+  }
+ },
+ "US_TVP.SC2Replay": {
+  "rawSize": 165616,
+  "rawMd5": "383e0976cf8b5261911b19ca702f5d75",
+  "header": {
+   "magic": "4d50511a",
+   "headerSize": 208,
+   "archiveSize": 164592,
+   "formatVersion": 3,
+   "sectorSizeShift": 5,
+   "hashTableOffset": 163808,
+   "blockTableOffset": 164320,
+   "hashTableEntries": 32,
+   "blockTableEntries": 17,
+   "offset": 1024
+  },
+  "userDataHeader": {
+   "magic": "4d50511b",
+   "userDataSize": 512,
+   "mpqHeaderOffset": 1024,
+   "userDataHeaderSize": 115,
+   "contentMd5": "328225404add7f85559ddf3b030121c8",
+   "contentLength": 115
+  },
+  "hashTableEntryCount": 32,
+  "blockTableEntryCount": 17,
+  "listfile": [
+   "replay.attributes.events",
+   "replay.details",
+   "replay.details.backup",
+   "replay.game.events",
+   "replay.gamemetadata.json",
+   "replay.initData",
+   "replay.initData.backup",
+   "replay.load.info",
+   "replay.message.events",
+   "replay.resumable.events",
+   "replay.server.battlelobby",
+   "replay.smartcam.events",
+   "replay.sync.events",
+   "replay.sync.history",
+   "replay.tracker.events"
+  ],
+  "files": {
+   "replay.attributes.events": {
+    "blockIndex": 13,
+    "offset": 162173,
+    "archivedSize": 586,
+    "size": 2141,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "b17a825c521498f777f8ce732f5d4fc4"
+   },
+   "replay.details": {
+    "blockIndex": 0,
+    "offset": 1232,
+    "archivedSize": 709,
+    "size": 709,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "ba7fe1f2f03d3a996b7c6d70516dc844"
+   },
+   "replay.details.backup": {
+    "blockIndex": 1,
+    "offset": 1957,
+    "archivedSize": 648,
+    "size": 648,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "df65583649480fdc11be8f4a8bc7f58b"
+   },
+   "replay.game.events": {
+    "blockIndex": 6,
+    "offset": 23807,
+    "archivedSize": 107329,
+    "size": 257704,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "0adff2cb6886e0b98b2b3c84991df6c1"
+   },
+   "replay.gamemetadata.json": {
+    "blockIndex": 2,
+    "offset": 2621,
+    "archivedSize": 309,
+    "size": 613,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "fdff8da9866f87208fb4dfd0b7271376"
+   },
+   "replay.initData": {
+    "blockIndex": 3,
+    "offset": 2946,
+    "archivedSize": 2042,
+    "size": 4871,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "3af949d80c98084a308ba6405d2f677d"
+   },
+   "replay.initData.backup": {
+    "blockIndex": 4,
+    "offset": 5004,
+    "archivedSize": 1887,
+    "size": 4698,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "7c76fb65034bd611fb57ae113ca4c53d"
+   },
+   "replay.load.info": {
+    "blockIndex": 8,
+    "offset": 131330,
+    "archivedSize": 40,
+    "size": 52,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "469aa816010c9c8639a9176f625189af"
+   },
+   "replay.message.events": {
+    "blockIndex": 7,
+    "offset": 131248,
+    "archivedSize": 66,
+    "size": 70,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "dcc92e7678e7e0fc9a3ba6f8dbdc19e1"
+   },
+   "replay.resumable.events": {
+    "blockIndex": 14,
+    "offset": 162775,
+    "archivedSize": 12,
+    "size": 12,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "0ff498665107caac3682658f4221787d"
+   },
+   "replay.server.battlelobby": {
+    "blockIndex": 5,
+    "offset": 6907,
+    "archivedSize": 16868,
+    "size": 33369,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "494e404dfa59f2d29009852c113ab9d2"
+   },
+   "replay.smartcam.events": {
+    "blockIndex": 12,
+    "offset": 158496,
+    "archivedSize": 3661,
+    "size": 6507,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "fb291e63967fe0be56a8e0b4038d43df"
+   },
+   "replay.sync.events": {
+    "blockIndex": 9,
+    "offset": 131386,
+    "archivedSize": 1232,
+    "size": 1795,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "c3dd3fd0fce1402f1e7be4a375a7ad09"
+   },
+   "replay.sync.history": {
+    "blockIndex": 10,
+    "offset": 0,
+    "archivedSize": 0,
+    "size": 0,
+    "flags": 2147484160,
+    "compression": "none",
+    "md5Unpacked": null
+   },
+   "replay.tracker.events": {
+    "blockIndex": 11,
+    "offset": 132634,
+    "archivedSize": 25830,
+    "size": 131119,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "cd7d8d8d4ac230e2ac0c3b504e99293c"
+   }
+  }
+ },
+ "US_TVR(T)_2018_old.SC2Replay": {
+  "rawSize": 139694,
+  "rawMd5": "bc36a714f31def408ddcc019504eb7ad",
+  "header": {
+   "magic": "4d50511a",
+   "headerSize": 208,
+   "archiveSize": 138670,
+   "formatVersion": 3,
+   "sectorSizeShift": 5,
+   "hashTableOffset": 137886,
+   "blockTableOffset": 138398,
+   "hashTableEntries": 32,
+   "blockTableEntries": 17,
+   "offset": 1024
+  },
+  "userDataHeader": {
+   "magic": "4d50511b",
+   "userDataSize": 512,
+   "mpqHeaderOffset": 1024,
+   "userDataHeaderSize": 115,
+   "contentMd5": "61a2255b764158fa55adf5514ff8101d",
+   "contentLength": 115
+  },
+  "hashTableEntryCount": 32,
+  "blockTableEntryCount": 17,
+  "listfile": [
+   "replay.attributes.events",
+   "replay.details",
+   "replay.details.backup",
+   "replay.game.events",
+   "replay.gamemetadata.json",
+   "replay.initData",
+   "replay.initData.backup",
+   "replay.load.info",
+   "replay.message.events",
+   "replay.resumable.events",
+   "replay.server.battlelobby",
+   "replay.smartcam.events",
+   "replay.sync.events",
+   "replay.sync.history",
+   "replay.tracker.events"
+  ],
+  "files": {
+   "replay.attributes.events": {
+    "blockIndex": 13,
+    "offset": 136284,
+    "archivedSize": 553,
+    "size": 2037,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "3bd10cee2fb7c0ea0bac1442b7fa150f"
+   },
+   "replay.details": {
+    "blockIndex": 0,
+    "offset": 1232,
+    "archivedSize": 565,
+    "size": 565,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "3f544ef231a2778be9adb15aa3ec2c4d"
+   },
+   "replay.details.backup": {
+    "blockIndex": 1,
+    "offset": 1813,
+    "archivedSize": 542,
+    "size": 542,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "343d11238c80f50851583f550f9bfdc3"
+   },
+   "replay.game.events": {
+    "blockIndex": 6,
+    "offset": 21073,
+    "archivedSize": 78197,
+    "size": 152895,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "db22bf900270553b6a40b57856852525"
+   },
+   "replay.gamemetadata.json": {
+    "blockIndex": 2,
+    "offset": 2371,
+    "archivedSize": 293,
+    "size": 603,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "fdd1a245c00d0183200e988a4f83ae8f"
+   },
+   "replay.initData": {
+    "blockIndex": 3,
+    "offset": 2680,
+    "archivedSize": 1607,
+    "size": 3775,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "486c6bbf827b80578ab99500859089ad"
+   },
+   "replay.initData.backup": {
+    "blockIndex": 4,
+    "offset": 4303,
+    "archivedSize": 1568,
+    "size": 3698,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "d660e0abc94e26aa959eeabb8028e33a"
+   },
+   "replay.load.info": {
+    "blockIndex": 8,
+    "offset": 99460,
+    "archivedSize": 40,
+    "size": 52,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "469aa816010c9c8639a9176f625189af"
+   },
+   "replay.message.events": {
+    "blockIndex": 7,
+    "offset": 99350,
+    "archivedSize": 94,
+    "size": 94,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "eeaca726617e1f301a99c894d97b9fcc"
+   },
+   "replay.resumable.events": {
+    "blockIndex": 14,
+    "offset": 136853,
+    "archivedSize": 12,
+    "size": 12,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "4e068d9485e99dbe589c12ad381c55c3"
+   },
+   "replay.server.battlelobby": {
+    "blockIndex": 5,
+    "offset": 5887,
+    "archivedSize": 15170,
+    "size": 29711,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "3c4cf22ea115a59997969f512b95dbbc"
+   },
+   "replay.smartcam.events": {
+    "blockIndex": 12,
+    "offset": 129888,
+    "archivedSize": 6380,
+    "size": 11818,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "041fd22c9b8cf2b95f1c9805be0b1108"
+   },
+   "replay.sync.events": {
+    "blockIndex": 9,
+    "offset": 99516,
+    "archivedSize": 1853,
+    "size": 3040,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "f48fc174351d7cd5f44f7793c1e151f5"
+   },
+   "replay.sync.history": {
+    "blockIndex": 10,
+    "offset": 0,
+    "archivedSize": 0,
+    "size": 0,
+    "flags": 2147484160,
+    "compression": "none",
+    "md5Unpacked": null
+   },
+   "replay.tracker.events": {
+    "blockIndex": 11,
+    "offset": 101385,
+    "archivedSize": 28471,
+    "size": 161083,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "3db86f6a516e38a464d2f5cbce478e08"
+   }
+  }
+ },
+ "hero(w) vs reynor g1 winter madness(PVZ).SC2Replay": {
+  "rawSize": 246623,
+  "rawMd5": "d7bacbf204fffcae28afc3f70543a755",
+  "header": {
+   "magic": "4d50511a",
+   "headerSize": 208,
+   "archiveSize": 245599,
+   "formatVersion": 3,
+   "sectorSizeShift": 5,
+   "hashTableOffset": 244815,
+   "blockTableOffset": 245327,
+   "hashTableEntries": 32,
+   "blockTableEntries": 17,
+   "offset": 1024
+  },
+  "userDataHeader": {
+   "magic": "4d50511b",
+   "userDataSize": 512,
+   "mpqHeaderOffset": 1024,
+   "userDataHeaderSize": 115,
+   "contentMd5": "cc850afa0a5e2346eea4c65fbc8546c7",
+   "contentLength": 115
+  },
+  "hashTableEntryCount": 32,
+  "blockTableEntryCount": 17,
+  "listfile": [
+   "replay.attributes.events",
+   "replay.details",
+   "replay.details.backup",
+   "replay.game.events",
+   "replay.gamemetadata.json",
+   "replay.initData",
+   "replay.initData.backup",
+   "replay.load.info",
+   "replay.message.events",
+   "replay.resumable.events",
+   "replay.server.battlelobby",
+   "replay.smartcam.events",
+   "replay.sync.events",
+   "replay.sync.history",
+   "replay.tracker.events"
+  ],
+  "files": {
+   "replay.attributes.events": {
+    "blockIndex": 13,
+    "offset": 243168,
+    "archivedSize": 576,
+    "size": 2141,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "ab2fed7ad704ecda6889e4c03cbc050e"
+   },
+   "replay.details": {
+    "blockIndex": 0,
+    "offset": 1232,
+    "archivedSize": 605,
+    "size": 605,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "94587f200e57d6a6e31b564fb0e10b73"
+   },
+   "replay.details.backup": {
+    "blockIndex": 1,
+    "offset": 1853,
+    "archivedSize": 589,
+    "size": 589,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "6adf7eb72c4bfb28b269c46b0c19ac65"
+   },
+   "replay.game.events": {
+    "blockIndex": 6,
+    "offset": 22876,
+    "archivedSize": 157323,
+    "size": 369001,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "c8f6416156a930fb2af7de5ce794182f"
+   },
+   "replay.gamemetadata.json": {
+    "blockIndex": 2,
+    "offset": 2458,
+    "archivedSize": 298,
+    "size": 613,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "2196942f87ee5efb8a34a2cdf7d54267"
+   },
+   "replay.initData": {
+    "blockIndex": 3,
+    "offset": 2772,
+    "archivedSize": 1811,
+    "size": 4755,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "c65888675afabd4c2ddfac0eb985d8c7"
+   },
+   "replay.initData.backup": {
+    "blockIndex": 4,
+    "offset": 4599,
+    "archivedSize": 1738,
+    "size": 4621,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "4eaef18aed82c696fab419642e2f72ae"
+   },
+   "replay.load.info": {
+    "blockIndex": 8,
+    "offset": 180479,
+    "archivedSize": 40,
+    "size": 52,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "469aa816010c9c8639a9176f625189af"
+   },
+   "replay.message.events": {
+    "blockIndex": 7,
+    "offset": 180359,
+    "archivedSize": 104,
+    "size": 204,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "715e8a8e2503065327fa0c9ddcd14670"
+   },
+   "replay.resumable.events": {
+    "blockIndex": 14,
+    "offset": 243760,
+    "archivedSize": 29,
+    "size": 29,
+    "flags": 2164261376,
+    "compression": "none",
+    "md5Unpacked": "02d2dd2e7485193981c197a7d22b4a47"
+   },
+   "replay.server.battlelobby": {
+    "blockIndex": 5,
+    "offset": 6353,
+    "archivedSize": 16491,
+    "size": 32921,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "5a78dd865f8aa25076c22ba294072a19"
+   },
+   "replay.smartcam.events": {
+    "blockIndex": 12,
+    "offset": 239757,
+    "archivedSize": 3395,
+    "size": 5967,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "aeb1532c3985fce5a5f42b45ce6144e1"
+   },
+   "replay.sync.events": {
+    "blockIndex": 9,
+    "offset": 180535,
+    "archivedSize": 1124,
+    "size": 1630,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "a40c111183978c6dc0cb6cc40ea9692b"
+   },
+   "replay.sync.history": {
+    "blockIndex": 10,
+    "offset": 0,
+    "archivedSize": 0,
+    "size": 0,
+    "flags": 2147484160,
+    "compression": "none",
+    "md5Unpacked": null
+   },
+   "replay.tracker.events": {
+    "blockIndex": 11,
+    "offset": 181675,
+    "archivedSize": 58018,
+    "size": 476635,
+    "flags": 2164261376,
+    "compression": "bzip2",
+    "md5Unpacked": "468e17bb8e3fa660d1745c1cb667c5c8"
+   }
+  }
+ }
+}

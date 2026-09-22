@@ -1,6 +1,7 @@
 /** 跨模块共享的可变状态（单页应用内统一从此读写） */
 export const appState = {
-  pyodide: null,
+  /** 解析内核（Worker + wasm）是否就绪。旧字段 `pyodide` 已随 Pyodide 下线移除。 */
+  parserReady: false,
   lastData: null,
   lastFileMeta: null,
   lastFile: null,

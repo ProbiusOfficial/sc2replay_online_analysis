@@ -1,0 +1,346 @@
+/* ============================================================================
+   录像数据分析台 · 样式
+   ⚠️ 本文件由 scripts/extract-lab-css.mjs 从 prototype/data-lab.template.html
+      的 <style> 块**逐字节提取**，再追加「运行态外壳」一节。
+      改样式请改这里（提取只在原型与生产需要重新对齐时才跑一次）。
+
+   设计系统速览：
+     浅色主题；--a 红 = 玩家 A、--b 蓝 = 玩家 B（中国习惯：涨红跌绿）；
+     图表与时间轴共用一个全局游标 S.t；所有卡片都由 syncCursor() 驱动刷新。
+   ============================================================================ */
+
+/* ==========================================================================
+   录像数据分析台 —— 单文件原型
+   数据：官方回放 SPlayerStatsEvent 的 39 个计分字段（内联 JSON，真实录像导出）
+   口径：官方客户端回放 overlay 的 Resources / Income / Spending / Army / Losses
+   ========================================================================== */
+:root{
+  --bg:#f3f5f9; --card:#fff; --card2:#fafbfd;
+  --line:#e2e7ef; --line2:#edf0f6; --line3:#dfe4ec;
+  --ink:#141922; --ink2:#525d70; --ink3:#8792a5; --ink4:#aab3c2;
+  --a:#d94f45; --b:#2f80d6;
+  --accent:#2f6feb; --accent-soft:#eef3fe;
+  --warn:#c9821a; --ok:#2f9e6a;
+  --r:10px; --r2:8px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#cfd6e2;border-radius:6px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#b6c0d0;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+
+.top{position:sticky;top:0;z-index:60;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
+     border-bottom:1px solid var(--line);height:52px;display:flex;align-items:center;gap:14px;padding:0 18px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
+.brand i{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,var(--accent),#7aa8f5);
+        display:grid;place-items:center;color:#fff;font-size:11px;font-style:normal;font-weight:800}
+.brand small{font-weight:400;color:var(--ink3);font-size:11px;margin-left:2px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg button{padding:4px 11px;border-radius:6px;color:var(--ink2);font-size:12px;white-space:nowrap}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(20,25,34,.10);font-weight:600}
+.spacer{flex:1}
+.tbtn{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:8px;
+      padding:5px 11px;font-size:12px;color:var(--ink2);white-space:nowrap}
+.tbtn:hover{border-color:var(--line3);color:var(--ink)}
+
+.samples{display:flex;gap:6px;overflow-x:auto;padding:12px 0 0}
+.smp{flex:0 0 auto;text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r2);
+     padding:7px 12px;min-width:190px;transition:.12s}
+.smp:hover{border-color:#c9d2e0}
+.smp.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset}
+.smp b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.smp span{display:block;font-size:10.5px;color:var(--ink3);font-family:var(--mono);margin-top:2px;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.smp.on span{color:var(--accent)}
+
+.wrap{padding:12px 18px 40px;max-width:1600px;margin:0 auto}
+.head{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
+      display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.hmeta{display:flex;flex-direction:column;gap:3px;min-width:0}
+.hmeta h1{margin:0;font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hmeta .sub{display:flex;gap:7px;flex-wrap:wrap;font-size:11px;color:var(--ink3);font-family:var(--mono)}
+.hmeta .sub b{font-weight:600;color:var(--ink2)}
+.vs{flex:1;display:flex;align-items:center;justify-content:center;gap:18px;min-width:360px}
+.pl{display:flex;align-items:center;gap:9px}
+.pl .rc{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff}
+.pl.pa .rc{background:var(--a)} .pl.pb .rc{background:var(--b)}
+.pl .nm{display:flex;flex-direction:column;line-height:1.25}
+.pl .nm b{font-size:13px;font-weight:650}
+.pl .nm span{font-size:11px;color:var(--ink3)}
+.pl .win{font-size:10px;font-weight:700;color:var(--ok);border:1px solid #bfe3d1;background:#f0faf5;
+         border-radius:4px;padding:1px 5px;margin-left:3px}
+.vslab{font-size:11px;color:var(--ink4);font-weight:600;font-family:var(--mono)}
+
+.tlbox{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-top:12px;overflow:hidden}
+.tlhead{display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid var(--line2)}
+.tlhead .lab{font-size:11px;font-weight:650;color:var(--ink2);letter-spacing:.3px;white-space:nowrap}
+.clock{font-family:var(--mono);font-size:19px;font-weight:650;letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.clock em{font-style:normal;color:var(--ink4);font-size:12px;font-weight:400}
+.tl{position:relative;padding:0 14px 8px;user-select:none;cursor:ew-resize}
+.tl svg{display:block;width:100%}
+.tl .evlay{position:absolute;left:14px;right:14px;top:0;height:14px;pointer-events:none}
+.tl .ev{position:absolute;top:3px;height:10px;width:2px;border-radius:1px;background:var(--warn);opacity:.7}
+.tl .ev.battle{background:var(--a);opacity:.55}
+.tl .cl{position:absolute;top:0;bottom:8px;width:1px;background:var(--ink);pointer-events:none;z-index:5}
+.tl .cl::after{content:"";position:absolute;top:-3px;left:-3.5px;width:8px;height:8px;border-radius:50%;
+               background:#fff;border:2px solid var(--ink)}
+.tllegend{display:flex;gap:14px;padding:0 14px 10px;font-size:11px;color:var(--ink3);flex-wrap:wrap}
+.tllegend i{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+
+.readouts{display:flex;gap:10px;overflow-x:auto;padding:12px 0 0}
+.ro{flex:0 0 auto;background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:9px 12px;min-width:164px}
+.ro .t{font-size:11px;color:var(--ink3);white-space:nowrap;margin-bottom:6px}
+.ro .row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:12.5px}
+.ro .row+.row{margin-top:3px}
+.ro .row .k{display:flex;align-items:center;gap:5px;color:var(--ink3);font-family:var(--sans);font-size:11px}
+.ro .row .k i{width:7px;height:7px;border-radius:2px}
+.ro .row .v{font-variant-numeric:tabular-nums;font-weight:600}
+.ro .d{font-family:var(--mono);font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line2);color:var(--ink2)}
+.up{color:var(--a)} .down{color:var(--b)}
+
+.body{display:grid;grid-template-columns:236px 1fr;gap:12px;margin-top:12px;align-items:start}
+.side{background:var(--card);border:1px solid var(--line);border-radius:var(--r);position:sticky;top:64px;
+      max-height:calc(100vh - 80px);overflow:auto}
+.side h3{margin:0;font-size:11px;font-weight:650;color:var(--ink3);letter-spacing:.4px;padding:11px 14px 6px}
+.grp{border-top:1px solid var(--line2);padding:2px 0 8px}
+.grp>.gh{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;cursor:pointer}
+.grp>.gh b{font-size:11.5px;font-weight:650;color:var(--ink2)}
+.grp>.gh em{font-style:normal;font-size:10.5px;color:var(--ink4);font-family:var(--mono)}
+.ck{display:flex;align-items:center;gap:8px;padding:4px 14px;cursor:pointer;font-size:12px;color:var(--ink2)}
+.ck:hover{background:var(--card2)}
+.ck input{margin:0;accent-color:var(--accent);width:13px;height:13px;flex:0 0 auto}
+.ck span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ck em{font-style:normal;font-size:9.5px;color:var(--ink4);font-family:var(--mono)}
+.ck.on span{color:var(--ink);font-weight:600}
+.sidefoot{border-top:1px solid var(--line2);padding:9px 14px;display:flex;gap:7px;flex-wrap:wrap}
+.mini{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--ink2)}
+.mini:hover{border-color:var(--line3);color:var(--ink)}
+
+.charts{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card>header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.card>header .tt{display:flex;flex-direction:column;line-height:1.3;min-width:0}
+.card>header .tt b{font-size:12.5px;font-weight:650}
+.card>header .tt span{font-size:10.5px;color:var(--ink4);font-family:var(--mono)}
+.card>header .sp{flex:1}
+.curread{display:flex;gap:14px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.curread .v{display:flex;align-items:center;gap:5px}
+.curread .v i{width:7px;height:7px;border-radius:2px}
+.plot{position:relative;padding:6px 12px 8px;cursor:crosshair}
+.plot svg{display:block;width:100%}
+.plot .cl{position:absolute;top:6px;bottom:8px;width:1px;background:var(--ink);opacity:.32;pointer-events:none}
+.plot .dot{position:absolute;width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;pointer-events:none;
+           transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(0,0,0,.12)}
+.empty{padding:30px 14px;text-align:center;color:var(--ink4);font-size:12px}
+
+.tblbox{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-top:12px;overflow:hidden}
+.tblbox>header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.tblbox>header b{font-size:12.5px;font-weight:650}
+.tblbox>header .sp{flex:1}
+.tblwrap{max-height:392px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line2)}
+th{position:sticky;top:0;background:var(--card2);color:var(--ink3);font-weight:600;font-size:10.5px;z-index:2;
+   border-bottom:1px solid var(--line)}
+td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:3}
+th:first-child{background:var(--card2);z-index:4}
+tbody tr:hover td{background:var(--accent-soft)}
+tbody tr.on td{background:#e7eefe;font-weight:600}
+.tblwrap .sep{border-left:1px solid var(--line)}
+.note{font-size:11px;color:var(--ink4);padding:10px 14px;border-top:1px solid var(--line2);line-height:1.75}
+.note code{font-family:var(--mono);background:var(--bg);padding:1px 5px;border-radius:4px;font-size:10.5px}
+.note b{color:var(--ink2)}
+
+/* ==========================================================================
+   视图切换（数据分析 / 建造顺序）
+   ========================================================================== */
+body.boview .v-data{display:none}
+body:not(.boview) .v-bo{display:none}
+.wrap{padding-bottom:84px}
+
+/* ==========================================================================
+   建造顺序
+   ========================================================================== */
+.bo{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:960px){.bo{grid-template-columns:1fr}}
+.bocol{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.bocol>header{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.bocol .rc{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;font-weight:800;font-size:12px;color:#fff;flex:0 0 auto}
+.bocol.pa .rc{background:var(--a)} .bocol.pb .rc{background:var(--b)}
+.bocol .who{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.bocol .who b{font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.bocol .who span{font-size:10.5px;color:var(--ink3);font-family:var(--mono)}
+.bocol .sp{flex:1}
+.bofilter{display:flex;gap:4px;flex-wrap:wrap}
+.bofilter button{border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--ink3);background:#fff}
+.bofilter button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+.bolist{overflow:auto;max-height:clamp(300px,calc(100vh - 640px),660px);padding:0 0 6px}
+.bog{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:3px 12px;
+     background:var(--card2);border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:10px;color:var(--ink3)}
+.bog b{color:var(--ink2);font-weight:600}
+.bog .ln{flex:1;height:1px;background:var(--line2)}
+.borow{display:grid;grid-template-columns:50px 30px 20px 1fr;align-items:center;gap:7px;
+       padding:3px 12px;border-bottom:1px solid var(--line2);cursor:default;
+       border-left:2px solid transparent}
+.borow:hover{background:var(--accent-soft)}
+.borow .tm{font-family:var(--mono);font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.borow .sp2{font-family:var(--mono);font-size:10.5px;color:var(--ink4);text-align:right}
+.borow .gly{width:16px;height:16px;border-radius:4px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;font-style:normal}
+.borow .nm{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.borow .en{font-size:10px;color:var(--ink4);font-family:var(--mono);margin-left:6px}
+.borow.k-building .gly{background:#6b7c93}
+.borow.k-unit     .gly{background:var(--b)}
+.borow.k-worker   .gly{background:#9aa6b6}
+.borow.k-upgrade  .gly{background:#7a6cf0}
+.borow.k-recall   .gly{background:#30a0a8}
+.borow.k-unknown  .gly{background:#c2c9d4}
+.borow.k-worker .nm,.borow.k-worker .tm{color:var(--ink3)}
+.borow.k-upgrade .nm{color:#5f52d6}
+.borow.k-recall .nm{color:#1f7f86;font-weight:600}
+.borow.now{background:#e7eefe;border-left-color:var(--accent)}
+.borow.now .tm{color:var(--accent);font-weight:700}
+.boempty{padding:26px 12px;text-align:center;color:var(--ink4);font-size:12px}
+.bostat{padding:8px 12px;border-top:1px solid var(--line2);font-size:10.5px;color:var(--ink3);font-family:var(--mono)}
+
+/* ==========================================================================
+   语音播报 + 悬浮（播放器条）
+   ========================================================================== */
+.vb{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;align-items:center;gap:14px;
+    padding:9px 18px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);box-shadow:0 -2px 14px rgba(20,25,34,.06);flex-wrap:wrap}
+.vb .clock2{font-family:var(--mono);font-size:19px;font-weight:700;letter-spacing:-.4px;
+            font-variant-numeric:tabular-nums;min-width:74px;color:var(--ink2)}
+.vb .clock2.on{color:var(--ok)}
+.vb .queue{display:flex;flex-direction:column;gap:2px;flex:1;min-width:280px}
+.vb .qs{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--ink4);line-height:1.35}
+.vb .qs .t{font-family:var(--mono);font-size:10.5px;flex:0 0 auto;min-width:42px;text-align:right}
+.vb .qs.cur{color:var(--ink);font-size:13.5px;font-weight:650}
+.vb .qs.cur .t{color:var(--warn);font-size:11.5px;font-weight:600}
+.vb .qs.dim{opacity:.62}
+.vb .prog{height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-top:5px}
+.vb .prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .1s linear}
+.vb .ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vbbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:600;color:var(--ink2)}
+.vbbtn:hover{border-color:var(--line3);color:var(--ink)}
+.vbbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.vbbtn.primary:hover{background:#2560d8}
+.vbset{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3)}
+.vbset select,.vbset input[type=range]{font:inherit;font-size:11px;color:var(--ink2)}
+.vbset select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
+.vbset input[type=range]{width:74px}
+.ov{display:flex;align-items:center;gap:7px;border-left:1px solid var(--line);padding-left:14px}
+.ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto}
+.ovdot.ok{background:var(--ok)} .ovdot.bad{background:#c0392b} .ovdot.wait{background:var(--warn)}
+.ovtxt{font-size:11px;color:var(--ink3);max-width:230px;line-height:1.3}
+
+/* ==========================================================================
+   运行态外壳（原型里没有，真实页面才有）
+   ========================================================================== */
+
+/* 主结果区：没数据时整块不占位（语音条也在里面，靠这条一起隐藏） */
+#result{display:none}
+#result.on{display:block}
+
+/* --------------------------------------------------------------------------
+   底部播报条：内层与主体同宽、居中
+   --------------------------------------------------------------------------
+   原型里 .vb 自己就是 flex 容器，内容从**视口左缘**起排；而主体 .wrap 用的是
+   max-width:1600px + margin:0 auto。两者只有在视口 ≤1636px 时才碰巧对齐 ——
+   1920 屏上条内容比主体左边缘偏 142px、2560 屏偏 462px（实测）。
+   拆成两层：.vb 只画「横跨视口的背景 + 分隔线」，.vbin 负责排版并与 .wrap 严格对齐。 */
+.vb{display:block;padding:0}
+.vbin{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+      max-width:1600px;margin:0 auto;padding:9px 18px}
+
+/* 底部留白跟随播报条**实测高度**：窄屏它会换行变高，写死 84px 就会被压住。
+   --vbh 由 js/lab/main.js 的 ResizeObserver 写入，加在**文档最后一个元素**（页脚）上。
+   ⚠️ 不能写成 body{padding-bottom} —— 本文件里有 html,body{height:100%}，body 的
+   content box 被固定成视口高，超出的内容会**穿过** padding 区域，那条 padding
+   不产生任何滚动空间（实测页脚仍被条盖住 69px）。
+   margin 同样不可靠：末尾元素的下外边距不计入 scrollHeight。 */
+.wrap{padding-bottom:26px}
+.pagefoot{max-width:1600px;margin:0 auto;color:var(--ink4);font-size:11.5px;line-height:1.9;
+          padding:0 18px calc(var(--vbh,84px) + 24px)}
+.pagefoot a{color:var(--accent)}
+.pagefoot code{font-family:var(--mono)}
+/* 内部指标侧栏同理：原规则只扣了顶部，没扣底部条，会钻到条下面去 */
+.side{max-height:calc(100vh - var(--vbh,84px) - 96px)}
+
+/* --------------------------------------------------------------------------
+   录像列表侧边栏
+   --------------------------------------------------------------------------
+   宽度取 236px，与内部「指标分组」侧栏（.side）同宽，两条竖栏对齐。
+   窄屏（≤1180px）退回顶部横排，避免挤压图表。 */
+.layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:16px;align-items:start;margin-top:14px}
+.rail{display:flex;flex-direction:column;gap:8px;min-height:0;
+      position:sticky;top:64px;max-height:calc(100vh - var(--vbh,84px) - 92px)}
+.rail .railhead{margin:0;flex-wrap:wrap}
+.rail .railhead .grow{flex:0 0 100%;height:0}         /* 强制提示文字独占一行 */
+.rail .railhead .lab{font-size:10px;white-space:normal;line-height:1.5}
+.rail .samples{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;
+               overflow-y:auto;overflow-x:hidden;padding:0 3px 2px 0}
+.rail .smp{flex:0 0 auto;width:100%;min-width:0}
+.rail .smp b,.rail .smp span{max-width:none}
+.rail .smp b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+             white-space:normal;overflow-wrap:anywhere;overflow:hidden}
+
+@media (max-width:1180px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .rail{position:static;max-height:none}
+  .rail .railhead{margin:12px 0 0}
+  .rail .railhead .grow{flex:1;height:auto}
+  .rail .samples{flex-direction:row;overflow-x:auto;overflow-y:visible;padding:12px 0 0}
+  .rail .smp{width:auto;min-width:190px}
+  .rail .smp b{display:block;white-space:nowrap;max-width:230px}
+  /* 底部条也收紧：原型里 .queue 的 min-width:280px 会把窄屏的条挤成两行（实测 126px 高） */
+  .vbin{gap:10px;padding:7px 18px}
+  .vb .queue{min-width:150px}
+}
+
+.shellbox{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.init-status{text-align:center;padding:26px 18px}
+.init-status p{margin:0 0 6px;color:var(--ink2)}
+.init-status .progress{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+.init-status .spinner{margin:0 auto 14px}
+.spinner{width:26px;height:26px;border:2.5px solid var(--line);border-top-color:var(--accent);
+         border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+
+.drop-zone{border:1.5px dashed var(--line3);border-radius:var(--r);padding:34px 20px;text-align:center;
+           background:var(--card);cursor:pointer;transition:.15s;margin-top:12px}
+.drop-zone:hover,.drop-zone.dragover,.drop-zone:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+.drop-zone:focus{outline:none}
+.drop-zone .icon{font-size:30px;line-height:1;margin-bottom:10px}
+.drop-zone p{margin:0 0 5px;color:var(--ink2)}
+.drop-zone .hint{font-size:11.5px;color:var(--ink4)}
+.drop-zone input[type=file]{display:none}
+
+.loading{display:none;align-items:center;gap:11px;justify-content:center;padding:16px;margin-top:12px;
+         background:var(--card);border:1px solid var(--line);border-radius:var(--r);color:var(--ink2);font-size:12.5px}
+.loading.on{display:flex}
+.loading .spinner{width:16px;height:16px;border-width:2px;margin:0}
+
+.errorbar{display:none;padding:12px 15px;margin-top:12px;border-radius:var(--r);font-size:12.5px;
+          background:#fdecea;border:1px solid #f3c2bd;color:#8a2b21}
+.errorbar.on{display:block}
+.errorbar strong{display:block;margin-bottom:3px}
+
+.empty{padding:34px 18px;text-align:center;color:var(--ink4);font-size:12.5px;line-height:1.9}
+
+/* 录像列表（本地批量；砍掉共享库之后的唯一入口） */
+.railhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 0}
+.railhead .lab{font-size:11px;color:var(--ink3);font-family:var(--mono)}
+.railhead .lab.err{color:#c0392b}
+.railhead .grow{flex:1}
+.smp{position:relative;padding-left:14px}
+.smp .rule{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line3)}
+.smp.on .rule{background:var(--accent)}
+.smp .err{color:#c0392b}
+.smp .busy{color:var(--warn)}

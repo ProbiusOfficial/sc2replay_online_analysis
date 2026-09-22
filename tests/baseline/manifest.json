@@ -1,0 +1,57 @@
+{
+  "generated_by": "scripts/freeze-baseline.py",
+  "packages": {
+    "sc2reader": "1.9.0",
+    "spawningtool": "3.0.0 (无 __version__)"
+  },
+  "parse_script_sha256": "343e54bb09dc9916d7ed52163fa58e27b40af39f72ac60bbb5d226803f509202",
+  "purpose": "P1c ReplayData 字段级 diff 的参照物；替代已下线的 Pyodide 路径",
+  "replays": {
+    "CN_PVT_T-AI.SC2Replay": {
+      "baseline_sha256": "72992ba7ca21329ea41960201f7d1a3ea3c63782b9b8b31ba98b2d4b61e5728b",
+      "build_order_entries": 77,
+      "bytes": 37433,
+      "game_length": 395,
+      "map_name": "White Rabbit LE",
+      "players": 2,
+      "sha256": "368713373fbedbbca4135aeef52f8423e6fd7362089de6678ee70954a634538e"
+    },
+    "CN_ZVP.SC2Replay": {
+      "baseline_sha256": "4bfd1393e4225c02011e42beec25358c2f0b218178e3ca14443a4930e18cf0b3",
+      "build_order_entries": 33,
+      "bytes": 39409,
+      "game_length": 118.0,
+      "map_name": "10000 Feet LE",
+      "players": 2,
+      "sha256": "2d836f5e1fb79c12ec6a8e8375f3a2ed02a1e6d749773fc99a23cf06327827d7"
+    },
+    "US_TVP.SC2Replay": {
+      "baseline_sha256": "98b2eb8bcc4a835d21fc45bd662b299071eb952a0b89977c46642c2704429b82",
+      "build_order_entries": 667,
+      "bytes": 165616,
+      "game_length": 1026.0,
+      "map_name": "Taito Citadel LE",
+      "players": 2,
+      "sha256": "c478acc589e2f3432af28456634e4282f90712c113e538915237c073996b42cf"
+    },
+    "US_TVR_T__2018_old.SC2Replay": {
+      "baseline_sha256": "37180a7428153bff50c5473cea0194dc9d987780cc79797e2ecbae9b8858571d",
+      "build_order_entries": 598,
+      "bytes": 139694,
+      "game_length": 1738.0,
+      "map_name": "Eastwatch LE",
+      "players": 2,
+      "sha256": "694602efb55a5449dbb2fa081db3d52a50bafcfa127e3c67e17d684532c9c5ab"
+    },
+    "hero_w_vs_reynor_g1_winter_madness_PVZ_.SC2Replay": {
+      "baseline_sha256": "898e60d6f59084c5b24dde02dc2954a694704e2bdaee61b2304bffafe092019d",
+      "build_order_entries": 995,
+      "bytes": 246623,
+      "game_length": 931.0,
+      "map_name": "Winter Madness LE",
+      "players": 2,
+      "sha256": "4fc7e511476b1d870434495cba40e2d354539c24c30819562e9a8e059af6c45b"
+    }
+  },
+  "source_of_truth": "tools/baseline/parse_script.py（原 js/parse_script.js 的 PARSE_SCRIPT，已随 Pyodide 下线迁出）"
+}

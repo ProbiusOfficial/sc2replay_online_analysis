@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>协议解码 · 浏览器验收</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --line: #e3e6ea;
+        --text: #1f2328;
+        --muted: #6b7280;
+        --ok: #1a7f37;
+        --bad: #cf222e;
+        --accent: #0969da;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      h1 { margin: 0 0 4px; font-size: 17px; }
+      p.lead { margin: 0 0 18px; color: var(--muted); }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+      }
+      #summary { font-size: 15px; font-weight: 600; }
+      #summary.pass { color: var(--ok); }
+      #summary.fail { color: var(--bad); }
+      #summary.running { color: var(--accent); }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 500; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px; }
+      .tag.pass { background: #dafbe1; color: var(--ok); }
+      .tag.fail { background: #ffebe9; color: var(--bad); }
+      pre { margin: 6px 0 0; padding: 8px; background: #f6f8fa; border-radius: 6px; overflow-x: auto; max-height: 220px; }
+      .muted { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <h1>协议解码 · 浏览器验收</h1>
+    <p class="lead">
+      在真实浏览器里走完整链路：fetch 录像 → MPQ 解包（wasm bzip2）→ 协议解码 →
+      与官方 s2protocol 的基准逐字段比对。这条路径与 Node 侧脚本**不同**
+      （wasm 走 <code>init()</code> fetch 而非 <code>initSync</code>），必须单独验。
+    </p>
+
+    <div class="panel">
+      <div id="summary" class="running">运行中…</div>
+      <div id="detail" class="muted"></div>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>录像</th>
+            <th class="num">baseBuild</th>
+            <th class="num">协议</th>
+            <th class="num">tracker</th>
+            <th class="num">game</th>
+            <th class="num">message</th>
+            <th>结果</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="failures-panel" hidden>
+      <strong>失败明细</strong>
+      <pre id="failures"></pre>
+    </div>
+
+    <script type="module">
+      // 与 scripts/verify-protocol.mjs 保持同一套规范化与摘要规则。
+      const SAFE_INT = 2n ** 53n;
+
+      function normalize(value) {
+        if (value === null || ["boolean", "string", "number"].includes(typeof value)) return value;
+        if (typeof value === "bigint") {
+          const abs = value < 0n ? -value : value;
+          return abs > SAFE_INT ? value.toString() : Number(value);
+        }
+        if (value instanceof Uint8Array) {
+          let out = "";
+          for (const byte of value) out += byte.toString(16).padStart(2, "0");
+          return `hex:${out}`;
+        }
+        if (Array.isArray(value)) return value.map(normalize);
+        if (typeof value === "object") {
+          const out = {};
+          for (const key of Object.keys(value)) out[key] = normalize(value[key]);
+          return out;
+        }
+        throw new Error(`无法规范化 ${typeof value}`);
+      }
+
+      function canonical(value) {
+        if (Array.isArray(value)) return value.map(canonical);
+        if (value !== null && typeof value === "object") {
+          const out = {};
+          for (const key of Object.keys(value).sort()) out[key] = canonical(value[key]);
+          return out;
+        }
+        return value;
+      }
+
+      const stable = (value) => JSON.stringify(canonical(value));
+      const encoder = new TextEncoder();
+
+      async function digest(items) {
+        const chunks = [];
+        let size = 0;
+        for (const item of items) {
+          const bytes = encoder.encode(`${stable(item)}\n`);
+          chunks.push(bytes);
+          size += bytes.length;
+        }
+        const merged = new Uint8Array(size);
+        let offset = 0;
+        for (const chunk of chunks) {
+          merged.set(chunk, offset);
+          offset += chunk.length;
+        }
+        const hash = await crypto.subtle.digest("SHA-256", merged);
+        return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      const checks = { total: 0, failed: 0 };
+      const failures = [];
+
+      function eq(label, actual, expected) {
+        checks.total += 1;
+        if (stable(actual) !== stable(expected)) {
+          checks.failed += 1;
+          const a = stable(actual);
+          const b = stable(expected);
+          failures.push(
+            `${label}\n   TS   = ${a.length > 240 ? `${a.slice(0, 240)}…` : a}\n` +
+              `   期望 = ${b.length > 240 ? `${b.slice(0, 240)}…` : b}`,
+          );
+        }
+      }
+
+      const SAMPLE_HEAD = 8;
+      const SAMPLE_TAIL = 2;
+
+      async function compareStream(label, items, expected) {
+        eq(`${label} 条数`, items.length, expected.count);
+        eq(`${label} 全量摘要`, await digest(items), expected.digest);
+        eq(
+          `${label} _gameloop 摘要`,
+          await digest(items.map((item) => item._gameloop)),
+          expected.gameloopDigest,
+        );
+        eq(`${label} 首 ${SAMPLE_HEAD} 条`, items.slice(0, SAMPLE_HEAD), expected.head);
+        if (items.length > SAMPLE_HEAD) {
+          eq(`${label} 末 ${SAMPLE_TAIL} 条`, items.slice(-SAMPLE_TAIL), expected.tail);
+        }
+      }
+
+      const rows = document.getElementById("rows");
+      const summary = document.getElementById("summary");
+      const detail = document.getElementById("detail");
+
+      try {
+        const [{ openMpqArchive }, { createWasmDecompressor }, protocols, events, baselineResp] =
+          await Promise.all([
+            import("../js/worker/decoder/mpq.js"),
+            import("../js/worker/decoder/decompressors.js"),
+            import("../js/worker/decoder/protocols/index.js"),
+            import("../js/worker/decoder/events.js"),
+            fetch("../tests/fixtures/protocol-baseline.json"),
+          ]);
+        const baseline = await baselineResp.json();
+        // 浏览器路径：让 wasm 适配层按 import.meta.url 自己 fetch 产物。
+        const decompressor = createWasmDecompressor();
+        const names = Object.keys(baseline).sort();
+
+        for (const name of names) {
+          const expected = baseline[name];
+          const row = document.createElement("tr");
+          const bytes = new Uint8Array(await (await fetch(`../sampleTest/${encodeURIComponent(name)}`)).arrayBuffer());
+          const archive = await openMpqArchive(bytes, { decompressor });
+
+          const probed = protocols.probeBaseBuild(archive.readHeaderContent());
+          eq(`[${name}] 探测出的 baseBuild`, probed.baseBuild, expected.baseBuild);
+          const selection = protocols.selectProtocolTables(probed.baseBuild);
+          eq(`[${name}] 选中的协议`, selection.protocolBuild, expected.protocolBuild);
+          eq(`[${name}] 未降级`, selection.degraded, false);
+
+          eq(
+            `[${name}] header`,
+            normalize(events.decodeReplayHeader(selection, archive.readHeaderContent())),
+            expected.header,
+          );
+          eq(
+            `[${name}] details`,
+            normalize(events.decodeReplayDetails(selection, await archive.readFile("replay.details"))),
+            expected.details,
+          );
+          eq(
+            `[${name}] initData`,
+            normalize(events.decodeReplayInitData(selection, await archive.readFile("replay.initData"))),
+            expected.initdata,
+          );
+          for (const [key, file, decode] of [
+            ["tracker", "replay.tracker.events", events.decodeReplayTrackerEvents],
+            ["game", "replay.game.events", events.decodeReplayGameEvents],
+            ["message", "replay.message.events", events.decodeReplayMessageEvents],
+          ]) {
+            const raw = await archive.readFile(file);
+            const items = raw ? normalize(decode(selection, raw)) : [];
+            await compareStream(`[${name}] ${key}`, items, expected[key]);
+          }
+          const attrRaw = await archive.readFile("replay.attributes.events");
+          eq(
+            `[${name}] attributes`,
+            attrRaw ? normalize(events.decodeReplayAttributesEvents(attrRaw)) : null,
+            expected.attributes,
+          );
+
+          row.innerHTML =
+            `<td>${name.length > 38 ? `${name.slice(0, 35)}…` : name}</td>` +
+            `<td class="num">${expected.baseBuild}</td>` +
+            `<td class="num">${selection.protocolBuild}</td>` +
+            `<td class="num">${expected.tracker.count}</td>` +
+            `<td class="num">${expected.game.count}</td>` +
+            `<td class="num">${expected.message.count}</td>` +
+            `<td><span class="tag pass">OK</span></td>`;
+          rows.append(row);
+        }
+      } catch (error) {
+        checks.failed += 1;
+        failures.push(`未捕获异常：${error && error.stack ? error.stack : String(error)}`);
+      }
+
+      if (checks.failed === 0) {
+        summary.className = "pass";
+        summary.textContent = `✓ 全部通过：${checks.total} 项断言一致`;
+        detail.textContent = `已在浏览器内跑完 ${Object.keys(await (await fetch("../tests/fixtures/protocol-baseline.json")).json()).length} 个录像的六个流。`;
+        window.__RESULT__ = { ok: true, checks };
+      } else {
+        summary.className = "fail";
+        summary.textContent = `✗ ${checks.failed}/${checks.total} 项断言失败`;
+        detail.textContent = "见下方明细";
+        document.getElementById("failures-panel").hidden = false;
+        document.getElementById("failures").textContent = failures.slice(0, 10).join("\n\n");
+        window.__RESULT__ = { ok: false, checks, failures };
+      }
+    </script>
+  </body>
+</html>

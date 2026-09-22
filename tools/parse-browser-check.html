@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P1c/P4 验收 · 全链路浏览器解析（无 Pyodide）</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; padding: 32px;
+    font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #f6f7f9; color: #1f2328;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.lead { color: #57606a; margin: 0 0 20px; }
+  .card { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed #eaeef2; }
+  .row:last-child { border-bottom: 0; }
+  .label { flex: 0 0 260px; color: #57606a; }
+  .value { flex: 1 1 auto; word-break: break-all; }
+  .ok { color: #1a7f37; font-weight: 700; }
+  .bad { color: #cf222e; font-weight: 700; }
+  .note { font-size: 12px; color: #6e7781; margin-top: 8px; }
+  code { background: #eff1f3; border-radius: 4px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+<!-- parse_client.js 会操作这几个 id（成功隐藏状态区 / 显示拖放区，失败写错误文案），
+     所以按真实站点的 DOM 约定提供它们 —— 这本身也是对「UI 时序保留」的验收。 -->
+<div id="initStatus" style="display:none"><p id="initProgress"></p></div>
+<div id="dropZone" style="display:none"></div>
+<div id="error"></div>
+<div id="result" class="visible"></div>
+<div id="loading"></div>
+
+<main>
+  <h1>P1c / P4 验收：浏览器全链路解析（Worker + wasm，零 Python）</h1>
+  <p class="lead">
+    开发用页面，验证「页面 → <code>js/parse_client.js</code> → <code>parse.worker.js</code> → wasm」
+    在真实浏览器里跑通，且输出与 <code>tests/baseline/</code> 的旧链路金标准一致（build_order 只比
+    条目数与单位多重集 —— 发布口径的取整差不参与）。必须通过 HTTP 服务打开
+    （仓库根目录 <code>python3 -m http.server 8080</code>）。
+  </p>
+
+  <div class="card">
+    <div class="row"><span class="label">initParser（Worker + ping）</span><span class="value" id="st-init">…</span></div>
+    <div class="row"><span class="label">初始化 UI 时序</span><span class="value" id="st-ui">…</span></div>
+    <div class="row"><span class="label">skipCache（未实现须明确报错）</span><span class="value" id="st-skip">…</span></div>
+    <div id="per-replay"></div>
+    <div class="row" style="margin-top:10px"><span class="label">总计</span><span class="value" id="st-total">…</span></div>
+    <p class="note">
+      对照字段：<code>map_name / game_length / client_version / region / start_time / winner / chat</code> 与
+      每个玩家的 <code>name / race / worker_deaths / stats / workers_curve / build_order(条目数 + 单位多重集)</code>。
+      <code>US_TVP</code> 允许恰好多 1 条幻象 Phoenix（已登记偏差）。
+    </p>
+  </div>
+</main>
+
+<script type="module">
+  const el = (id) => document.getElementById(id);
+  const set = (node, ok, text) => {
+    node.innerHTML = `<span class="${ok ? "ok" : "bad"}">${ok ? "OK" : "FAIL"}</span> ${text}`;
+  };
+
+  window.__p1cCheck = { done: false, pass: 0, fail: 0, results: {} };
+  const T = window.__p1cCheck;
+  const assert = (ok, label, detail = "") => {
+    if (ok) T.pass += 1; else T.fail += 1;
+    return { ok, label, detail };
+  };
+
+  /** 单位多重集（unit|is_worker → 计数），mode 无关。 */
+  function unitMultiset(rows) {
+    const m = new Map();
+    for (const r of rows) {
+      const k = `${r.unit}\u0000${r.is_worker}`;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  }
+  function multisetDiff(a, b) {
+    const diff = [];
+    for (const [k, n] of a) if ((b.get(k) ?? 0) !== n) diff.push(`${k.replaceAll("\u0000", "|")}:${n}vs${b.get(k) ?? 0}`);
+    for (const [k, n] of b) if (!a.has(k)) diff.push(`${k.replaceAll("\u0000", "|")}:0vs${n}`);
+    return diff;
+  }
+
+  /** 键序无关序列化：基线由 Python `sort_keys=True` 生成，键序不同但值相同。 */
+  function canonical(value) {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === "object") {
+      const out = {};
+      for (const k of Object.keys(value).sort()) out[k] = canonical(value[k]);
+      return out;
+    }
+    return value;
+  }
+  const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+
+  /** 已登记偏差（与 `scripts/verify-replay-data.mjs` 的 `BASELINE_UNIT_RENAMES` 同步）：
+   *  CN_PVT 是 coop 录像，spawningtool 查 coop 表查不到 Adept 时长会兜底印成
+   *  `"Adept (Error on build time)"`；我们始终用 LotV 表，产出 `"Adept"`。 */
+  const BASELINE_UNIT_RENAMES = {
+    "CN_PVT_T-AI.SC2Replay": [["Adept (Error on build time)", "Adept"]],
+  };
+
+  const CASES = [
+    ["CN_PVT_T-AI.SC2Replay", "CN_PVT_T-AI.SC2Replay.json", 0],
+    ["CN_ZVP.SC2Replay", "CN_ZVP.SC2Replay.json", 0],
+    ["US_TVP.SC2Replay", "US_TVP.SC2Replay.json", 1], // 幻象 Phoenix 白名单
+    ["US_TVR(T)_2018_old.SC2Replay", "US_TVR_T__2018_old.SC2Replay.json", 0],
+    ["hero(w) vs reynor g1 winter madness(PVZ).SC2Replay", "hero_w_vs_reynor_g1_winter_madness_PVZ_.SC2Replay.json", 0],
+  ];
+
+  async function run() {
+    // 1) 初始化：拉起 Worker + ping
+    const { initParser, parseReplayBufferToData, isParserReady } = await import("../js/parse_client.js");
+    const { skipCache } = await import("../js/worker/index.js");
+    try {
+      await initParser();
+      set(el("st-init"), isParserReady(), `parserReady=${isParserReady()}`);
+      const uiOk =
+        el("initStatus").style.display === "none" &&
+        el("dropZone").style.display === "block";
+      set(el("st-ui"), uiOk, `initStatus hidden=${el("initStatus").style.display === "none"}, dropZone shown=${el("dropZone").style.display === "block"}`);
+    } catch (err) {
+      set(el("st-init"), false, String(err && err.message ? err.message : err));
+      set(el("st-ui"), false, "init 失败，UI 时序未验");
+    }
+
+    // 2) 未实现能力必须明确报错
+    try {
+      const res = await skipCache("smoke-md5");
+      const ok = res.type === "error" && res.code === "NOT_IMPLEMENTED";
+      set(el("st-skip"), ok, `<code>${ok ? res.code : JSON.stringify(res)}</code>`);
+    } catch (err) {
+      set(el("st-skip"), false, String(err && err.message ? err.message : err));
+    }
+
+    // 3) 五个样本全链路解析 + 对金标准
+    const container = el("per-replay");
+    for (const [replay, baselineName, allowExtra] of CASES) {
+      const row = document.createElement("div");
+      row.className = "row";
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = replay;
+      const value = document.createElement("span");
+      value.className = "value";
+      row.append(label, value);
+      container.append(row);
+
+      try {
+        const [replayBuf, baseline] = await Promise.all([
+          fetch(`../sampleTest/${encodeURIComponent(replay)}`).then((r) => {
+            if (!r.ok) throw new Error(`sample HTTP ${r.status}`);
+            return r.arrayBuffer();
+          }),
+          fetch(`../tests/baseline/${baselineName}`).then((r) => {
+            if (!r.ok) throw new Error(`baseline HTTP ${r.status}`);
+            return r.json();
+          }),
+        ]);
+
+        const t0 = performance.now();
+        const data = await parseReplayBufferToData(replayBuf);
+        const ms = Math.round(performance.now() - t0);
+
+        const fails = [];
+        for (const k of ["map_name", "game_length", "client_version", "region", "start_time", "winner", "chat"]) {
+          if (!same(data[k], baseline[k])) fails.push(`${k}: ours=${JSON.stringify(data[k])} baseline=${JSON.stringify(baseline[k])}`);
+        }
+        if (data.teams.length !== baseline.teams.length) fails.push("teams.length");
+
+        const ourPlayers = data.teams.flatMap((t) => t.players);
+        const basePlayers = baseline.teams.flatMap((t) => t.players);
+        if (ourPlayers.length !== basePlayers.length) fails.push("players.length");
+
+        let totalExtra = 0;
+        for (let i = 0; i < Math.min(ourPlayers.length, basePlayers.length); i += 1) {
+          const o = ourPlayers[i];
+          const b = basePlayers[i];
+          if (o.name !== b.name) fails.push(`players[${i}].name`);
+          if (o.race !== b.race) fails.push(`players[${i}].race`);
+          for (const k of ["worker_deaths", "stats", "workers_curve"]) {
+            if (!same(o[k], b[k])) fails.push(`players[${i}].${k}`);
+          }
+          // 基线侧先套已登记改名（见 BASELINE_UNIT_RENAMES），多重集比对天然覆盖条目数。
+          const renames = BASELINE_UNIT_RENAMES[replay] ?? [];
+          const bBuild = b.build_order.map((r) => {
+            const row = { ...r };
+            for (const [from, to] of renames) if (row.unit === from) row.unit = to;
+            return row;
+          });
+          const extra = multisetDiff(unitMultiset(o.build_order), unitMultiset(bBuild));
+          if (allowExtra === 0 && extra.length > 0) {
+            fails.push(`players[${i}].build_order 多重集: ${extra.join(", ")}`);
+          }
+          if (allowExtra > 0) {
+            // 只允许幻象单位：多出的键必须全部以 |false 结尾（非农民）。
+            for (const s of extra) if (s.endsWith("|true")) fails.push(`players[${i}].build_order 农民不可豁免: ${s}`);
+            totalExtra += extra.reduce((n, s) => {
+              const m = s.match(/:(\d+)vs(\d+)$/);
+              return m ? n + Math.max(0, Number(m[1]) - Number(m[2])) : n;
+            }, 0);
+          }
+        }
+        if (allowExtra > 0 && totalExtra !== allowExtra) {
+          fails.push(`幻象豁免应为 ${allowExtra} 条，实得 ${totalExtra}`);
+        }
+
+        const ok = fails.length === 0;
+        const entries = ourPlayers.reduce((n, p) => n + p.build_order.length, 0);
+        set(row.querySelector(".value"), ok,
+          ok ? `✓ 与金标准一致（build_order ${entries} 条，${ms}ms）`
+             : `✗ ${fails.length} 处：${fails.slice(0, 4).join(" | ")}${fails.length > 4 ? " …" : ""}`);
+        T.results[replay] = { ok, ms, fails };
+      } catch (err) {
+        set(row.querySelector(".value"), false, String(err && err.message ? err.message : err));
+        T.results[replay] = { ok: false, fails: [String(err)] };
+      }
+    }
+
+    const entries = Object.values(T.results);
+    T.pass = entries.filter((r) => r.ok).length;
+    T.fail = entries.length - T.pass;
+    set(el("st-total"), T.fail === 0, `录像 ${T.pass}/${entries.length} 通过`);
+    T.done = true;
+  }
+
+  run();
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+name: Build WASM + Worker
+
+# P0 构建链路：在 CI 上编译 wasm、转译 Worker TypeScript，产物提交回仓库供 GitHub Pages 使用。
+# 本地开发不强制安装 Rust / TypeScript，产物由 CI 生成后落到固定路径（§2.4 零构建原则）。
+# 见 plans/ROUTE-C-WASM-REFACTOR-PLAN.md §2.1（C-4）、§2.4、§6 P0。
+
+on:
+  push:
+    branches: ["main"]
+    # 注意：这里**不能**包含 wasm/pkg/** 或 js/worker/**/*.js，
+    # 否则「提交产物」这一步会再次触发本 workflow，形成无限循环。
+    paths:
+      - "wasm/src/**"
+      - "wasm/Cargo.toml"
+      - "wasm/Cargo.lock"
+      - "js/worker/**/*.ts"
+      - "js/worker/tsconfig.json"
+      - "scripts/*.mjs"
+      - "scripts/*.py"
+      - "tests/fixtures/**"
+      - "sampleTest/**"
+      - ".github/workflows/build-wasm.yml"
+  pull_request:
+    paths:
+      - "wasm/src/**"
+      - "wasm/Cargo.toml"
+      - "js/worker/**/*.ts"
+      - "js/worker/tsconfig.json"
+      - "scripts/*.mjs"
+      - "scripts/*.py"
+      - "tests/fixtures/**"
+      - "sampleTest/**"
+      - ".github/workflows/build-wasm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-wasm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (wasm32-unknown-unknown)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wasm
+
+      - name: cargo test (host target)
+        working-directory: wasm
+        run: cargo test
+
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+
+      - name: Build wasm (wasm-pack)
+        working-directory: wasm
+        run: wasm-pack build --target web --release
+
+      # wasm-pack 每次构建都会在 pkg/ 里写一个内容为 "*" 的 .gitignore，
+      # 会让整个产物目录被 git 忽略，导致提交步骤拿不到文件。
+      - name: Drop wasm-pack's pkg/.gitignore
+        run: rm -f wasm/pkg/.gitignore
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Transpile worker TypeScript
+        run: npx --yes --package typescript@5 -- tsc --project js/worker/tsconfig.json
+
+      - name: Smoke test wasm + size budget (Node)
+        run: node scripts/wasm-smoke.mjs
+
+      # MPQ 容器层验收：5 个样本录像 × 全部 75 个文件条目，含 53 个 bzip2 块的解压后 md5。
+      # 基准是 tests/fixtures/mpq-baseline.json（已固化入仓），所以这一步不需要 Python。
+      - name: Verify MPQ reader + bzip2 decompress
+        run: node scripts/verify-mpq.mjs
+
+      # 协议解码验收：TS 实现 vs 官方 s2protocol 的固化基准。
+      # 覆盖 5 个录像 × 6 个流（约 8.2 万条事件）的全量 sha256 逐字节比对。
+      # 基准是 tests/fixtures/protocol-baseline.json（已入仓），不需要 Python。
+      - name: Verify protocol decoder against Blizzard baseline
+        run: node scripts/verify-protocol.mjs
+
+      - name: Commit build artifacts
+        if: github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(ci): rebuild wasm + worker artifacts"
+          file_pattern: "wasm/pkg js/worker/**/*.js"

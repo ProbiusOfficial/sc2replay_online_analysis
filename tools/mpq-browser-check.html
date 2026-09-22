@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MPQ 容器层 · 浏览器验收</title>
+<style>
+  body { font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 24px; color: #1a1a1a; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 20px 0 4px; }
+  .ok { color: #0a7d28; } .bad { color: #c00; font-weight: 600; } .dim { color: #777; }
+  pre { margin: 6px 0; white-space: pre-wrap; }
+  table { border-collapse: collapse; margin: 6px 0 16px; font-size: 12px; }
+  th, td { border: 1px solid #ddd; padding: 2px 8px; text-align: left; }
+  th { background: #f5f5f5; font-weight: 600; }
+  #summary { font-size: 14px; font-weight: 600; margin-top: 16px; padding: 8px 12px; border-radius: 4px; }
+  #summary.pass { background: #e8f5e9; color: #0a7d28; }
+  #summary.fail { background: #fdecea; color: #c00; }
+  code { background: #f2f2f2; padding: 0 3px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<h1>MPQ 容器层 · 浏览器验收</h1>
+<p class="dim">
+  证明 <b>wasm 解压后端在浏览器里可用</b>。Node 测试走 <code>initSync</code>（注入字节），
+  浏览器走 <code>init()</code>（fetch <code>compute_bg.wasm</code>）—— 两条路径不同，必须分别验收。<br>
+  比对基准：<code>tests/fixtures/mpq-baseline.json</code>（仓库内固化，与 mpyq + libbz2 对齐）。<br>
+  说明：浏览器 WebCrypto 没有 MD5，故这里比对<b>长度</b>；而 bzip2 自带 CRC32 且解压成功即校验通过，
+  长度一致 + 无异常已是强证据。
+</p>
+
+<pre id="log"></pre>
+<div id="summary">运行中…</div>
+
+<script type="module">
+import { createWasmDecompressor } from "../js/worker/decoder/decompressors.js";
+import { openMpqArchive } from "../js/worker/decoder/mpq.js";
+
+const logEl = document.getElementById("log");
+const summaryEl = document.getElementById("summary");
+
+const log = (msg, cls = "") => {
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+};
+
+let checks = 0;
+const failures = [];
+
+function check(label, actual, expected) {
+  checks += 1;
+  if (actual !== expected) {
+    failures.push(`${label}: 实际 ${actual} ≠ 期望 ${expected}`);
+    log(`  ✗ ${label}: ${actual} ≠ ${expected}`, "bad");
+  }
+}
+
+try {
+  // createWasmDecompressor() 内部会触发 init() → fetch compute_bg.wasm。
+  // 这一步在浏览器里能否走通，正是本页要验的。
+  const decompressor = createWasmDecompressor();
+
+  const fixturesRes = await fetch("../tests/fixtures/mpq-baseline.json");
+  if (!fixturesRes.ok) throw new Error(`取基准失败 HTTP ${fixturesRes.status}（请通过 HTTP 服务访问，不要用 file://）`);
+  const baseline = await fixturesRes.json();
+
+  const wasmRes = await fetch("../wasm/pkg/compute_bg.wasm");
+  const wasmBytes = (await wasmRes.arrayBuffer()).byteLength;
+  log(`wasm 产物 ${wasmBytes.toLocaleString()} B (${(wasmBytes / 1024).toFixed(1)} KB) · 基准含 ${Object.keys(baseline).length} 个录像`, "dim");
+
+  for (const [name, expected] of Object.entries(baseline)) {
+    const replayRes = await fetch(`../sampleTest/${encodeURIComponent(name)}`);
+    if (!replayRes.ok) throw new Error(`取录像失败 ${name} HTTP ${replayRes.status}`);
+    const raw = new Uint8Array(await replayRes.arrayBuffer());
+
+    check(`[${name}] 录像大小`, raw.length, expected.rawSize);
+    const archive = await openMpqArchive(raw, { decompressor });
+    check(`[${name}] hash 表条目数`, archive.hashTableEntryCount, expected.hashTableEntryCount);
+    check(`[${name}] block 表条目数`, archive.blockTableEntryCount, expected.blockTableEntryCount);
+
+    const listfile = await archive.listFiles();
+    check(`[${name}] listfile 条目数`, listfile.length, expected.listfile.length);
+
+    let bzip2Blocks = 0;
+    let unpacked = 0;
+    const failuresBefore = failures.length;
+
+    for (const [fname, exp] of Object.entries(expected.files)) {
+      const data = await archive.readFile(fname);
+      const actualSize = data === null ? null : data.length;
+      // archivedSize === 0 的文件（replay.sync.history）约定返回 null，不算失败
+      const expectedSize = exp.md5Unpacked === null ? null : exp.size;
+      check(`[${name}] ${fname}`, actualSize, expectedSize);
+      if (exp.compression === "bzip2") {
+        bzip2Blocks += 1;
+        unpacked += exp.size;
+      }
+    }
+
+    const bad = failures.length - failuresBefore;
+    const mark = bad === 0 ? "✅" : "✗";
+    log(
+      `${mark} ${name} — ${Object.keys(expected.files).length} 个文件，${bzip2Blocks} 个 bzip2 块（解压 ${unpacked.toLocaleString()} B）`,
+      bad === 0 ? "ok" : "bad",
+    );
+  }
+
+  summaryEl.classList.add(failures.length ? "fail" : "pass");
+  summaryEl.textContent = failures.length
+    ? `✗ ${checks} 项检查，${failures.length} 项失败`
+    : `✅ ${checks} 项检查全部通过 — 浏览器路径下 wasm bzip2 解压与基准完全一致`;
+} catch (err) {
+  summaryEl.classList.add("fail");
+  summaryEl.textContent = `✗ 运行异常：${err.message}`;
+  log(`✗ ${err.stack || err.message}`, "bad");
+}
+
+// 供外部自动化检查使用
+window.__mpqCheckDone = true;
+window.__mpqCheckResult = { checks, failures };
+</script>
+</body>
+</html>

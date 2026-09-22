@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>悬浮窗视觉规格稿 · sc2-overlay.exe</title>
+<!--
+  ============================================================================
+  悬浮窗视觉规格稿 —— 目标只有两条：
+    ① **呈现建造轴上的操作**（当前在哪、接下来几步、在整局轴上的位置）
+    ② **占屏尽可能小**（默认 36px 高，约占 1080p 的 1.1%）
+
+  这份文件就是将来 exe 里 WebView2 要加载的那张页面。
+  exe 只管窗口（无边框 / 逐像素透明 / 置顶 / 点击穿透 / 不抢焦点），这份 HTML 只管外观。
+
+  地址参数：
+    ?v=axis|ticker|stack|rail   选版式（默认 axis）
+    ?embed=1                    去掉预览外壳、背景透明 —— exe 用这个
+  ============================================================================
+-->
+<style>
+:root{
+  --card:rgba(13,16,22,.90); --line:rgba(255,255,255,.10);
+  --ink:#e8edf4; --ink2:#98a3b3; --ink3:#66707e;
+  --green:#39e07a; --gold:#e0a63a;
+  --building:#8b98a8; --unit:#4a9bf5; --upgrade:#a08cf0; --worker:#5d6875;
+  --spawn:#39e07a;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#1d2127;color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+
+/* ---------- 预览外壳（exe 里不存在） ---------- */
+.shell{max-width:1180px;margin:0 auto;padding:20px 20px 56px}
+.shellhead{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.shellhead h1{margin:0;font-size:15px;font-weight:600}
+.tag{font-size:11px;font-family:var(--mono);border:1px solid #333b45;border-radius:5px;padding:2px 7px;color:var(--ink2)}
+.shellnote{font-size:11.5px;color:var(--ink2);background:#171b21;border:1px solid #272e37;border-radius:8px;
+           padding:10px 13px;line-height:1.8;margin-bottom:14px}
+.shellnote b{color:var(--ink)} .shellnote code{font-family:var(--mono);font-size:10.5px;background:#0e1218;padding:1px 5px;border-radius:4px;color:var(--gold)}
+.bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.bar .lab{font-size:11px;color:var(--ink3);font-family:var(--mono);margin-right:2px}
+.sb{border:1px solid #333b45;background:#1a1f27;color:var(--ink2);border-radius:7px;padding:5px 11px;font-size:11.5px}
+.sb:hover{color:var(--ink);border-color:#48525f}
+.sb.on{background:#22303f;border-color:#3d5a7c;color:#cfe3ff}
+.rng{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3);font-family:var(--mono)}
+.rng input[type=range]{width:88px}
+.meter{font-size:11px;font-family:var(--mono);color:var(--gold);background:#171b21;border:1px solid #272e37;
+       border-radius:6px;padding:4px 9px;margin-left:auto}
+.stage{position:relative;border-radius:12px;padding:28px 22px;min-height:220px;display:grid;place-items:center;
+       background:#1d2127;border:1px solid #272e37;transition:background .2s}
+.stage.game{background:linear-gradient(165deg,#3a2418 0%,#20303a 42%,#0c1116 100%)}
+.stage.check{background:
+   linear-gradient(45deg,#2a2f36 25%,transparent 25%,transparent 75%,#2a2f36 75%),
+   linear-gradient(45deg,#2a2f36 25%,#232830 25%,#232830 75%,#2a2f36 75%);
+   background-size:16px 16px;background-position:0 0,8px 8px}
+
+/* ==========================================================================
+   ★ 悬浮窗本体 —— 以下样式决定 exe 里显示的样子
+   ========================================================================== */
+#overlay{font-family:var(--sans);color:var(--ink);filter:drop-shadow(0 6px 18px rgba(0,0,0,.5))}
+.ov{background:var(--card);border:1px solid var(--line);display:flex;align-items:center;
+    backdrop-filter:blur(12px);overflow:hidden}
+.ov.h-axis{border-radius:9px;height:36px;width:100%}
+.ov.h-ticker{border-radius:8px;height:30px;width:100%}
+.ov.h-stack{border-radius:10px;height:54px;width:100%;flex-direction:column;align-items:stretch;justify-content:center}
+.ov.h-rail{border-radius:10px;flex-direction:column;align-items:stretch;width:100%;padding:7px 0}
+
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.now{display:flex;align-items:baseline;gap:7px;flex:0 0 auto;padding:0 11px 0 13px;min-width:0}
+.now .t{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.now .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now .g{width:3px;height:18px;border-radius:2px;flex:0 0 auto}
+.divv{width:1px;align-self:stretch;background:var(--line);flex:0 0 auto}
+
+/* 建造轴 */
+.axis{flex:1;position:relative;height:100%;min-width:60px;margin:0 12px}
+.axis .track{position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(255,255,255,.14)}
+.axis .fill{position:absolute;left:0;top:50%;height:1px;background:rgba(57,224,122,.42)}
+.axis .tick{position:absolute;top:50%;width:2px;border-radius:1px;transform:translate(-50%,-50%);background:var(--building);opacity:.55}
+.axis .tick.past{opacity:.32}
+.axis .tick.next{opacity:1;width:3px;box-shadow:0 0 7px rgba(255,255,255,.4)}
+.axis .cur{position:absolute;top:3px;bottom:3px;width:2px;background:var(--green);transform:translateX(-50%);
+           box-shadow:0 0 7px rgba(57,224,122,.6)}
+.axis .cur::after{content:"";position:absolute;left:50%;top:-2px;width:6px;height:6px;
+                  background:var(--green);transform:translateX(-50%) rotate(45deg);border-radius:1px}
+/* 「下一步」放右侧固定槽位：不遮挡刻度、不随游标跳位 */
+.nxs{flex:0 0 auto;display:flex;align-items:baseline;gap:6px;padding:0 13px 0 0;
+     font-size:11.5px;color:var(--ink2);white-space:nowrap}
+.nxs .lb{font-size:10px;color:var(--ink3)}
+.nxs b{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--gold)}
+.nxs .nev{color:var(--ink3);font-size:11px}
+
+/* 单行 ticker */
+.tk{flex:1;display:flex;align-items:center;gap:0;min-width:0;overflow:hidden;height:100%;padding-right:6px}
+.tk .it{flex:0 0 auto;font-size:11.5px;font-family:var(--mono);color:var(--ink3);padding:0 9px;
+        white-space:nowrap;position:relative}
+.tk .it.on{color:#fff;font-weight:700;font-size:13px}
+.tk .it.on::before{content:"";position:absolute;left:2px;top:50%;transform:translateY(-50%);width:2px;height:14px;
+                   background:var(--green);border-radius:1px}
+
+/* 双行 */
+.st{width:100%;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 13px}
+.st .r1{display:flex;align-items:baseline;gap:8px;min-width:0}
+.st .r2{display:flex;align-items:center;gap:9px;font-size:11px;font-family:var(--mono);color:var(--ink3);min-width:0}
+.st .r2 .k{white-space:nowrap}
+.st .r2 .k.soon{color:var(--ink2)}
+.stp{height:2px;border-radius:1px;background:rgba(255,255,255,.10);overflow:hidden;flex:1;min-width:40px}
+.stp i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f9e6a,var(--green))}
+
+/* 竖向贴边 */
+.railrow{display:grid;grid-template-columns:44px 1fr 3px;align-items:center;gap:8px;
+         padding:3px 11px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);position:relative}
+.railrow .g{position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:1px;background:var(--building);opacity:.5}
+.railrow .tm{text-align:right;opacity:.75}
+.railrow .nm{font-family:var(--sans);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railrow.on{background:rgba(57,224,122,.10);color:#fff}
+.railrow.on .g{background:var(--green);opacity:1;width:3px}
+.railrow.on .tm{color:var(--gold);font-weight:700;opacity:1}
+.railrow.on .nm{font-weight:700;font-size:13px}
+.railfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;
+          padding:4px 11px 0;margin-top:2px;border-top:1px solid var(--line);
+          font-size:10px;font-family:var(--mono);color:var(--ink3)}
+
+/* ?embed=1 —— exe 的 WebView2 用这个 */
+body.embed{background:transparent}
+body.embed .preview-only{display:none}
+body.embed .shell{max-width:none;margin:0;padding:0}
+body.embed .stage{padding:0;min-height:0;display:block;background:transparent;border:0;border-radius:0}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="shellhead preview-only">
+    <h1>悬浮窗视觉规格稿</h1>
+    <span class="tag">sc2-overlay.exe · WebView2 加载页</span>
+    <span class="tag" id="tagV">v=axis</span>
+  </div>
+
+  <div class="shellnote preview-only">
+    <b>设计目标只有两条</b> ——
+    ① <b>呈现建造轴上的操作</b>：游标在哪一格、下一步还有多少秒、接下来几步是什么；
+    ② <b>占屏尽可能小</b>：默认轴条高 <code>36px</code>，贴满屏宽（1920×1080）也只占 <code>3.3%</code>。
+    <br><b>轴上的颜色是信息不是装饰</b> —— 灰 = 建筑、蓝 = 单位、紫 = 科技；游标前为暗、游标后为亮，
+    下一项加粗放大。左侧色条跟着当前项的类别走。
+    <br><b>exe 侧还会再省两次空间</b>（这两件由 exe 做，不在本页里）：
+    ① <b>SC2 不在前台就整条隐藏</b>（`SetWinEventHook` 比对前台进程，见调研报告 §3.4）；
+    ② 可设「暂停时收起为只剩时间 + 当前步」。
+    <br><b>四种版式</b> —— 轴条 / 单行 / 双行 / 竖向贴边，都尽量压扁。切换看哪一种顺手。
+    <br><b>预览外壳不存在于 exe</b> —— 说明条、控件条、这圈背景都只在浏览器里。地址加
+    <code>?embed=1</code> 看 exe 里的真实样子（背景透明）；加 <code>?v=xxx</code> 直接锁定版式。
+  </div>
+
+  <div class="bar preview-only">
+    <span class="lab">版式</span>
+    <button class="sb on" data-v="axis">轴条 36px</button>
+    <button class="sb" data-v="ticker">单行 30px</button>
+    <button class="sb" data-v="stack">双行 54px</button>
+    <button class="sb" data-v="rail">竖向贴边</button>
+    <span class="lab" style="margin-left:8px">宽度</span>
+    <div class="rng"><input type="range" id="wRange" min="300" max="1180" step="20" value="1180"><span id="wVal">1180px</span></div>
+    <div class="rng" style="margin-left:8px">不透明度<input type="range" id="oRange" min="40" max="100" step="2" value="90"><span id="oVal">90%</span></div>
+    <div class="meter" id="meter">占屏 —</div>
+  </div>
+  <div class="bar preview-only">
+    <span class="lab">底衬</span>
+    <button class="sb" data-bg="dark">深色</button>
+    <button class="sb on" data-bg="game">游戏画面</button>
+    <button class="sb" data-bg="check">透明（棋盘格）</button>
+    <button class="sb" id="btnPlay">▶ 演示播放</button>
+    <button class="sb" id="btnEmbed" style="margin-left:auto">切到 ?embed=1 预览</button>
+  </div>
+
+  <div class="stage game" id="stage">
+    <!-- ===== exe 悬浮窗的全部内容（由 JS 按版式渲染） ===== -->
+    <div id="overlay" style="width:1180px"></div>
+  </div>
+</div>
+
+<script>
+/* 真实形状的样本：模拟「筛掉农民后的建造顺序」（US_TVP 那一局的非农民项） */
+const STEPS = [
+  { t: 24,  zh: '补给站',   en: 'SupplyDepot',  k: 'building' },
+  { t: 56,  zh: '兵营',     en: 'Barracks',     k: 'building' },
+  { t: 84,  zh: '气矿',     en: 'Refinery',     k: 'building' },
+  { t: 112, zh: '轨道控制基地', en: 'OrbitalCommand', k: 'building' },
+  { t: 129, zh: '陆战队员', en: 'Marine',       k: 'unit' },
+  { t: 148, zh: '工程站',   en: 'EngineeringBay', k: 'building' },
+  { t: 166, zh: '兵营',     en: 'Barracks',     k: 'building' },
+  { t: 187, zh: '死神',     en: 'Reaper',       k: 'unit' },
+  { t: 205, zh: '工厂',     en: 'Factory',      k: 'building' },
+  { t: 231, zh: '指挥中心', en: 'CommandCenter', k: 'building' },
+  { t: 259, zh: '兴奋剂',   en: 'Stimpack',     k: 'upgrade' },
+  { t: 278, zh: '盾牌',     en: 'ShieldWall',   k: 'upgrade' },
+  { t: 296, zh: '星港',     en: 'Starport',     k: 'building' },
+  { t: 318, zh: '导弹车',   en: 'Cyclone',      k: 'unit' },
+  { t: 341, zh: '攻城坦克', en: 'SiegeTank',    k: 'unit' },
+  { t: 364, zh: '医疗运输机', en: 'Medivac',    k: 'unit' },
+  { t: 389, zh: '兵营',     en: 'Barracks',     k: 'building' },
+  { t: 412, zh: '维京',     en: 'VikingFighter', k: 'unit' },
+  { t: 438, zh: '工程站',   en: 'EngineeringBay', k: 'building' },
+  { t: 461, zh: '兵营',     en: 'Barracks',     k: 'building' },
+  { t: 487, zh: '坦克模式', en: 'SiegeTech',    k: 'upgrade' },
+  { t: 512, zh: '恶火',     en: 'Hellion',      k: 'unit' },
+  { t: 538, zh: '工厂',     en: 'Factory',      k: 'building' },
+  { t: 564, zh: '渡鸦',     en: 'Raven',        k: 'unit' },
+  { t: 592, zh: '装甲等级 1', en: 'TerranInfantryArmorsLevel1', k: 'upgrade' },
+  { t: 620, zh: '星港',     en: 'Starport',     k: 'building' },
+  { t: 651, zh: '战列巡航舰', en: 'Battlecruiser', k: 'unit' },
+  { t: 683, zh: '武器等级 1', en: 'TerranInfantryWeaponsLevel1', k: 'upgrade' },
+];
+const DUR = 1026;
+const PLAYER = { name: 'Percival', race: 'T', idx: 8 };
+
+const $ = s => document.querySelector(s);
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const lastIdxAt = (a, t) => { let i = -1; for (let k = 0; k < a.length; k++) { if (a[k].t <= t + 1e-6) i = k; else break; } return i; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/** 类别 → 颜色。轴上的刻度、当前项的左侧色条都用它，颜色本身带信息。 */
+const KIND_COLOR = s => !s ? 'var(--worker)'
+  : s.k === 'upgrade' ? 'var(--upgrade)' : s.k === 'unit' ? 'var(--unit)' : 'var(--building)';
+
+const S = { v: 'axis', t: 318, playing: false, base: 318, wall0: 0, speed: 2, w: 1180, opacity: .90 };
+
+/* ---------- 四种版式 ---------- */
+function shellHTML(inner, h){
+  return `<div class="ov h-${S.v}" id="ovCard" style="opacity:${S.opacity}">${inner}</div>`;
+}
+
+function renderAxis(){
+  const i = lastIdxAt(STEPS, S.t);
+  const cur = STEPS[i], nxt = STEPS[i + 1];
+  const W = Math.max(120, S.w - 380);        // 轴可用宽度（扣掉左侧当前块与右侧「下一步」槽位）
+  const X = t => (t / DUR) * W;
+  const ticks = STEPS.map((s, k) => {
+    const past = k <= i;
+    const isNext = k === i + 1;
+    const hgt = isNext ? 13 : (s.k === 'upgrade' ? 10 : 7);
+    return `<i class="tick ${past ? 'past' : ''} ${isNext ? 'next' : ''}"
+      style="left:${X(s.t).toFixed(1)}px;height:${hgt}px;background:${KIND_COLOR(s)}"></i>`;
+  }).join('');
+  const nxs = nxt
+    ? `<span class="lb">下一步</span><b>${mmss(nxt.t)}</b><span>${esc(nxt.zh)}</span><span class="lb">+${Math.round(nxt.t - S.t)}s</span>`
+    : `<span class="nev">轴上已到末尾</span>`;
+  return shellHTML(`
+    <div class="now">
+      <i class="g" style="background:${KIND_COLOR(cur)}"></i>
+      <span class="t">${mmss(S.t)}</span>
+      <span class="n">${cur ? esc(cur.zh) : '未开始'}</span>
+    </div>
+    <div class="divv"></div>
+    <div class="axis">
+      <div class="track"></div>
+      <div class="fill" style="width:${Math.min(100, S.t / DUR * 100).toFixed(2)}%"></div>
+      ${ticks}
+      <div class="cur" style="left:${(S.t / DUR * 100).toFixed(2)}%"></div>
+    </div>
+    <div class="divv"></div>
+    <div class="nxs">${nxs}</div>`);
+}
+
+function renderTicker(){
+  const i = lastIdxAt(STEPS, S.t);
+  const from = Math.max(0, i - 1);
+  const items = STEPS.slice(from, i + 4).map((s, k) => {
+    const on = k === i - from;
+    return `<span class="it ${on ? 'on' : ''}">${mmss(s.t)} ${esc(s.zh)}</span>`;
+  }).join('');
+  return shellHTML(`<div class="now" style="padding-left:13px">
+      <span class="t">${mmss(S.t)}</span></div><div class="divv"></div><div class="tk">${items}</div>`);
+}
+
+function renderStack(){
+  const i = lastIdxAt(STEPS, S.t);
+  const cur = STEPS[i];
+  const nx = STEPS.slice(i + 1, i + 4);
+  const prog = Math.min(1, S.t / DUR) * 100;
+  return shellHTML(`
+    <div class="st">
+      <div class="r1">
+        <span class="t mono" style="font-size:16px;font-weight:700;color:var(--gold)">${mmss(S.t)}</span>
+        <span style="font-size:15px;font-weight:600">${cur ? esc(cur.zh) : '未开始'}</span>
+        <span class="mono" style="font-size:11px;color:var(--ink3)">${PLAYER.name} · ${i + 1}/${STEPS.length}</span>
+      </div>
+      <div class="r2">
+        <span class="stp"><i style="width:${prog.toFixed(2)}%"></i></span>
+        ${nx.map((s, k) => `<span class="k ${k === 0 ? 'soon' : ''}">${k === 0 ? '下一步 ' : ''}${mmss(s.t)} ${esc(s.zh)}</span>`).join('')}
+      </div>
+    </div>`);
+}
+
+function renderRail(){
+  const i = lastIdxAt(STEPS, S.t);
+  const rows = STEPS.slice(Math.max(0, i - 1), i + 6).map((s, k) => {
+    const on = k === (i - Math.max(0, i - 1));
+    const col = KIND_COLOR(s);
+    return `<div class="railrow ${on ? 'on' : ''}">
+      <i class="g" style="background:${col}"></i>
+      <span class="tm">${mmss(s.t)}</span>
+      <span class="nm">${esc(s.zh)}</span>
+      <span style="width:3px"></span>
+    </div>`;
+  }).join('');
+  return shellHTML(rows + `<div class="railfoot">
+      <span>${esc(PLAYER.name)}</span><span>${i + 1} / ${STEPS.length}</span></div>`);
+}
+
+const RENDER = { axis: renderAxis, ticker: renderTicker, stack: renderStack, rail: renderRail };
+
+function render(){
+  const host = $('#overlay');
+  // ⚠️ embed 模式（= exe 里）：窗口尺寸由 exe 决定，页面必须**填满**它。
+  // 早期版本在这里写死了宽度，导致窗口比卡片窄时卡片被居中推到负坐标（x=-140）。
+  const embedded = document.body.classList.contains('embed');
+  host.style.width = embedded
+    ? '100%'
+    : (S.v === 'rail' ? Math.min(240, S.w) + 'px' : S.w + 'px');
+  host.innerHTML = RENDER[S.v]();
+  updateMeter();
+}
+
+/* ---------- 占屏比读数（按 1920×1080 计，如实区分「本档宽度」与「贴满屏宽」） ---------- */
+const SCREEN = { w: 1920, h: 1080 };
+function updateMeter(){
+  const el = $('#ovCard'); if (!el) return;
+  const r = el.getBoundingClientRect();
+  const card = `${Math.round(r.width)}×${Math.round(r.height)}`;
+  const own = (r.width * r.height) / (SCREEN.w * SCREEN.h) * 100;
+  const full = (SCREEN.w * r.height) / (SCREEN.w * SCREEN.h) * 100;
+  $('#meter').textContent = S.v === 'rail'
+    ? `卡片 ${card} · 占屏 ${own.toFixed(2)}%`
+    : `卡片 ${card} · 本档宽占 ${own.toFixed(2)}% ｜ 贴满屏宽 ${SCREEN.w}×${Math.round(r.height)} 占 ${full.toFixed(2)}%`;
+  $('#tagV').textContent = 'v=' + S.v;
+}
+
+/* ---------- 播放（演示状态机） ---------- */
+function tick(){
+  if (!S.playing) return;
+  S.t = S.base + (Date.now() - S.wall0) / 1000 * S.speed;
+  if (S.t >= DUR){ S.t = DUR; S.playing = false; $('#btnPlay').textContent = '▶ 演示播放'; }
+  render();
+}
+setInterval(tick, 90);
+$('#btnPlay').onclick = () => {
+  if (S.playing){ S.base = S.t; S.playing = false; $('#btnPlay').textContent = '▶ 演示播放'; }
+  else {
+    if (S.t >= DUR - .5) S.t = 0;
+    S.base = S.t; S.wall0 = Date.now(); S.playing = true; $('#btnPlay').textContent = '❚❚ 暂停';
+  }
+  render();
+};
+
+/* ---------- 控件 ---------- */
+document.querySelectorAll('.sb[data-v]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.sb[data-v]').forEach(x => x.classList.toggle('on', x === b));
+    S.v = b.dataset.v; render();
+  };
+});
+document.querySelectorAll('.sb[data-bg]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.sb[data-bg]').forEach(x => x.classList.toggle('on', x === b));
+    $('#stage').className = 'stage' + (b.dataset.bg === 'dark' ? '' : ' ' + b.dataset.bg);
+  };
+});
+$('#wRange').oninput = e => { S.w = +e.target.value; $('#wVal').textContent = S.w + 'px'; render(); };
+$('#oRange').oninput = e => {
+  S.opacity = +e.target.value / 100;
+  $('#oVal').textContent = e.target.value + '%';
+  const c = $('#ovCard'); if (c) c.style.opacity = S.opacity;
+};
+$('#btnEmbed').onclick = () => {
+  const u = new URL(location.href);
+  u.searchParams.has('embed') ? u.searchParams.delete('embed') : u.searchParams.set('embed', '1');
+  u.searchParams.set('v', S.v);
+  location.href = u.toString();
+};
+
+/* ---------- 启动：支持 ?v= 与 ?embed=1 ---------- */
+const q = new URLSearchParams(location.search);
+if (q.has('embed')) document.body.classList.add('embed');
+if (RENDER[q.get('v')]) { S.v = q.get('v'); document.querySelectorAll('.sb[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === S.v)); }
+render();
+</script>
+</body>
+</html>

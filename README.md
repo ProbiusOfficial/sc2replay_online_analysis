@@ -2,7 +2,11 @@
 
 ![banner](./assets/banner.png)
 
-一个基于浏览器端的《星际争霸 II》录像在线解析工具。默认在浏览器本地解析；同时支持将玩家自愿共享的录像上传到独立服务，由服务端二次校验后归档到公开仓库。
+一个基于浏览器端的《星际争霸 II》录像分析工具。**全部解析在本地完成，录像文件不会上传到任何服务器。**
+
+> **2026-09 产品方向调整**：**「共享录像库」功能已下线**（无自建后端可持续运营），
+> 站点转为**纯客户端**。`replays.html` 与上传相关代码保留在仓库中但已从导航移除，不再维护。
+> 主页面重做为「**录像数据分析台**」：官方回放 overlay 口径的 28 张指标图 + 建造顺序 + 语音播报。
 
 ### 使用方法
 
@@ -14,47 +18,66 @@
 python -m http.server 8080
 ```
 
-浏览器访问 `http://127.0.0.1:8080/` 即可。
+浏览器访问 `http://127.0.0.1:8080/`，把 `.SC2Replay` 拖进页面即可（可一次拖多个）。
 
 开发与维护时，模块职责、解析数据流与发布方式见 **[docs/MAINTENANCE.md](docs/MAINTENANCE.md)**。
 
-### 项目结构（零构建）
+### 待补的可选组件
 
-仓库为纯静态资源，无 `npm` / 打包步骤，GitHub Actions 直接发布整仓。
+**桌面悬浮窗（`sc2-overlay.exe`）尚未实现。** 它是一个**可选**的 Windows 小组件：
+装了就有一个无边框、置顶、逐像素透明、点击穿透的建造轴浮层；
+**不装也完全不影响使用**，此时「悬浮到桌面」会降级为浏览器自带的 Document 画中画
+（顶部会带浏览器标题栏，且不能透明）。
+
+- 视觉规格稿：`prototype/overlay-exe.html`（四种版式，`?embed=1` 即 exe，里 WebView2 要加载的形态）
+- 方案调研（含通道设计、反作弊边界、Win32 细节）：`docs/RESEARCH-ALWAYS-ON-TOP-OVERLAY.md`
+
+### 项目结构（站点零构建）
+
+站点自身仍是**纯静态、零构建**：没有打包器、没有 `node_modules`，GitHub Actions 直接发布整仓。
+唯一的「构建」发生在 **CI**（`.github/workflows/build-wasm.yml`）：Rust → wasm、Worker TypeScript → JS，
+产物提交回仓库（`wasm/pkg/`、`js/worker/**/*.js`），所以本地开发**不用**装 Rust / TypeScript。
 
 | 路径 | 说明 |
 |------|------|
-| `index.html` | 本地解析主页面（含共享上传入口） |
-| `replays.html` | 共享录像检索页面 |
-| `css/app.css` | 全局样式 |
-| `js/app.js` | 本地解析页面入口 |
-| `js/replays_page.js` | 共享录像页入口 |
-| `js/parse_script.js` | 内嵌 Python 解析脚本（供 Pyodide 执行） |
-| `js/*.js` | 其余按功能拆分的逻辑（状态、Pyodide 启动、展示、批量侧栏、语音、图表等） |
-| `server/` | 独立 FastAPI 服务（本地持久化 + 公共查询 + 后台管理 + 可选同步） |
-| `data.json` | 单位/建筑/升级等中文翻译数据 |
-| `docs/MAINTENANCE.md` | 维护说明与模块对照表 |
+| `index.html` | **主页面**（录像数据分析台）：左侧录像列表侧边栏 + 数据分析 / 建造顺序两个视图 + 底部语音播报条 + 悬浮通道 |
+| `css/lab.css` | 主页面的设计系统（浅色；`--a` 红 = 玩家 A、`--b` 蓝 = 玩家 B） |
+| `js/lab/main.js` | 主页面编排层：文件输入 → 解析 → 适配 → 挂载；运行态（初始化 / 进度 / 错误） |
+| `js/lab/data.js` | **数据适配层**：`ReplayData` → 视图层形状（含 39 字段短名映射、建造项分类、玩家时间网格对齐） |
+| `js/lab/views.js` | 视图层（**由脚本从原型逐字节提取**，见 `scripts/extract-lab-views.mjs`）：全部渲染与交互 |
+| `js/parse_client.js` | 主线程解析门面：拉起解析 Worker、`parseReplayBufferToData` |
+| `js/worker/` | **解析 Worker**：MPQ 容器 + 六流协议解码 + `ReplayData` 组装（TS，由 CI 转译） |
+| `wasm/` | Rust 源码与其 wasm 产物（bzip2 解压等热点） |
+| `data.json` | 单位 / 建筑 / 升级等中文译名（建造顺序的分类与显示都依赖它） |
+| `prototype/` | **设计来源**：交互原型、以及 `extract-lab-*.mjs` 提取生产文件时所依赖的模板。⚠️ 不要删，提取脚本靠它 |
+| `tests/baseline/` | `ReplayData` 字段级对拍的金标准快照 |
+| `tests/screenshots-lab/` | 生产页面端到端验收的截图产物 |
+| `scripts/` | codegen 与验收脚本（`gen-*.py` / `verify-*.mjs` / `extract-lab-*.mjs` / `research/`） |
+| `docs/` | 维护说明与调研报告（功能全集、竞品矩阵、悬浮窗方案） |
+
+**已删除（2026-09-22 UI 重构）**：
+上一代 UI 的 `css/app.css`、`js/app.js`、`js/display.js`、`js/display_helpers.js`、
+`js/voice_reader.js`、`js/benchmarks.js`、`js/batch_rail.js`、`js/constants.js`、
+`js/format_utils.js`、`js/export_build.js`；共享录像库的 `replays.html`、`js/replays_page.js`、
+`js/share_upload.js`、`js/upload_api.js`、`js/telemetry.js`；以及未入仓的 `server/`。
+删完后 `js/` 下 **44 个模块全部可达** —— 用 `node scripts/analyze-module-reachability.mjs` 核验
+（它连 `new Worker(...)` / `new URL("...", import.meta.url)` 这类**字符串路径**的边都会走）。
+仍保留 `tools/baseline/parse_script.py`：重建金标准基准要用的冻结参考，**不是死代码**。
 
 ### 功能概述
 
-- **纯前端运行**：使用 Pyodide 在浏览器中加载 Python 运行时与第三方库完成解析，录像文件不会上传到服务器。
-- **可选共享上传**：在本地解析完成后，玩家可勾选同意项并提交留言（50字内）；服务端会再次校验大小/格式/摘要字段，先本地持久化，再按周期可选同步到公开仓库。
-- **共享录像检索**：`replays.html` 使用服务端公共接口检索，支持关键词检索、置顶展示、点赞计数与按点赞排序；点击后按需从服务端拉取录像并复用同一解析渲染链路。
-- **后台管理面板**：服务端提供 Bearer Token 保护的管理页，可人工置顶、编辑标签与留言等元数据。
-- **批量录像**：支持一次选择或拖入多个 `.SC2Replay`，顺序解析；左侧**独立悬浮**摘要面板展示每场地图、玩家（含种族）、胜者、时长、区域、客户端版本；右缘可**拖动调节面板宽度**（宽度会记入本地存储）；点击某张卡片可在主区域切换该场的完整分析（建造表、聊天、图表等）。悬浮层**不挤压**中间主内容宽度。
-- **对战信息展示**：展示地图名称、对局时长等基础信息。
-- **聊天消息**：还记得那天对局你们聊了什么么？精准还原，身临其境w！
-- **造兵/建筑时间轴**：按时间顺序显示双方建造顺序，可切换“开始建造时间 / 完成建造时间”两种模式。
-- **升级与技能事件**：支持展示科技升级完成时间以及“星空加速（Nexus Mass Recall）”等关键技能事件。
-- **中英双语名称**：通过本地 `data.json` 进行单位、建筑与升级的中文翻译，支持切换显示原始英文名称。
-- **无视版本**：不管现在的客户端是否能播放，只要数据完好，都能看！（理论支持15405-95299版本，不过好像一些资料片调整没法避免，至少我测试了2018年的录像还能提取）
-- **对局分析图表**：解析成功后，若能从 Tracker 事件汇总出玩家按分钟的统计数据，会在建造列表下方自动展示「对局分析」区块（基于 **Chart.js 4**）。当前包含五张折线图，便于对比双方曲线：
-  - **农民数量**：按游戏内时间（更快）采样，横轴为游戏分钟、每秒一点；无曲线数据时回退为按分钟的 `workers` 统计。
-  - **军队价值**：每名玩家矿物 /瓦斯两条线（虚线区分瓦斯）。
-  - **采集速率**：矿物与瓦斯采集速率（虚线区分瓦斯）。
-  - **人口 / 补给**：已用人口与补给上限（虚线区分补给上限）。
-  - **工人战损**：累计击杀工人与累计损失工人（虚线区分损失）。  
-  多玩家时以不同色相区分；图表随重新解析录像而销毁并重绘。
+- **纯前端运行**：解析全部在浏览器里完成 —— Rust→WASM 负责容器解压，TypeScript 解码器在 **Web Worker** 中还原六个事件流并组装 `ReplayData`。**不加载 Python 运行时**，主线程不参与解析，大录像与多文件批量时页面不再冻结；**录像文件不会上传**。
+- **39 个计分字段完整呈现**：官方客户端回放 overlay（Resources / Income / Spending / Army / Losses）所用的 `SPlayerStatsEvent` 有 **39 个 `m_scoreValue*` 字段**，本页把它们做成 **28 张可视图表**（少数为派生求和，如「军队价值 = 矿 + 气」）。字段口径与官方完全一致，因此零学习成本。
+- **全局时间轴为主控**：一条时间轴显示双方军队价值差的镜像包络，自动标记**交战**与**工人批量损失**事件；在任意图表或时间轴上移动鼠标，全部视图（读数卡 / 图表游标 / 采样表）同步。
+- **读数卡与差值**：8 个核心指标双方对位，带差值与「谁领先」。
+- **原始采样表 + CSV 导出**：可选指标跟随游标高亮滚动；一键导出 39 字段 × 双方的完整宽表。
+- **建造顺序**：双列对位、按分钟分组、类别色条（建筑 / 单位 / 科技 / 农民 / 星空加速）、跟随时间轴高亮、点行跳转、类别筛选、中英双语、工人阵亡计数。
+  > 原始 `build_order._kind` **只有 `unit` / `recall` 两种**，「建筑 / 单位 / 升级」是用 `data.json` 名表反查的 —— 这是旧链路 `itemIsTechUpgrade()` 的同一判据。
+- **语音播报**：把建造顺序按时间轴朗读出来，可调倍速（1/2/4/8×）与语速、可切换播报对象与语言；**播报会推进全局时间轴**，切样本 / 切对象 / 改筛选都不打断。
+- **桌面悬浮（可选）**：见上文「待补的可选组件」。未安装时降级为浏览器 Document 画中画。
+- **批量录像**：一次拖入多个 `.SC2Replay`，在**左侧录像列表侧边栏**（吸顶、可滚动）里切换；
+  单份解析失败不会影响其余，失败原因在错误条里逐条列出。
+- **无视版本**：只要数据完好就能看（含 2018 年的 HotS 老录像）。
 
 ![我就说很有用吧.jpg](./assets/image-20260310011545460.png)
 
@@ -62,17 +85,24 @@ python -m http.server 8080
 
 ### 依赖说明
 
-本项目的核心解析逻辑基于 Python 社区开源库 **sc2reader**：
+解析逻辑是**对既有 Python 生态实现的等价重写**，语义对齐对象为：
 
-- **sc2reader**：用于读取并解析 `.SC2Replay` 文件，提取玩家、单位、建筑、升级、事件等结构化数据。
-- 通过 Pyodide 在浏览器中安装并运行 `sc2reader`，结合自定义脚本，将解析结果序列化为 JSON，再由前端渲染为时间轴视图。
+- **sc2reader 1.9.0** 与 **spawningtool 3.0.0**：站点以前直接在浏览器里跑这两个库（Pyodide）；
+  现在的 TypeScript 解码器逐字段复刻它们的输出，判据是 `tests/baseline/*.json`
+  —— 由它们离线生成的冻结快照（源码 `tools/baseline/parse_script.py`，生成脚本 `scripts/freeze-baseline.py`）。
+- **运行时不依赖 Python**：这两个库只在**重建基准**时需要，站点实际加载的产物是
+  `wasm/pkg/*.wasm` 与 `js/worker/**/*.js`。改动解析口径后必须重新冻结基线并跑
+  `scripts/verify-replay-data.mjs`，流程见 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)。
 
-### 上传服务部署（可选）
+### ~~上传服务部署（可选）~~ —— 已下线并移除
 
-如需启用“共享上传”，需要额外部署 `server/` 下的 FastAPI 服务。默认以本地持久化为主，GitHub 同步可按开关启用。
+**共享上传与共享录像检索已于 2026-09 下线**（无自建后端可持续运营），站点转为纯客户端。
+相关的 `server/`（FastAPI 服务）、`replays.html`、`js/replays_page.js`、`js/share_upload.js`、
+`js/upload_api.js`、`js/telemetry.js` 已于 2026-09-22 **从仓库删除**（被删文件都在 git 历史里）。
+如需重新启用，得先自行评估服务端托管与内容审核成本，再从头实现。
 
-- 文档：[`server/README.md`](server/README.md)
-- 默认上传地址：`https://replayapi.s.3q.hair/api/replays/upload`（可通过前端全局变量覆盖）
+- ~~文档：`server/README.md`~~（未入仓，本机亦已不存在）
+- ~~默认上传地址：`https://replayapi.s.3q.hair/api/replays/upload`~~
 
 
 
@@ -107,6 +137,55 @@ python -m http.server 8080
 在此对 **sc2reader** 以及 **SC2ReplayAnalyzer-main** 项目作者和贡献者表示感谢。
 
 ### 更新日志
+
+```build-260922
+*主页面重做为「录像数据分析台」，砍掉共享录像库，站点转为纯客户端：
+- 新增 js/lab/ 三个模块：main.js（编排：文件输入 → 解析 → 适配 → 挂载）、
+  data.js（适配层：ReplayData → 视图层形状）、views.js（渲染与交互，由
+  scripts/extract-lab-views.mjs 从原型 prototype/data-lab.template.html 逐字节提取）。
+- index.html 整页重做：官方回放 overlay 口径的 28 张指标图（39 个 m_scoreValue* 字段）、
+  全局时间轴主控（军队价值差镜像包络 + 交战/工人损失事件标记）、8 张读数差值卡、
+  原始采样表 + CSV 导出、建造顺序双列视图、语音播报条、悬浮通道。移除 Chart.js CDN 依赖。
+- 解析层新增 stats_series（列式，39 字段完整原始采样序列），与 stats[]（逐分钟摘要）
+  并存。⚠️ 时间基准改用录像是自己的帧率常量（gameloop / fps），与 game_length 同基准；
+  旧 stats[].minute 硬编码 /1.4 的口径错位仅保留在旧字段里，未动（避免破坏对拍）。
+- 砍掉共享录像库：index.html 移除导航与上传入口；replays.html、replays_page.js、
+  share_upload.js、upload_api.js、telemetry.js、server/ 保留在仓库但不再维护、不再被引用。
+- 上一代 UI 模块（app.js / display.js / voice_reader.js / benchmarks.js / batch_rail.js 等）
+  保留未删但已无页面引用，仅为回退。
+- 新增验收：verify-lab-page.mjs（真实 HTTP + 真实 Chromium + 5 份真实录像的端到端验收，
+  含 43 个 DOM 契约 id、跨样本重建、游标联动、建造顺序跳转、语音状态机、悬浮降级、CSV 下载）。
+- 新增提取工具：extract-lab-css.mjs / extract-lab-views.mjs（原型 → 生产，带断言式定点替换与自检）。
+- **删除全部旧代码**（不再是「保留未引用」）：上一代 UI 的 14 个模块（css/app.css、js/app.js、
+  js/batch_rail.js、js/benchmarks.js、js/constants.js、js/display.js、js/display_helpers.js、
+  js/export_build.js、js/format_utils.js、js/replays_page.js、js/share_upload.js、js/telemetry.js、
+  js/upload_api.js、js/voice_reader.js）与 replays.html。新增 scripts/analyze-module-reachability.mjs
+  做依赖闭包核验（连 new Worker / new URL(..., import.meta.url) 这类字符串路径的边都会走），
+  现 js/ 下 44 个模块全部可达、零死代码。
+- **录像列表改为左侧吸顶侧边栏**（236px，与「指标分组」侧栏同宽；≤1180px 退回顶部横排），
+  含「＋ 添加录像」入口与加载状态提示。
+- **修掉底部播报条的位置缺陷**：原先 .vb 横跨视口且自己就是 flex 容器，内容从视口左缘起排，
+  与居中的主体（max-width 1600）错位 —— 实测 1920 屏偏 142px、2560 屏偏 462px。
+  现拆成 .vb（背景层）+ .vbin（内容层，与主体同宽居中）；条高由 ResizeObserver 写入 CSS 变量 --vbh，
+  供页面底部留白与各吸顶侧栏扣减（窄屏条会换行变高，写死 84px 会压住内容）。
+  ⚠️ 页面底部留白由 &lt;footer class="pagefoot"&gt; 承担 —— 不能写成 body{padding-bottom}，
+  因为 lab.css 里有 html,body{height:100%}，body 的 content box 固定为视口高、溢出的内容会**穿过** padding 区。
+- 新增 scripts/research/probe-layout.mjs：5 种视口 × 空态/有数据的几何契约探针
+  （条贴底 / 与主体对齐 / 不遮挡页脚与侧栏 / 侧栏竖排可滚）。
+```
+
+```build-260921
+*解析内核替换为 Rust/WASM + TypeScript Worker（正式下线 Pyodide）：
+- 新增 js/worker/：MPQ 容器解析、六个事件流的协议解码，以及 build_order / worker_deaths / stats /
+  workers_curve / chat 的组装（decoder/replay_data.ts），产出与旧链路 extract_replay_data 同构的 ReplayData。
+- 解析从主线程搬进 Web Worker：新增 js/parse_client.js（initParser / parseReplayBufferToData / isParserReady），
+  app.js / batch_rail.js / replays_page.js 全部改走 Worker，大录像与多文件批量时页面不再冻结。
+- 移除 Pyodide：删除 js/parse_script.js、js/pyodide_boot.js，去掉 index.html / replays.html 的 pyodide.js CDN 引用，
+  constants.js 的 PYODIDE_VERSION 与 state.js 的 appState.pyodide 一并移除；首屏不再下载 Python 运行时。
+- 旧解析脚本迁至 tools/baseline/parse_script.py，只作为 tests/baseline/ 金标准的生成源保留（离线运行，不进站点）。
+- 新增验收脚本：verify-replay-data.mjs（ReplayData 对基线的字段级 diff，parity / 发布两趟口径）、
+  verify-worker.mjs（真跑 parse.worker.js 的端到端通道验收）。
+```
 
 ```build-260419
 *前端工程化（零构建拆分）：
