@@ -5,6 +5,9 @@ name: Build Overlay (Windows)
 #   2. 对产物做真实冒烟测试（启动进程、探测 127.0.0.1:18760/health）；
 #   3. 产物连同 sha256 校验信息提交回仓库 download/ 目录，
 #      由 GitHub Pages 直接提供稳定下载链接（与 wasm 产物回仓同一约定）。
+#
+# 注意：windows-latest 镜像的 git 默认 core.autocrlf=true，checkout 会把 LF 检出成
+# CRLF，gofmt 会把整个文件判为需重排 —— 因此 checkout 前先全局关闭 autocrlf。
 
 on:
   push:
@@ -35,6 +38,9 @@ jobs:
         shell: bash
         working-directory: overlay
     steps:
+      - name: Disable autocrlf
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - name: Setup Go
@@ -47,19 +53,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      # 一致性校验失败时把详细日志写入 download/，供远程排查（发布步骤会一并提交）
       - name: Verify icon mapping consistency
         id: iconcheck
         continue-on-error: true
         working-directory: ${{ github.workspace }}
         run: |
           python -m pip install --quiet pillow
-          set -o pipefail
           python scripts/gen-overlay-icons.py --check 2>&1 | tee icon-check.log
           st=${PIPESTATUS[0]}
+          result=ok
           if [ $st -ne 0 ]; then
+            result=failure
             mkdir -p download
             cp icon-check.log download/icon-check.log
           fi
+          echo "result=$result" >> "$GITHUB_OUTPUT"
           exit $st
 
       - name: Verify gofmt
@@ -67,13 +76,19 @@ jobs:
         continue-on-error: true
         run: |
           go version
-          gofmt -d . > ../gofmt.diff || true
-          test ! -s ../gofmt.diff
+          gofmt -d . > ../gofmt.diff
+          st=$?
+          result=ok
+          if [ $st -ne 0 ]; then result=failure; fi
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          exit $st
 
       - name: Vet
+        if: steps.iconcheck.outputs.result != 'failure' && steps.gofmtcheck.outputs.result != 'failure'
         run: go vet ./...
 
       - name: Build (desktop,production)
+        if: steps.iconcheck.outputs.result != 'failure' && steps.gofmtcheck.outputs.result != 'failure'
         run: go build -trimpath -tags desktop,production -o sc2-overlay.exe .
 
       # 真实冒烟：启动进程，探测本地服务与 WebView2 页面是否就绪。
@@ -97,15 +112,13 @@ jobs:
           } else {
             Write-Host "冒烟失败：/health 20s 内未就绪（CI 桌面会话差异，见上方日志）"
           }
-          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
 
-      - name: Publish to download/ (exe + sha256)
+      - name: Publish to download/ (exe + sha256 + 诊断)
         if: github.event_name == 'push'
         run: |
           mkdir -p ../download
           cp sc2-overlay.exe ../download/sc2-overlay.exe
           [ -f icon-check.log ] && cp icon-check.log ../download/icon-check.log || true
-          [ -s ../gofmt.diff ] && cp ../gofmt.diff ../download/gofmt.diff || true
           {
             echo "build: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
             echo "commit: ${GITHUB_SHA}"
@@ -127,14 +140,15 @@ jobs:
           path: overlay/sc2-overlay.exe
           if-no-files-found: error
 
+      # 诚实门禁：放在产物发布之后，保证诊断信息先行落库
       - name: Gate on icon check
-        if: steps.iconcheck.outcome == 'failure'
+        if: steps.iconcheck.outputs.result == 'failure'
         run: |
-          cat icon-check.log 2>/dev/null || true
+          cat download/icon-check.log 2>/dev/null || true
           exit 1
 
       - name: Gate on gofmt
-        if: steps.gofmtcheck.outcome == 'failure'
+        if: steps.gofmtcheck.outputs.result == 'failure'
         run: |
           cat ../gofmt.diff 2>/dev/null || true
           exit 1
