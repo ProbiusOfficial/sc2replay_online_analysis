@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: build-overlay-${{ github.ref }}
@@ -140,6 +141,14 @@ jobs:
         with:
           commit_message: "chore(ci): build sc2-overlay.exe"
           file_pattern: "download/*"
+
+      # GITHUB_TOKEN 的 push 不会触发其它 workflow（防递归），但 workflow_dispatch
+      # 是官方豁免场景 —— 显式调度 static.yml，让 Pages 重新发布新的 exe
+      - name: Trigger Pages deploy
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run static.yml --ref main
 
       - name: Upload artifact
         if: always()
