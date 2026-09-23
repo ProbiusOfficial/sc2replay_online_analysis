@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
 	"io"
 	"log"
 	"net"
@@ -75,8 +76,13 @@ type App struct {
 	followGapRight, followGapTop    int
 	followGapSet, followGapApplied  bool
 	lastGameL, lastGameT, lastGameR int
-	lastFG                          bool // 上一tick SC2 是否前台（边沿检测用）
-	armedAutoStart                  bool // autostart=foreground：已装表待命，SC2 进前台即从 0 起表
+	lastFG                          bool // 上一tick SC2 是否前台（进/出前台的边沿广播用）
+	// 读游戏时钟（clock.go）：最近一次定位到的时钟区域与其中的墨迹像素数，供调试端点回读。
+	lastClockBand   image.Rectangle
+	lastClockPixels int
+	// 时钟区域（窗口比例）。0 值表示用 clock.go 里的默认值；可在 config.json 里覆盖 ——
+	// 不同分辨率 / UI 缩放下这个区域会有偏移，留个后门免得改代码。
+	clockX0, clockX1, clockY0, clockY1 float64
 	// M3：SSE 状态回推 + 托盘
 	sse       *sseHub
 	trayReady bool
@@ -92,7 +98,7 @@ type App struct {
 func NewApp() *App {
 	return &App{
 		sse:    newSseHub(),
-		layout: "bar", plate: "card", autostart: "now", // 与网页侧 load() 的缺省行为一致
+		layout: "bar", plate: "card", autostart: "key", // 默认「等快捷键」—— 自动起表实测时机不可控
 		mLayoutItems: map[string]*systray.MenuItem{},
 		mPlateItems:  map[string]*systray.MenuItem{},
 		mStartItems:  map[string]*systray.MenuItem{},
@@ -152,7 +158,7 @@ func (a *App) startup(ctx context.Context) {
 	// 2s 周期会让起表最多晚 2 秒，悬浮窗与游戏时钟从此整体错位（起表时刻无法事后补回）。
 	go func() {
 		for {
-			time.Sleep(a.modeTickInterval())
+			time.Sleep(2 * time.Second)
 			a.tickModes()
 		}
 	}()
@@ -182,6 +188,12 @@ func (a *App) startup(ctx context.Context) {
 	mux.HandleFunc("/debug/place", a.handleDebugPlace)
 	mux.HandleFunc("/debug/rect", a.handleDebugRect)
 	mux.HandleFunc("/debug/fg", a.handleDebugFG)
+	// 读游戏时钟（clock.go）：/clock/read 读一次、/clock/learn 喂模板、/clock/debug 落调试图
+	mux.HandleFunc("/clock/read", a.handleClockRead)
+	mux.HandleFunc("/clock/learn", a.handleClockLearn)
+	mux.HandleFunc("/clock/debug", a.handleClockDebug)
+	// 不依赖 GUI 的退出通道（sc2-overlay.exe --quit 会转发到这里）
+	mux.HandleFunc("/quit", a.handleQuit)
 
 	a.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 3 * time.Second}
 	go func() {
@@ -196,6 +208,23 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.srv != nil {
 		_ = a.srv.Shutdown(context.Background())
 	}
+}
+
+// handleQuit：退出进程。给「托盘点不开」留一条不依赖 GUI 的退路 ——
+// 先把响应发出去，再延迟一点收摊，免得 curl 那边看到 connection reset。
+func (a *App) handleQuit(w http.ResponseWriter, r *http.Request) {
+	cors(w, r)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "pid": os.Getpid()})
+	log.Printf("[overlay] 收到 /quit，正在退出（pid %d）", os.Getpid())
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		systray.Quit()
+		runtime.Quit(a.ctx)
+	}()
 }
 
 // placeWindow：默认 bar 版式 = 紧凑宽（620 逻辑像素）贴主屏右上角（规格 v2）。
@@ -391,12 +420,9 @@ var layoutSizes = map[string][2]int{
 // NotifyLayout：悬浮页切换版式后上报，exe 按规格调整窗口尺寸（硬不变式 2：
 // 固定高版式的窗口高度必须等于卡片高度）。w/h 为页面自报 CSS 视口，用于和
 // Win32 矩形对账 —— 排查「WebView2 内容不跟随外部 SetWindowPos」。
-// NotifyAutostart：悬浮页上报「autostart=foreground 武装待命」。
-// 武装期间看护协程检测到 SC2 进前台即 dispatch("play")，实现游戏开始同步起表。
-func (a *App) NotifyAutostart(armed bool) {
-	a.armedAutoStart = armed
-	log.Printf("[overlay] autostart=foreground armed = %v", armed)
-}
+//
+// 原先还有个 NotifyAutostart：「SC2 进前台即自动起表」。实测起表时机太不可控
+// （回放还在加载就开始跑），2026-09-23 弃用，改由用户按 Alt+↑ 手动起表。
 
 func (a *App) NotifyLayout(v string, cssW, cssH int) {
 	dim, ok := layoutSizes[v]
@@ -461,7 +487,6 @@ func (a *App) handleDebugFG(w http.ResponseWriter, r *http.Request) {
 		"fgSC2":      foregroundIsSC2(),
 		"fgPID":      pid,
 		"fgImage":    processImageName(pid),
-		"armed":      a.armedAutoStart,
 		"lastFG":     a.lastFG,
 		"gameWindow": g,
 	})
@@ -478,17 +503,7 @@ func (a *App) handleDebugRect(w http.ResponseWriter, r *http.Request) {
 
 // ---- M2：跟随游戏窗口 + 仅游戏内显示（调研 §3.4）----
 
-// modeTickInterval：看护协程的轮询间隔。默认低频（2s）—— 位置记忆与模式同步不需要更密；
-// 但 `autostart=foreground` 武装待命时改用 250ms：这段窗口里唯一在等的是「SC2 进前台」的边沿，
-// 2s 周期会让起表最多晚 2 秒。每轮重新取，所以武装后立刻生效、起表后立刻回落。
-func (a *App) modeTickInterval() time.Duration {
-	if a.armedAutoStart {
-		return 250 * time.Millisecond
-	}
-	return 2 * time.Second
-}
-
-// tickModes：看护协程按 modeTickInterval 周期执行；模式开关变化后也会立即调用一次。
+// tickModes：看护协程每 2s 执行一次；模式开关变化后也会立即调用一次。
 func (a *App) tickModes() {
 	h := findOverlayWindow()
 	if h == 0 {
@@ -545,15 +560,9 @@ func (a *App) tickModes() {
 		a.persistCfg(l, t)
 	}
 
-	// 2.5) autostart=foreground：武装待命中，SC2 从后台切到前台（边沿）即起表。
-	// 电平触发会在「武装时 SC2 本来就在前台」的场景立刻误起表，所以按边沿判定。
-	fg := foregroundIsSC2()
-	if a.armedAutoStart && fg && !a.lastFG {
-		a.armedAutoStart = false
-		log.Printf("[overlay] SC2 进前台（边沿）→ 起表")
-		a.dispatch("play", 0)
-	}
-	a.lastFG = fg
+	// 2.5) 只记录 SC2 的前台边沿。原先这里还负责「进前台 → 自动起表」，
+	// 但实测时机不可控（回放还在加载就跑起来了），已改为用户按 Alt+↑ 手动起表。
+	a.lastFG = foregroundIsSC2()
 
 	// 3) 仅游戏内显示：SC2 不在前台就整条隐藏（调研 §3.4）
 	if a.onlyWhenGame {

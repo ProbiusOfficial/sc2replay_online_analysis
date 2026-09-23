@@ -355,6 +355,8 @@ body.sandboxview .v-sandbox{margin-top:0}
 .vbset select,.vbset input[type=range]{font:inherit;font-size:11px;color:var(--ink2)}
 .vbset select{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
 .vbset input[type=range]{flex:1;min-width:0}
+.vbset input[type=text]{flex:1;min-width:0;font:inherit;font-size:11px;color:var(--ink2);
+                        border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
 .vbsep{height:1px;background:var(--line2);margin:1px 0}
 .vb .ov{display:flex;align-items:flex-start;gap:7px}
 .ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto;margin-top:4px}

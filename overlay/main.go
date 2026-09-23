@@ -35,6 +35,23 @@ func forwardShow() bool {
 	return true
 }
 
+// forwardQuit：让已运行的实例自己退出。
+//
+// 为什么要有这条：托盘菜单在 Windows 上可能因为线程/焦点问题点不开（runTray 漏了
+// LockOSThread，已修），但退出这种事不该只有 GUI 一条路 —— 留个
+// `sc2-overlay.exe --quit`，用户不必去开任务管理器。
+func forwardQuit() bool {
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Post("http://127.0.0.1:18760/quit", "application/json", nil)
+	if err != nil {
+		log.Printf("[overlay] 转发退出失败（无运行实例？）: %v", err)
+		return false
+	}
+	resp.Body.Close()
+	log.Printf("[overlay] 已请求运行中的实例退出")
+	return true
+}
+
 // anotherInstanceRunning：命名互斥锁检测单实例。
 func anotherInstanceRunning() bool {
 	m, exists := createMutex(`Local\sc2-overlay-singleton`)
@@ -48,6 +65,15 @@ func anotherInstanceRunning() bool {
 var keepMutexHandle uintptr
 
 func main() {
+	// sc2-overlay.exe --quit：让已运行的实例退出（不依赖托盘菜单）
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--quit", "-q", "quit":
+			if forwardQuit() {
+				return
+			}
+		}
+	}
 	// sc2overlay:// 唤起：已有实例在跑就转发显示指令后退出，否则继续正常启动
 	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "sc2overlay://") {
 		if forwardShow() {

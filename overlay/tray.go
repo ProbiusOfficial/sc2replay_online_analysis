@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	goruntime "runtime"
 
 	"github.com/energye/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -15,8 +16,16 @@ import (
 var trayICO []byte
 
 // runTray：托盘在自己的锁定线程上建窗口循环，与 Wails 主循环互不干扰（Windows）。
+//
+// ⚠️ 必须 LockOSThread：Windows 把窗口消息投递到**创建该窗口的线程**的消息队列，
+// 而 Go 的 goroutine 默认会在 OS 线程之间迁移 —— systray 的窗口和它的消息泵一旦落到
+// 不同线程上，托盘菜单就会「时灵时不灵」（实测：右键经常没反应，连退出都点不开）。
+// hotkey.go 里 RegisterHotKey(hwnd=0) + LockOSThread 是同一个道理，那边一开始就锁了。
 func (a *App) runTray() {
-	go systray.Run(a.onTrayReady, func() {})
+	go func() {
+		goruntime.LockOSThread()
+		systray.Run(a.onTrayReady, func() {})
+	}()
 }
 
 func (a *App) onTrayReady() {
@@ -53,7 +62,7 @@ func (a *App) onTrayReady() {
 	}
 	a.mStart = systray.AddMenuItem("开始方式", "推送脚本后如何起表（下次推送生效）")
 	for _, o := range []struct{ v, label string }{
-		{"now", "立即开始"}, {"foreground", "进游戏自动起表"},
+		{"now", "推送后立即开始"}, {"key", "等快捷键 Alt+↑"},
 	} {
 		it := a.mStart.AddSubMenuItemCheckbox(o.label, "", a.autostart == o.v)
 		v := o.v
@@ -152,9 +161,10 @@ func (a *App) setPlateMode(v string) {
 	log.Printf("[overlay] plate = %s", v)
 }
 
-// setAutostartMode：只影响**下一次**推送 —— 脚本到手时才决定「立即走表」还是「等 SC2 进前台」。
+// setAutostartMode：只影响**下一次**推送 —— 脚本到手时才决定「立即走表」还是「等 Alt+↑」。
+// （历史值 `foreground`（等 SC2 进前台自动起表）已弃用：实测时机不可控，回放加载期就跑起来了。）
 func (a *App) setAutostartMode(v string) {
-	if v != "now" && v != "foreground" {
+	if v != "now" && v != "key" {
 		return
 	}
 	a.autostart = v

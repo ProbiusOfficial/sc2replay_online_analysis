@@ -115,7 +115,11 @@ const S = {
 };
 
 const $ = s => document.querySelector(s);
-const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+// ⚠️ 秒数必须 floor 不能 round：round 会把 59.5~59.9 舍成 60，出现「00:60」这种不存在的读数。
+const mmss = s => {
+  const t = Math.max(0, Math.floor(s));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 const lastIdxAt = (a, t) => { let i = -1; for (let k = 0; k < a.length; k++) { if (a[k].t <= t + 1e-6) i = k; else break; } return i; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 /** 类别 → 颜色。色条/时间用它，颜色本身带信息（灰建筑/蓝单位/紫科技）。 */
@@ -247,13 +251,14 @@ function load(p){
   S.t = 0; S.base = 0; S.wall0 = Date.now();
   S.loaded = S.steps.length > 0;
   S.autostart = p.autostart || 'now';
-  S.playing = S.loaded && S.autostart !== 'foreground';
+  // 只有 `now` 才立即走表。`key`（等快捷键）—— 以及历史值 `foreground` —— 都先停在 0 等 Alt+↑。
+  // 原先的 foreground 是「等 SC2 进前台自动起表」，实测太不可控（回放加载期就开始跑），已弃用。
+  S.playing = S.loaded && S.autostart === 'now';
   if (S.loaded){
     if (p.plate) setPlate(p.plate, true);
     setLayout(p.layout || S.v);
   }
   render();
-  notifyAutostart();
   notifyLayout(S.v);
 }
 /** 版式切换：页面只管渲染，窗口尺寸由 exe 按规格表调整（硬不变式 2）。 */
@@ -277,10 +282,6 @@ function setOpacity(x){
   S.opacity = Math.max(.3, Math.min(1, +x || .9));
   const c = $('#ovCard');
   if (c && S.plate !== 'plain') c.style.opacity = S.opacity;
-}
-function notifyAutostart(){
-  const app = window.go && window.go.main && window.go.main.App;
-  if (app && app.NotifyAutostart) app.NotifyAutostart(S.loaded && S.autostart === 'foreground');
 }
 function notifyLayout(v){
   const app = window.go && window.go.main && window.go.main.App;

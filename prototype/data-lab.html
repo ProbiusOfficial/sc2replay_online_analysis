@@ -295,6 +295,8 @@ body:not(.chatview) .v-chat{display:none}
 .vbset select{flex:1;min-width:0;font:inherit;font-size:11px;color:var(--ink2);
               border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
 .vbset input[type=range]{flex:1;min-width:0;font:inherit;color:var(--ink2)}
+.vbset input[type=text]{flex:1;min-width:0;font:inherit;font-size:11px;color:var(--ink2);
+                        border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
 .vbnote{font-size:10px;color:var(--ink4);line-height:1.45}
 .vb .ov{display:flex;align-items:flex-start;gap:7px}
 .ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto;margin-top:4px}
@@ -397,6 +399,7 @@ body:not(.chatview) .v-chat{display:none}
         <div class="vbset"><span>游戏倍率</span><select id="ovSpeed"><option value="same">与录像同速 1:1</option><option value="faster">Faster 1.4</option><option value="fast">Fast 1.2</option><option value="normal">Normal 1.0</option><option value="slow">Slow 0.8</option><option value="slower">Slower 0.6</option></select></div>
         <div class="vbset"><span>语速</span><input type="range" id="vbRate" min="1" max="4" step="0.2" value="2"><b id="vbRateVal" style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);min-width:24px;text-align:right">2.0</b></div>
         <div class="vbset"><span>语言</span><select id="vbLang"><option value="zh-CN">中文</option><option value="en-US">English</option></select></div>
+        <div class="vbset"><span>对齐</span><input type="text" id="ovAlign" placeholder="游戏内此刻，如 03:12"><button class="pickbtn" id="ovAlignRead" type="button">读游戏</button><button class="pickbtn" id="ovAlignBtn" type="button">对齐</button></div>
 
         <div class="vbsep"></div>
 
@@ -581,7 +584,15 @@ const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const mmss = s => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(Math.round(s % 60)).padStart(2,'0')}`;
+/**
+ * 秒 → mm:ss。
+ * ⚠️ 秒数必须 **floor** 不能 round：`Math.round(s % 60)` 会把 59.5~59.9 舍成 60，
+ * 于是时钟出现「00:60」这种不存在的读数，下一秒才跳 01:00（用户实测反馈）。
+ */
+const mmss = s => {
+  const t = Math.max(0, Math.floor(s));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 function fmt(v){
   if (v == null || !isFinite(v)) return '—';
   const a = Math.abs(v);
@@ -657,6 +668,72 @@ function renderSamples(){
 
 const smpSearchEl = $('#smpSearch');
 if (smpSearchEl) smpSearchEl.oninput = e => { smpQ = e.target.value.trim().toLowerCase(); renderSamples(); };
+
+/* ==========================================================================
+   对齐游戏时间
+   —— SC2 不提供任何外部读时钟的接口，所以倍率（ovSpeedFactor）只能保证**走得一样快**，
+     起点对不对齐没人知道。真正的对齐只能靠人：看一眼游戏内时钟，把数字敲进来。
+     这一下会同时把分析页游标与悬浮窗游标拨到该时刻（两边同尺度，都是墙钟秒）。
+   ========================================================================== */
+
+/** "03:12" → 192；"192" → 192；解析不了返回 null。 */
+function parseClock(v){
+  const s = String(v == null ? '' : v).trim();
+  const m = /^(\d+):([0-5]\d)$/.exec(s);
+  if (m) return +m[1] * 60 + +m[2];
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+
+function ovAlign(){
+  const el = $('#ovAlign');
+  const t = parseClock(el && el.value);
+  if (t == null) {
+    ovSet('bad', '对齐失败：请填 03:12 这种格式，或纯秒数');
+    return;
+  }
+  const at = Math.max(0, t);
+  S.t = at;
+  if (V.playing) { V.base = at; V.wall0 = Date.now(); V.spoken = lastIdxAt(V.steps, at); }
+  scheduleSync();
+  renderVoiceUi();
+  ovCtl('seek', at); // 没连组件时 ovCtl 内部会直接返回
+  ovSet(ovReady ? 'ok' : 'bad',
+    ovReady ? `已对齐到 ${mmss(at)}` : '本页已对齐；本地悬浮组件未连接，没同步过去');
+}
+
+{
+  const btn = $('#ovAlignBtn'), el = $('#ovAlign'), rd = $('#ovAlignRead');
+  if (btn) btn.onclick = ovAlign;
+  if (el) el.onkeydown = e => { if (e.key === 'Enter') ovAlign(); };
+  if (rd) rd.onclick = ovReadGameClock;
+}
+
+/**
+ * 「读游戏」：让本地组件截屏识别 SC2 的 HUD 时钟，读到就填进输入框并直接对齐。
+ *
+ * 这条链路在 exe 侧（clock.go）：截 SC2 窗口 → 在固定比例区域里切出时钟 → 模板匹配。
+ * 模板库是**自己长出来的** —— 认不出的字形不会硬猜，而是等你手动对齐输对一次之后，
+ * 用那次读数把当帧的字形收进去（见 exe 的 /clock/learn）。所以头几次大概率要手动填，
+ * 把 0-9 喂齐之后就基本不用管了。
+ */
+async function ovReadGameClock(){
+  if (!ovReady) { ovSet('bad', '本地悬浮组件没连上，读不了游戏时钟'); return; }
+  ovSet('wait', '正在识别游戏时钟…');
+  try {
+    const res = await ovFetch('/clock/read', {}, 4000);
+    const d = await res.json();
+    if (d && d.ok) {
+      const el = $('#ovAlign'); if (el) el.value = d.text;
+      ovAlign();
+      ovSet('ok', `已从游戏读到 ${d.text} 并对齐`);
+    } else {
+      ovSet('bad', '读不到游戏时钟：' + ((d && d.detail) || '未知原因'));
+    }
+  } catch (e) {
+    ovSet('bad', '读不到游戏时钟：' + (e && e.message ? e.message : e));
+  }
+}
 
 /* ==========================================================================
    样本筛选弹窗
