@@ -100,6 +100,19 @@ const cleanUnitName = (u) => String(u ?? "").replace(WERROR_NOISE, "");
 
 const r1 = (n) => Math.round(n * 10) / 10;
 
+/**
+ * Blizzard 的对局速度系数（**精确分数**，Liquipedia `StarCraft_II/Game_Speed`）。
+ * Normal 基准 = 1，各档按 4096 分数给出 —— 别用 1.4 / 1.2 这种小数近似，
+ * 悬浮窗是长时间走表的，第四位小数的差别几分钟就能看出来。
+ */
+const SC2_SPEED_FACTOR = {
+  slower: 2457 / 4096,
+  slow: 3276 / 4096,
+  normal: 1,
+  fast: 4915 / 4096,
+  faster: 5734 / 4096,
+};
+
 /* ==========================================================================
    建造项分类 —— `_kind` 只有 `unit` / `recall`，真正的类别要靠 data.json 名表反查
    ========================================================================== */
@@ -210,13 +223,18 @@ function toLabReplay(file, d) {
   if (grid.length === 0) throw new Error("录像里没有玩家统计事件（SPlayerStatsEvent），无法做数据分析");
 
   // ⚠️ 时间口径换算：build_order / worker_deaths / chat 的时间都是 **16fps 基准游戏秒**
-  // （gameloop / 16），而时间轴用的是 gameloop / 实际 fps（Normal 16、Faster 22.4，
-  // 由录像自己的对局速度决定，**不能写死 1.4**）。stats 事件每 160 gameloop 一个采样点，
-  // 所以实际 fps = 160 / 采样间隔秒 —— 按样本实测。
-  // 实测：人机局 fps=16.0（因子 1.0），全部对战局 fps=22.54（因子 0.710）；
-  // 换算后建造末条落点 82%~99%，不换算则 LotV 对局的建造/聊天时间整体偏长 40%。
+  // （gameloop / 16），而时间轴用的是 gameloop / 实际 fps（由录像自己的对局速度决定）。
+  //
+  // **优先用录像自带的对局速度档位查精确表**（`m_gameSpeed` → Blizzard 的精确分数，
+  // 如 Faster = 5734/4096 = 1.39990234375）。
+  //
+  // 旧做法是拿 stats 采样间隔反推（`16/(160/med)`）：实测得 0.710，而精确值是
+  // 0.714285…，**约 0.6% 的系统性偏差**。这点误差做图表对齐看不出来，但悬浮窗是
+  // **长时间连续走表**的 —— 几分钟就累积成好几秒的可见偏移（实测 3 分钟差 3 秒）。
   const med = medianStep(grid);
-  const gameSecFactor = med > 0 ? 16 / (160 / med) : 1;
+  const speedFactor = SC2_SPEED_FACTOR[String(d.game_speed || "").toLowerCase()] || 0;
+  // 采样反推降级为兜底：老录像 / 字段缺失时仍可用。
+  const gameSecFactor = speedFactor > 0 ? 1 / speedFactor : (med > 0 ? 16 / (160 / med) : 1);
 
   // 对齐统计。⚠️ 不要用「Σ(网格长 - 该玩家长度)」来算补点数 —— 那会出负数，
   // 因为**同一玩家的序列里可能有重复时刻**（实测存在），并集去重后比单方还短。
@@ -296,6 +314,8 @@ function toLabReplay(file, d) {
     build: d.client_version ?? "—",
     region: d.region || "—",
     playedAt: d.start_time ?? null,
+    /** 录像录制时的对局速度档位（`Faster` 等，取自 `m_gameSpeed`）。诊断用；换算是 `gameSecFactor` 负责的。 */
+    gameSpeed: d.game_speed ?? null,
     winner: d.winner ?? null,
     winnerPid,
     chat,

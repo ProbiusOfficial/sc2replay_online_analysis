@@ -1135,8 +1135,11 @@ const SC2_SPEED_FACTOR = {
  * **回放速度 = 录像速度时倍率必须正好是 1**，再乘一次 1.4 会让悬浮窗快 40%。
  */
 function ovSpeedFactor(){
-  const g = rep().gameSecFactor || 1; // 游戏秒 → 真实秒
-  const rec = 1 / g;                  // 录像速度系数（由样本实测反推）
+  // `gameSecFactor` 现在由 data.js 按**录像自带的对局速度档位查精确表**得出
+  // （Faster → 1/1.39990234375 = 0.714335542），不再是早期那版按 stats 采样间隔反推的
+  // 0.710 —— 那有 0.6% 的系统性偏差，悬浮窗长时间走表时 3 分钟就差 1 秒多。
+  const g = rep().gameSecFactor || 1; // 游戏秒 → 墙钟秒
+  const rec = 1 / g;                  // 录像对局速度系数（与档位表一致）
   const key = $('#ovSpeed')?.value || 'same';
   const pb = key === 'same' ? rec : (SC2_SPEED_FACTOR[key] ?? rec);
   return +(pb * g).toFixed(4);

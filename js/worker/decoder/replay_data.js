@@ -596,9 +596,15 @@ export async function extractReplayData(buffer, options = {}) {
         : unixTimestampFromDetails(details);
     // `start_time` = `unix_timestamp - real_length`，不是裸的 `unix_timestamp`
     // （sc2reader 的 `replay.start_time` 是**开局**时刻，而 `m_timeUTC` 是结束时刻）。
+    //
+    // `gameSpeed`（"Slower"/"Slow"/"Normal"/"Fast"/"Faster"）顺带透出给上层：
+    // 它是**录制时的对局速度档位**，悬浮窗靠它 + Blizzard 的精确系数表算出
+    // 「游戏秒/墙钟秒」的倍率。以前上层拿不到它，只能用统计采样间隔反推（约 0.6% 误差，
+    // 跑几分钟就累积成好几秒的偏移），现在可以直接查表，误差为零。
+    const gameSpeed = gameSpeedOf(attributes);
     const startTime = unixTs === null
         ? null
-        : startTimeSeconds(unixTs, build, frames, expansion, gameSpeedOf(attributes));
+        : startTimeSeconds(unixTs, build, frames, expansion, gameSpeed);
     const entities = buildEntities(initData, details, attributes);
     const players = entities.filter((e) => !e.isObserver);
     // `replay.player` 只含非观察者 —— `killer.name` 的回落必须走这张表（观察者拿不到名字）。
@@ -858,6 +864,7 @@ export async function extractReplayData(buffer, options = {}) {
         client_version: build,
         region: replayRegion(details),
         start_time: startTime,
+        game_speed: gameSpeed,
         winner: winners.length > 0 ? winners.join(" / ") : null,
         teams,
         chat,

@@ -362,6 +362,15 @@ export interface ReplayData {
   client_version: number | null;
   region: string;
   start_time: number | null;
+  /**
+   * 录制时的对局速度档位（`m_gameSpeed` 的可读名）：`Slower` / `Slow` / `Normal` / `Fast` / `Faster`。
+   * 取不到时为 `null`（视为 Normal）。
+   *
+   * ⚠️ 展示层**不要**用统计采样间隔去反推这个档位 —— 那有约 0.6% 的误差，在悬浮窗这种
+   * 长时间走表的场景里会累积成数秒偏移。用本字段 + Blizzard 的精确系数表（见
+   * `views.js::SC2_SPEED_FACTOR`，如 Faster = 5734/4096）。
+   */
+  game_speed: string | null;
   winner: string | null;
   teams: ReplayDataTeam[];
   chat: ReplayDataChatRow[];
@@ -953,10 +962,16 @@ export async function extractReplayData(
 
   // `start_time` = `unix_timestamp - real_length`，不是裸的 `unix_timestamp`
   // （sc2reader 的 `replay.start_time` 是**开局**时刻，而 `m_timeUTC` 是结束时刻）。
+  //
+  // `gameSpeed`（"Slower"/"Slow"/"Normal"/"Fast"/"Faster"）顺带透出给上层：
+  // 它是**录制时的对局速度档位**，悬浮窗靠它 + Blizzard 的精确系数表算出
+  // 「游戏秒/墙钟秒」的倍率。以前上层拿不到它，只能用统计采样间隔反推（约 0.6% 误差，
+  // 跑几分钟就累积成好几秒的偏移），现在可以直接查表，误差为零。
+  const gameSpeed = gameSpeedOf(attributes);
   const startTime =
     unixTs === null
       ? null
-      : startTimeSeconds(unixTs, build, frames, expansion, gameSpeedOf(attributes));
+      : startTimeSeconds(unixTs, build, frames, expansion, gameSpeed);
 
   const entities = buildEntities(initData, details, attributes);
   const players = entities.filter((e) => !e.isObserver);
@@ -1227,6 +1242,7 @@ export async function extractReplayData(
     client_version: build,
     region: replayRegion(details),
     start_time: startTime,
+    game_speed: gameSpeed,
     winner: winners.length > 0 ? winners.join(" / ") : null,
     teams,
     chat,
