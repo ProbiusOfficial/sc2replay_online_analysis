@@ -112,17 +112,136 @@ function idxAt(pl, t){
 /* ==========================================================================
    样本切换 / 对局头
    ========================================================================== */
+/**
+ * 样本列表。一次可能拖进几十上百个录像，所以三件事必须成立：
+ * ① 列表自己在左栏里滚（`.samples{flex:1;min-height:0;overflow-y:auto}`），不把下方播报面板推走；
+ * ② 超过 6 个才露出筛选框（#smpSearch），按 地图 / 文件名 / 玩家名 匹配；
+ * ③ 计数显示成 `命中/总数` —— 筛过之后要能一眼看出被藏了多少个。
+ */
+let smpQ = '';
 function renderSamples(){
   const host = $('#samples'); host.innerHTML = '';
-  DATA.replays.forEach((r, i) => {
+  const all = DATA.replays, q = smpQ;
+  const keys = r => `${r.map} ${r.file} ${r.players.map(p => p.name).join(' ')}`.toLowerCase();
+  const hits = all.map((r, i) => ({ r, i })).filter(({ r }) => !q || keys(r).includes(q));
+
+  // 「＋ 添加录像」是列表里的**第一张卡**（不参与筛选，永远排最前）。
+  // ⚠️ 它在每次重渲染时都会被重建，所以生产页的点击绑定（main.js）必须走事件委托。
+  const add = el('button', 'smp smp-add');
+  add.id = 'pickMore'; add.type = 'button';
+  add.textContent = '＋ 添加录像';
+  host.appendChild(add);
+
+  hits.forEach(({ r, i }) => {
     const b = el('button', 'smp' + (i === S.ri ? ' on' : ''));
     b.innerHTML = `<b>${esc(r.map)}</b>`
       + `<span>${esc(r.file.replace(/\.SC2Replay$/, ''))}</span>`
       + `<span>${mmss(r.duration)} · build ${r.build} · ${r.players.map(p => p.race).join(' v ')} · ${r.sampleCount} 采样</span>`;
-    b.onclick = () => { S.ri = i; S.t = 0; renderAll(); };
+    b.onclick = () => { S.ri = i; S.t = 0; renderAll(); };   // i 用**原索引**，筛选后仍指向正确样本
     host.appendChild(b);
   });
+  if (!hits.length) {
+    // ⚠️ 不能用 `host.innerHTML = ...` 写空态 —— 那会把上面那张「＋ 添加录像」卡一起抹掉。
+    const em = document.createElement('div');
+    em.className = 'smpempty';
+    em.textContent = '没有匹配的样本';
+    host.appendChild(em);
+  }
+  // 计数不再单独占一个节点（左栏每行都金贵）——「命中 x / 总数」在弹窗底部有完整版。
+  // 筛选框从 **3 个样本**起启用：1~2 个时筛选没有意义，还白占一行。
+  const se = $('#smpSearch'); if (se) se.style.display = all.length > 2 ? '' : 'none';
 }
+
+const smpSearchEl = $('#smpSearch');
+if (smpSearchEl) smpSearchEl.oninput = e => { smpQ = e.target.value.trim().toLowerCase(); renderSamples(); };
+
+/* ==========================================================================
+   样本筛选弹窗
+   —— 左栏只有 236px，样本一多就没法横向比较「哪一局更值得看」。弹窗负责
+      「搜索 + 排序 + 种族筛选」；点条目只做**选中（预览）**，「应用」才真正切换样本。
+   ========================================================================== */
+const PICK = { q: '', sort: 'playedAt', desc: true, matchup: '', sel: 0 };
+
+const pickMatchupOf = r => r.players.map(p => p.race || '?').join('v');
+
+/** 按当前搜索 / 筛选 / 排序条件算出命中列表；元素是 `{r, i}`，`i` 是**原始索引**。 */
+function pickHits(){
+  const q = PICK.q;
+  const keys = r => `${r.map} ${r.file} ${r.players.map(p => p.name).join(' ')}`.toLowerCase();
+  const cmp = {
+    playedAt:    (a, b) => (a.r.playedAt || 0) - (b.r.playedAt || 0),
+    duration:    (a, b) => (a.r.duration || 0) - (b.r.duration || 0),
+    sampleCount: (a, b) => (a.r.sampleCount || 0) - (b.r.sampleCount || 0),
+    map:         (a, b) => String(a.r.map).localeCompare(String(b.r.map), 'zh'),
+  }[PICK.sort] || (() => 0);
+  const list = DATA.replays.map((r, i) => ({ r, i }))
+    .filter(({ r }) => !q || keys(r).includes(q))
+    .filter(({ r }) => !PICK.matchup || pickMatchupOf(r) === PICK.matchup);
+  list.sort((a, b) => PICK.desc ? -cmp(a, b) : cmp(a, b));
+  return list;
+}
+
+function renderPick(){
+  const box = $('#pickList'); if (!box) return;
+  const hits = pickHits(), all = DATA.replays.length;
+  box.innerHTML = hits.map(({ r, i }) => {
+    const dt = r.playedAt ? new Date(r.playedAt * 1000).toISOString().slice(0, 10) : '—';
+    const vs = r.players.map(p => `${p.name} (${p.race || '?'})`).join(' v ');
+    return `<div class="pitem${i === PICK.sel ? ' on' : ''}" data-i="${i}">
+      <span class="dot"></span>
+      <div class="bd">
+        <div class="t1"><b>${esc(r.map)}</b><i>${esc(r.file.replace(/\.SC2Replay$/, ''))}</i></div>
+        <div class="t2">${esc(vs)}</div>
+        <div class="t3">${dt} · ${mmss(r.duration)} · ${r.sampleCount} 采样</div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="pempty">没有匹配的样本</div>';
+  const st = $('#pickStat'); if (st) st.textContent = `命中 ${hits.length} / ${all}`;
+  const tt = $('#pickTotal'); if (tt) tt.textContent = `共 ${all} 个`;
+}
+
+function openPick(){
+  const m = $('#pickModal'); if (!m) return;
+  PICK.sel = S.ri;
+  // 种族下拉按现有样本重建 —— 样本换了之后旧选项可能已经不存在
+  const sel = $('#pickMatchup'), prev = sel ? sel.value : '';
+  const kinds = [...new Set(DATA.replays.map(pickMatchupOf))].sort();
+  if (sel) {
+    sel.innerHTML = '<option value="">不限</option>'
+      + kinds.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+    sel.value = kinds.includes(prev) ? prev : '';
+    PICK.matchup = sel.value;
+  }
+  m.hidden = false;
+  const q = $('#pickQ'); if (q) { q.focus(); q.select(); }
+  renderPick();
+}
+function closePick(){ const m = $('#pickModal'); if (m) m.hidden = true; }
+
+(function bindPick(){
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  on('#pickBtn', 'click', openPick);
+  on('#pickClose', 'click', closePick);
+  on('#pickCancel', 'click', closePick);
+  on('#pickBg', 'click', closePick);
+  on('#pickQ', 'input', e => { PICK.q = e.target.value.trim().toLowerCase(); renderPick(); });
+  on('#pickSort', 'change', e => { PICK.sort = e.target.value; renderPick(); });
+  on('#pickDir', 'change', e => { PICK.desc = e.target.value === 'desc'; renderPick(); });
+  on('#pickMatchup', 'change', e => { PICK.matchup = e.target.value; renderPick(); });
+  on('#pickList', 'click', e => {
+    const it = e.target.closest('.pitem'); if (!it) return;
+    PICK.sel = +it.dataset.i;
+    renderPick();
+  });
+  on('#pickApply', 'click', () => {
+    if (PICK.sel !== S.ri) { S.ri = PICK.sel; S.t = 0; renderAll(); }
+    closePick();
+  });
+  document.addEventListener('keydown', e => {
+    const m = $('#pickModal');
+    if (e.key === 'Escape' && m && !m.hidden) closePick();
+  });
+})();
 
 function renderHead(){
   const r = rep(), [a, b] = r.players;
@@ -751,7 +870,7 @@ function highlightChatRow(){
    语音播报（Web Speech API）—— 读完即推进全局时间轴，不再是独立计时器
    ========================================================================== */
 const synth = window.speechSynthesis;
-const V = { playing: false, wall0: 0, base: 0, spoken: -1, rate: 2, lang: 'zh-CN', speed: 2, who: 0, steps: [] };
+const V = { playing: false, wall0: 0, base: 0, spoken: -1, rate: 2, lang: 'zh-CN', speed: 1, who: 0, steps: [] };
 
 const voText = it => boShowEn ? (it.unit || it.zh) : (it.kind === 'recall' ? '星空加速' : (it.zh || it.unit));
 
@@ -769,11 +888,17 @@ function voiceRebuild(){
     vTick();
   }
   renderVoiceUi();
+  ovResync();   // 脚本内容变了 → 悬浮窗手里那份已过时，重推（未连接时是个 no-op）
 }
 
+/**
+ * 截断式朗读 —— 先把还没念完的上一句掐掉，再念这一句。
+ * 「能念几个字念几个，到对应地方直接截断」：不做队列、不补念被跳过的项。
+ */
 function speak(txt){
   if (!txt) return;
   try {
+    synth.cancel();
     const u = new SpeechSynthesisUtterance(txt);
     u.rate = V.rate; u.lang = V.lang;
     synth.speak(u);
@@ -808,7 +933,10 @@ function vTick(){
   if (S.t >= D) { S.t = D; vStop(); }
   const i = lastIdxAt(V.steps, S.t);
   if (i > V.spoken) {
-    for (let k = V.spoken + 1; k <= i; k++) speak(V.steps[k].text);
+    // ⚠️ 别用 for 循环把跨过的每一项都 speak 出去 —— 快速浏览或拖动时间轴时一个 tick 会跨过
+    // 几十项，语音会排队积压好几分钟，画面和朗读彻底脱节（画面 03:33、喇叭还在念 03:02）。
+    // 现在只念**当前项**，跨过的中间项一律不补；上一句没念完由 speak() 里的 cancel 截断。
+    speak(V.steps[i].text);
     V.spoken = i;
   }
   syncCursor();
@@ -820,14 +948,17 @@ function renderVoiceUi(){
   $('#vbClock').textContent = mmss(S.t);
   $('#vbClock').classList.toggle('on', V.playing);
   $('#vbPlay').textContent = V.playing ? '暂停' : (S.t > 0.5 ? '继续' : '开始');
+  // 队列区只留「当前项 + 下一项」两行 —— 原先是上下各两行的滚动队列，那是底部横条时代的排版。
+  // 观看与定位现在交给顶部时间轴（#tl），左栏不再重复一份时间轴视图。
+  // ⚠️ 游标还没走到第一项时（i = -1）要把第一项当「即将播报」显示，不能报"无可播报项" ——
+  // 那会让人以为 V.steps 是空的，其实它可能有几十项。
   const i = V.steps.length ? lastIdxAt(V.steps, S.t) : -1;
-  const rows = [];
-  for (let k = Math.max(0, i - 2); k <= Math.min(V.steps.length - 1, i + 2); k++) {
-    const cls = k === i ? 'cur' : 'dim';
-    rows.push(`<div class="qs ${cls}"><span class="t">${mmss(V.steps[k].t)}</span><span>${esc(V.steps[k].text)}</span></div>`);
-  }
-  $('#vbQueue').innerHTML = rows.join('')
-    || `<div class="qs dim"><span>无可播报项 —— 请到「建造顺序」页勾选类别，当前 ${V.steps.length} 项</span></div>`;
+  const cur = i >= 0 ? V.steps[i] : null, nxt = V.steps[i + 1];
+  const head = cur || nxt;
+  $('#vbQueue').innerHTML = head
+    ? `<div class="qs ${cur ? 'cur' : 'dim'}"><span class="t">${mmss(head.t)}</span><span>${esc(head.text)}</span></div>`
+      + (cur && nxt ? `<div class="qs dim"><span class="t">${mmss(nxt.t)}</span><span>${esc(nxt.text)}</span></div>` : '')
+    : `<div class="qs dim"><span>无可播报项 —— 请到「建造顺序」页勾选类别</span></div>`;
   $('#vbProg').style.width = (clamp(S.t / (rep().duration || 1), 0, 1) * 100).toFixed(2) + '%';
   renderPip();
 }
@@ -842,9 +973,23 @@ const OV_PORT = 18760;
 const OV_ORIGIN = 'http://127.0.0.1:' + OV_PORT;
 let pipWin = null;
 
-function ovSet(state, text){
-  $('#ovDot').className = 'ovdot ' + state;
-  $('#ovTxt').textContent = text;
+/**
+ * 写悬浮组件状态。`link` 可选：`{href, label}` —— 用在「未检测到组件」时给一条可点的下载入口
+ * （exe 免安装，双击即用；路径用相对的，本地 server 与线上 Pages 都指向同一份产物）。
+ * 用 DOM API 拼而不用 innerHTML —— 这段文字里有服务端返回的 name/version。
+ */
+function ovSet(state, text, link){
+  const dot = $('#ovDot'); if (dot) dot.className = 'ovdot ' + state;
+  const host = $('#ovTxt'); if (!host) return;
+  host.textContent = text;
+  if (!link) return;
+  host.appendChild(document.createTextNode(' · '));
+  const a = document.createElement('a');
+  a.href = link.href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = link.label;
+  host.appendChild(a);
 }
 
 /** 探测本地悬浮组件。Chrome 142+ 对「公网页面 → 环回地址」要求 LNA 授权， */
@@ -874,13 +1019,18 @@ async function ovProbe(timeoutMs = 1500){
     const res = await ovFetch('/health');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const info = await res.json();
+    ovReady = true;
     ovSet('ok', `已连接本地悬浮组件 ${info.name || 'overlay-agent'} v${info.version || '?'}`);
     return true;
   } catch (err) {
+    ovReady = false;
     const denied = err?.name === 'NotAllowedError';
-    ovSet('bad', denied
-      ? '本地网络访问被拒绝 —— 请在地址栏权限提示里允许访问本地网络后重试'
-      : '未检测到本地悬浮组件');
+    if (denied) {
+      ovSet('bad', '本地网络访问被拒绝 —— 请在地址栏权限提示里允许访问本地网络后重试');
+    } else {
+      // 组件没在跑（多半是还没装）—— 别只说「未检测到」就断了，给一条可点的下载入口。
+      ovSet('bad', '未检测到本地悬浮组件', { href: 'download/sc2-overlay.exe', label: '下载 Windows 组件' });
+    }
     return false;
   }
 }
@@ -918,6 +1068,43 @@ function ovSpeedFactor(){
   return +(pb * g).toFixed(4);
 }
 
+/**
+ * 本地悬浮组件是否已连接（ovProbe 成功过）。内容变化时据此决定要不要重推。
+ */
+let ovReady = false;
+
+/** 给悬浮窗发播放控制 —— 复用已有的 `POST /overlay/control`，不用改 exe。 */
+function ovCtl(action, t){
+  if (!ovReady) return;
+  const body = t == null ? { action } : { action, t };
+  ovFetch('/overlay/control', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }, 1200).catch(() => {});
+}
+
+let ovSyncTimer = null;
+/**
+ * 内容变化后把脚本重推给悬浮窗，并把它的游标对齐到分析页当前进度。
+ *
+ * ⚠️ 悬浮窗手里的是「推送那一刻的快照」：换播报对象 / 改建造类别 / 切样本之后不重推，
+ * 它就一直是旧内容 —— 这正是「网页和悬浮窗播报不同步」的成因（`ovPush()` 原先只在点
+ * 按钮时调一次）。另外 `load()` 会把悬浮窗游标归 0，所以重推后必须补一次 seek，
+ * 否则进度会跳回开头；分析页处于暂停时也要把悬浮窗按住，别让它自己跑起来。
+ *
+ * 防抖 400ms：勾选建造类别时按钮会连点，不能每下都推一次。
+ */
+function ovResync(){
+  if (!ovReady) return;
+  clearTimeout(ovSyncTimer);
+  ovSyncTimer = setTimeout(async () => {
+    try {
+      await ovPush();
+      ovCtl('seek', S.t);
+      if (!V.playing) ovCtl('pause');
+    } catch (_) {}
+  }, 400);
+}
+
 async function ovPush(){
   const pl = rep().players[V.who];
   const icons = await ensureOvIcons();
@@ -926,9 +1113,8 @@ async function ovPush(){
     duration: rep().duration, file: rep().file,
     rate: V.rate, lang: V.lang,
     speed: ovSpeedFactor(),
-    layout: $('#ovLayout').value,
-    plate: $('#ovPlate').value,
-    autostart: $('#ovStart').value,
+    // layout / plate / autostart 不再由网页决定 —— 悬浮窗从自己的**托盘设置**里取
+    // （网页不传时 Go 侧会补上托盘里存的值，见 overlay/app.go 的 handleOverlay）。
     steps: V.steps.map(s => ({ t: s.t, text: s.text, icon: icons[s.unit] || '' })),
   };
   const res = await ovFetch('/overlay', {
@@ -997,9 +1183,10 @@ $('#ovBtn').onclick = async () => {
   if (await ovProbe()) {
     try {
       const n = await ovPush();
-      ovSet('ok', $('#ovStart').value === 'foreground'
-        ? `已推送 ${n} 项 —— 进入游戏后自动起表（时钟 ×${ovSpeedFactor()}）`
-        : `已推送到本地悬浮组件：${n} 条播报项，立即开始（时钟 ×${ovSpeedFactor()}）`);
+      // 首次推送也要对齐：`load()` 会把悬浮窗游标归 0 并自动起表，不补这两下就会和分析页错开。
+      ovCtl('seek', S.t);
+      if (!V.playing) ovCtl('pause');
+      ovSet('ok', `已推送到本地悬浮组件：${n} 条播报项（时钟 ×${ovSpeedFactor()}）`);
     } catch (err) { ovSet('bad', '推送失败：' + (err?.message || err)); }
   } else {
     await openPip();
@@ -1033,8 +1220,13 @@ function fillWho(){
 
 $('#vbPlay').onclick = () => vPlayPause();
 $('#vbReset').onclick = () => vReset();
-$('#vbSpeed').onchange = e => { if (V.playing) { V.base = S.t; V.wall0 = Date.now(); } V.speed = parseFloat(e.target.value); renderVoiceUi(); };
-$('#vbRate').oninput = e => { V.rate = parseFloat(e.target.value); };
+// 「倍速」（V.speed，推的是全局游标 S.t）已随底部条一起删除 —— 它管的是整页播放速度，
+// 不是语音设置，摆在语音区属于位置与作用域不符。现在 V.speed 恒为 1（实时），
+// 想快速浏览直接拖顶部时间轴定位即可。
+$('#vbRate').oninput = e => {
+  V.rate = parseFloat(e.target.value);
+  const el = $('#vbRateVal'); if (el) el.textContent = V.rate.toFixed(1);   // 生产页若尚未加该节点也不报错
+};
 $('#vbLang').onchange = e => { V.lang = e.target.value; };
 $('#vbWho').onchange = e => { V.who = parseInt(e.target.value, 10) || 0; voiceRebuild(); fillWho(); };
 

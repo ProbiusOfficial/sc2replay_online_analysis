@@ -44,15 +44,25 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
       padding:5px 11px;font-size:12px;color:var(--ink2);white-space:nowrap}
 .tbtn:hover{border-color:var(--line3);color:var(--ink)}
 
-.samples{display:flex;gap:6px;overflow-x:auto;padding:12px 0 0}
+/* 样本列表与播报面板**五五分**：左栏高度固定（视口高），两段各拿一半、各自内部滚动。
+   实测反馈：让播报面板按内容自然高（~500px）时，100% 缩放的矮屏上样本列表只剩两三条。 */
+.samples{display:flex;flex-direction:column;gap:6px;flex:1 1 0;min-height:0;
+         overflow-y:auto;overflow-x:hidden;padding:0 3px 2px 0}
+/* 卡片高度直接决定「样本列表能显示几条」。三行内容一行不减，只收 padding 与行距：
+   实测 78px → 56px，同样半栏能多看 1~2 条。 */
 .smp{flex:0 0 auto;text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r2);
-     padding:7px 12px;min-width:190px;transition:.12s}
+     padding:5px 10px;min-width:190px;transition:.12s}
 .smp:hover{border-color:#c9d2e0}
 .smp.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset}
-.smp b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
-.smp span{display:block;font-size:10.5px;color:var(--ink3);font-family:var(--mono);margin-top:2px;
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.smp b{display:block;font-size:11.5px;font-weight:600;line-height:1.35;
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smp span{display:block;font-size:10px;line-height:1.35;color:var(--ink3);font-family:var(--mono);margin-top:1px;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .smp.on span{color:var(--accent)}
+/* 列表首卡：添加录像（虚线框，与真实样本卡区分；宽度撑满一栏） */
+.smp-add{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;flex:0 0 auto;
+         border-style:dashed;color:var(--ink3);font-size:11.5px;font-weight:600;cursor:pointer}
+.smp-add:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 
 .wrap{padding:12px 18px 40px;max-width:1600px;margin:0 auto}
 .head{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
@@ -226,35 +236,120 @@ body:not(.chatview) .v-chat{display:none}
 .bostat{padding:8px 12px;border-top:1px solid var(--line2);font-size:10.5px;color:var(--ink3);font-family:var(--mono)}
 
 /* ==========================================================================
-   语音播报 + 悬浮（播放器条）
+   左侧板栏：录像样本 + 播报 + 悬浮
+   —— 2026-09-23 由「底部固定播放器条」重做。原形态是一条横跨视口的 84px 高固定条，
+      里面塞了时间轴队列、播放控制、语音设置、悬浮设置四类东西；现在改成左栏纵向面板，
+      **观看与定位交给顶部时间轴（#tl）**，这里只管「播报」与「悬浮输出」。
+      两个倍率：游戏倍率（ovSpeed，对齐游戏内时钟）+ 语速倍率（vbRate，TTS）。
+      ⚠️ 原来还有个「倍速 1×/2×/4×/8×」（V.speed）—— 它其实推的是**全局游标 S.t**，
+      是整页播放速度而非语音设置，放在语音区属于位置与作用域不符，本次删除。
    ========================================================================== */
-.vb{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;align-items:center;gap:14px;
-    padding:9px 18px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
-    border-top:1px solid var(--line);box-shadow:0 -2px 14px rgba(20,25,34,.06);flex-wrap:wrap}
-.vb .clock2{font-family:var(--mono);font-size:19px;font-weight:700;letter-spacing:-.4px;
-            font-variant-numeric:tabular-nums;min-width:74px;color:var(--ink2)}
+.layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:16px;align-items:start}
+/* 左栏固定视口高，**内部两段各自管滚动**：样本列表 flex:1 自己滚，播报面板常驻底端。
+   ⚠️ 不要只写 .rail{overflow:auto} —— 那样样本一多（几十上百个）播报面板会被推到几千像素之外，
+   想按「开始」得先滚半天。生产页 css/lab.css 早就是这么做的，原型这里最初漏了。 */
+/* ⚠️ 必须是 `height` 而不是 `max-height`：下面 `.samples` / `.vb` 用的是 `flex:1 1 0`
+   （basis 0 = 纯按剩余空间平分），在「高度由内容决定」的父容器里没有空间可分，
+   两个子项会被解析成 0 高 —— 实测直接把样本列表和播报面板一起压没了。 */
+.rail{display:flex;flex-direction:column;gap:10px;min-height:0;align-self:start;
+      position:sticky;top:58px;height:calc(100vh - 74px);overflow:hidden}
+.railhead{display:flex;align-items:center;gap:8px;flex:0 0 auto;font-size:10px;color:var(--ink3);
+          font-family:var(--mono);letter-spacing:.3px}
+.railhead .ln{flex:1;height:1px;background:var(--line2)}
+.railhead .cnt{color:var(--ink4)}
+.smpsearch{font:inherit;font-size:11px;color:var(--ink2);background:#fff;flex:0 0 auto;
+           border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+.smpempty{padding:14px 4px;text-align:center;color:var(--ink4);font-size:11.5px}
+.main{min-width:0}
+@media (max-width:1180px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  /* 窄屏退回单列：左栏不再固定高，两段按内容自然排（否则 height:auto 下 flex:1 1 0 又会归零） */
+  .rail{position:static;height:auto}
+  .samples{flex:0 0 auto;max-height:260px}
+  .vb{flex:0 0 auto;overflow:visible}
+}
+
+/* 播报面板（原底部条 → 栏内纵向卡片）。与 .samples 五五分：`flex:1 1 0` + 内部滚动，
+   内容照旧全部展开（不折叠），只是超出半栏时自己滚。 */
+.vb{display:flex;flex-direction:column;gap:9px;flex:1 1 0;min-height:0;overflow-y:auto;
+    padding:11px 12px;background:var(--card);border:1px solid var(--line);border-radius:var(--r)}
+.vb .clock2{font-family:var(--mono);font-size:17px;font-weight:700;letter-spacing:-.4px;
+            font-variant-numeric:tabular-nums;color:var(--ink2)}
 .vb .clock2.on{color:var(--ok)}
-.vb .queue{display:flex;flex-direction:column;gap:2px;flex:1;min-width:280px}
+.vb .queue{display:flex;flex-direction:column;gap:2px;min-width:0}
 .vb .qs{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--ink4);line-height:1.35}
 .vb .qs .t{font-family:var(--mono);font-size:10.5px;flex:0 0 auto;min-width:42px;text-align:right}
-.vb .qs.cur{color:var(--ink);font-size:13.5px;font-weight:650}
+.vb .qs.cur{color:var(--ink);font-size:13px;font-weight:650}
 .vb .qs.cur .t{color:var(--warn);font-size:11.5px;font-weight:600}
 .vb .qs.dim{opacity:.62}
 .vb .prog{height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-top:5px}
 .vb .prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .1s linear}
 .vb .ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vbsep{height:1px;background:var(--line2);margin:1px 0}
 .vbbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 13px;font-size:12px;font-weight:600;color:var(--ink2)}
 .vbbtn:hover{border-color:var(--line3);color:var(--ink)}
 .vbbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .vbbtn.primary:hover{background:#2560d8}
-.vbset{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3)}
-.vbset select,.vbset input[type=range]{font:inherit;font-size:11px;color:var(--ink2)}
-.vbset select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
-.vbset input[type=range]{width:74px}
-.ov{display:flex;align-items:center;gap:7px;border-left:1px solid var(--line);padding-left:14px}
-.ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto}
+.vbset{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink3)}
+.vbset>span{flex:0 0 auto;min-width:46px}
+.vbset select{flex:1;min-width:0;font:inherit;font-size:11px;color:var(--ink2);
+              border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
+.vbset input[type=range]{flex:1;min-width:0;font:inherit;color:var(--ink2)}
+.vbnote{font-size:10px;color:var(--ink4);line-height:1.45}
+.vb .ov{display:flex;align-items:flex-start;gap:7px}
+.ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto;margin-top:4px}
 .ovdot.ok{background:var(--ok)} .ovdot.bad{background:#c0392b} .ovdot.wait{background:var(--warn)}
-.ovtxt{font-size:11px;color:var(--ink3);max-width:230px;line-height:1.3}
+.ovtxt{font-size:11px;color:var(--ink3);line-height:1.35}
+.ovtxt a{color:var(--accent);text-decoration:none}
+.ovtxt a:hover{text-decoration:underline}
+/* 左栏入口：「筛选」按钮（样本多时左栏塞不下，大范围挑选走弹窗） */
+.pickbtn{font:inherit;font-size:10.5px;color:var(--ink2);background:#fff;flex:0 0 auto;
+         border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer}
+.pickbtn:hover{border-color:var(--line3);color:var(--ink)}
+
+/* ==========================================================================
+   样本筛选弹窗
+   —— 左栏只有 236px，样本一多就没法比较「哪一局更值得看」。
+      这里给一个宽面板：搜索（玩家/地图/文件名）+ 排序（比赛时间/时长/采样数/地图）
+      + 种族筛选，点条目即切换样本并关闭。
+   ========================================================================== */
+.modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal[hidden]{display:none}
+.modal-bg{position:absolute;inset:0;background:rgba(20,25,34,.42)}
+.modal-panel{position:relative;display:flex;flex-direction:column;width:min(720px,100%);
+             max-height:min(78vh,760px);background:var(--card);border:1px solid var(--line);
+             border-radius:var(--r);overflow:hidden}
+.modal-panel>header{display:flex;align-items:center;gap:10px;padding:12px 16px;
+                    border-bottom:1px solid var(--line2);flex:0 0 auto}
+.modal-panel>header b{font-size:13px;font-weight:650}
+.modal-panel>header .cnt{font-size:11.5px;color:var(--ink3);font-family:var(--mono)}
+.modal-x{margin-left:auto;border:0;background:none;font-size:17px;line-height:1;
+         color:var(--ink3);cursor:pointer;padding:2px 4px}
+.modal-x:hover{color:var(--ink)}
+.modal-filter{display:flex;flex-direction:column;gap:9px;padding:12px 16px;
+              border-bottom:1px solid var(--line2);flex:0 0 auto}
+.modal-filter input{font:inherit;font-size:12.5px;color:var(--ink);background:#fff;
+                    border:1px solid var(--line);border-radius:7px;padding:7px 10px;width:100%}
+.modal-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--ink3)}
+.modal-row select{font:inherit;font-size:11.5px;color:var(--ink2);background:#fff;
+                  border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+.modal-list{flex:1 1 auto;min-height:0;overflow-y:auto}
+.pitem{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;
+       border-bottom:1px solid var(--line2);cursor:pointer}
+.pitem:hover,.pitem.on{background:var(--accent-soft)}
+.pitem .dot{width:8px;height:8px;border-radius:50%;border:1px solid var(--line3);flex:0 0 auto;margin-top:5px}
+.pitem.on .dot{background:var(--accent);border-color:var(--accent)}
+.pitem .bd{min-width:0;flex:1}
+.pitem .t1{display:flex;align-items:baseline;gap:8px}
+.pitem .t1 b{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .t1 i{font-style:normal;font-size:10.5px;color:var(--ink4);font-family:var(--mono);
+             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .t2{font-size:11.5px;color:var(--ink2);margin-top:2px}
+.pitem .t3{font-size:10.5px;color:var(--ink4);font-family:var(--mono);margin-top:2px}
+.pempty{padding:26px 16px;text-align:center;color:var(--ink4);font-size:12px}
+.modal-panel>footer{display:flex;align-items:center;gap:10px;padding:11px 16px;
+                    border-top:1px solid var(--line2);flex:0 0 auto}
+.modal-panel>footer .st{font-size:11.5px;color:var(--ink3);font-family:var(--mono)}
 </style>
 </head>
 <body>
@@ -277,7 +372,41 @@ body:not(.chatview) .v-chat{display:none}
 </div>
 
 <div class="wrap">
-  <div class="samples" id="samples"></div>
+  <div class="layout">
+    <aside class="rail">
+      <div class="railhead"><span>样本</span><i class="ln"></i><button class="pickbtn" id="pickBtn" type="button">筛选</button></div>
+      <input class="smpsearch" id="smpSearch" placeholder="筛选：地图 / 文件名 / 玩家" style="display:none">
+      <div class="samples" id="samples"></div>
+
+      <div class="railhead"><span>播报</span><i class="ln"></i></div>
+      <div class="vb" id="vb">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span class="clock2" id="vbClock">00:00</span>
+          <span style="flex:1"></span>
+          <span style="font-size:10px;color:var(--ink4)">当前播报项</span>
+        </div>
+        <div class="queue">
+          <div id="vbQueue"></div>
+          <div class="prog"><i id="vbProg"></i></div>
+        </div>
+        <div class="ctl">
+          <button class="vbbtn primary" id="vbPlay">开始</button>
+          <button class="vbbtn" id="vbReset">重置</button>
+        </div>
+        <div class="vbset"><span>对象</span><select id="vbWho"></select></div>
+        <div class="vbset"><span>游戏倍率</span><select id="ovSpeed"><option value="same">与录像同速 1:1</option><option value="faster">Faster 1.4</option><option value="fast">Fast 1.2</option><option value="normal">Normal 1.0</option><option value="slow">Slow 0.8</option><option value="slower">Slower 0.6</option></select></div>
+        <div class="vbset"><span>语速</span><input type="range" id="vbRate" min="1" max="4" step="0.2" value="2"><b id="vbRateVal" style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);min-width:24px;text-align:right">2.0</b></div>
+        <div class="vbset"><span>语言</span><select id="vbLang"><option value="zh-CN">中文</option><option value="en-US">English</option></select></div>
+
+        <div class="vbsep"></div>
+
+        <b style="font-size:10px;color:var(--ink3);font-family:var(--mono);letter-spacing:.3px">悬浮窗</b>
+        <button class="vbbtn" id="ovBtn">悬浮到桌面</button>
+        <div class="ov"><span class="ovdot" id="ovDot"></span><div class="ovtxt" id="ovTxt">探测本地悬浮组件中…</div></div>
+        <div class="ovtxt" style="color:var(--ink4)">版式 / 底板 / 开始方式改在悬浮窗托盘菜单里设置。</div>
+      </div>
+    </aside>
+    <div class="main">
 
   <div class="head" id="head"></div>
 
@@ -286,7 +415,7 @@ body:not(.chatview) .v-chat{display:none}
       <span class="lab">时间轴</span>
       <span class="clock" id="clock"></span>
       <div class="spacer" style="flex:1"></div>
-      <span class="lab" style="color:var(--ink4);font-weight:400">图表上移动鼠标即可同步全部视图 · 时间轴为点击定位，按住拖动可微调</span>
+      <span class="lab" style="color:var(--ink4);font-weight:400">时间轴与图表均为点击 / 拖动定位（悬停只预览，不动游标）</span>
     </div>
     <div class="tl" id="tl">
       <svg id="tlsvg"></svg>
@@ -349,43 +478,41 @@ body:not(.chatview) .v-chat{display:none}
       <code>ReplayDataStatsRow</code> 目前只导出 7 个字段，其余 32 个尚未进入生产管线。
     </div>
   </div>
+    </div><!-- /.main -->
+  </div><!-- /.layout -->
 </div>
 
-<!-- 语音播报 + 悬浮（播放器条） -->
-<div class="vb" id="vb">
-  <div class="clock2" id="vbClock">00:00</div>
-  <div class="queue">
-    <div id="vbQueue"></div>
-    <div class="prog"><i id="vbProg"></i></div>
-  </div>
-  <div class="ctl">
-    <button class="vbbtn primary" id="vbPlay">开始</button>
-    <button class="vbbtn" id="vbReset">重置</button>
-    <div class="vbset"><span>播报</span><select id="vbWho"></select></div>
-    <div class="vbset"><span>倍速</span>
-      <select id="vbSpeed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select>
+<!-- 样本筛选弹窗：点条目先选中（预览），「应用」才真正切换样本 -->
+<div class="modal" id="pickModal" hidden>
+  <div class="modal-bg" id="pickBg"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="样本筛选与排序">
+    <header>
+      <b>样本筛选与排序</b>
+      <span class="cnt" id="pickTotal">共 0 个</span>
+      <button class="modal-x" id="pickClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-filter">
+      <input id="pickQ" placeholder="搜索：玩家名 / 地图 / 文件名…">
+      <div class="modal-row">
+        <span>排序</span>
+        <select id="pickSort">
+          <option value="playedAt">比赛时间</option>
+          <option value="duration">时长</option>
+          <option value="sampleCount">采样点数</option>
+          <option value="map">地图名</option>
+        </select>
+        <select id="pickDir"><option value="desc">倒序</option><option value="asc">正序</option></select>
+        <span>种族</span>
+        <select id="pickMatchup"><option value="">不限</option></select>
+      </div>
     </div>
-    <div class="vbset"><span>语速</span><input type="range" id="vbRate" min="1" max="4" step="0.2" value="2"></div>
-    <div class="vbset"><select id="vbLang"><option value="zh-CN">中文</option><option value="en-US">English</option></select></div>
-  </div>
-  <div class="ov">
-    <span class="ovdot" id="ovDot"></span>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <button class="vbbtn" id="ovBtn" style="align-self:flex-start">悬浮到桌面</button>
-      <div class="ovtxt" id="ovTxt">探测本地悬浮组件中…</div>
-    </div>
-    <div class="vbset" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <label>版式 <select id="ovLayout"><option value="bar">条形</option><option value="stack">双行</option><option value="rail">侧边</option></select></label>
-      <label>底板 <select id="ovPlate"><option value="plain">纯文字</option><option value="card">实底卡片</option></select></label>
-      <label>开始 <select id="ovStart"><option value="foreground">进游戏自动起表</option><option value="now">立即开始</option></select></label>
-      <details>
-        <summary style="cursor:pointer;font-size:11px;color:var(--ink3)" title="默认「与录像同速」即为 1:1，通常无需改动">校准</summary>
-        <div style="display:flex;flex-direction:column;gap:7px;align-items:flex-start;padding:7px 0 2px 15px">
-          <label>回放速度 <select id="ovSpeed"><option value="same">与录像同速（时钟 1:1）</option><option value="faster">Faster 1.4</option><option value="fast">Fast 1.2</option><option value="normal">Normal 1.0</option><option value="slow">Slow 0.8</option><option value="slower">Slower 0.6</option></select></label>
-          <div style="font-size:10.5px;color:var(--ink3);max-width:300px;line-height:1.5">悬浮窗时钟默认与游戏内时钟 1:1，无需改动。<br>只有你在 SC2 里手动调过回放速度（<b>+</b> / <b>-</b>）时才需要在这里对齐。</div>
-        </div>
-      </details>
-    </div>
+    <div class="modal-list" id="pickList"></div>
+    <footer>
+      <span class="st" id="pickStat">命中 0 / 0</span>
+      <span style="flex:1"></span>
+      <button class="vbbtn" id="pickCancel" type="button">取消</button>
+      <button class="vbbtn primary" id="pickApply" type="button">应用</button>
+    </footer>
   </div>
 </div>
 
@@ -488,17 +615,136 @@ function idxAt(pl, t){
 /* ==========================================================================
    样本切换 / 对局头
    ========================================================================== */
+/**
+ * 样本列表。一次可能拖进几十上百个录像，所以三件事必须成立：
+ * ① 列表自己在左栏里滚（`.samples{flex:1;min-height:0;overflow-y:auto}`），不把下方播报面板推走；
+ * ② 超过 6 个才露出筛选框（#smpSearch），按 地图 / 文件名 / 玩家名 匹配；
+ * ③ 计数显示成 `命中/总数` —— 筛过之后要能一眼看出被藏了多少个。
+ */
+let smpQ = '';
 function renderSamples(){
   const host = $('#samples'); host.innerHTML = '';
-  DATA.replays.forEach((r, i) => {
+  const all = DATA.replays, q = smpQ;
+  const keys = r => `${r.map} ${r.file} ${r.players.map(p => p.name).join(' ')}`.toLowerCase();
+  const hits = all.map((r, i) => ({ r, i })).filter(({ r }) => !q || keys(r).includes(q));
+
+  // 「＋ 添加录像」是列表里的**第一张卡**（不参与筛选，永远排最前）。
+  // ⚠️ 它在每次重渲染时都会被重建，所以生产页的点击绑定（main.js）必须走事件委托。
+  const add = el('button', 'smp smp-add');
+  add.id = 'pickMore'; add.type = 'button';
+  add.textContent = '＋ 添加录像';
+  host.appendChild(add);
+
+  hits.forEach(({ r, i }) => {
     const b = el('button', 'smp' + (i === S.ri ? ' on' : ''));
     b.innerHTML = `<b>${esc(r.map)}</b>`
       + `<span>${esc(r.file.replace(/\.SC2Replay$/, ''))}</span>`
       + `<span>${mmss(r.duration)} · build ${r.build} · ${r.players.map(p => p.race).join(' v ')} · ${r.sampleCount} 采样</span>`;
-    b.onclick = () => { S.ri = i; S.t = 0; renderAll(); };
+    b.onclick = () => { S.ri = i; S.t = 0; renderAll(); };   // i 用**原索引**，筛选后仍指向正确样本
     host.appendChild(b);
   });
+  if (!hits.length) {
+    // ⚠️ 不能用 `host.innerHTML = ...` 写空态 —— 那会把上面那张「＋ 添加录像」卡一起抹掉。
+    const em = document.createElement('div');
+    em.className = 'smpempty';
+    em.textContent = '没有匹配的样本';
+    host.appendChild(em);
+  }
+  // 计数不再单独占一个节点（左栏每行都金贵）——「命中 x / 总数」在弹窗底部有完整版。
+  // 筛选框从 **3 个样本**起启用：1~2 个时筛选没有意义，还白占一行。
+  const se = $('#smpSearch'); if (se) se.style.display = all.length > 2 ? '' : 'none';
 }
+
+const smpSearchEl = $('#smpSearch');
+if (smpSearchEl) smpSearchEl.oninput = e => { smpQ = e.target.value.trim().toLowerCase(); renderSamples(); };
+
+/* ==========================================================================
+   样本筛选弹窗
+   —— 左栏只有 236px，样本一多就没法横向比较「哪一局更值得看」。弹窗负责
+      「搜索 + 排序 + 种族筛选」；点条目只做**选中（预览）**，「应用」才真正切换样本。
+   ========================================================================== */
+const PICK = { q: '', sort: 'playedAt', desc: true, matchup: '', sel: 0 };
+
+const pickMatchupOf = r => r.players.map(p => p.race || '?').join('v');
+
+/** 按当前搜索 / 筛选 / 排序条件算出命中列表；元素是 `{r, i}`，`i` 是**原始索引**。 */
+function pickHits(){
+  const q = PICK.q;
+  const keys = r => `${r.map} ${r.file} ${r.players.map(p => p.name).join(' ')}`.toLowerCase();
+  const cmp = {
+    playedAt:    (a, b) => (a.r.playedAt || 0) - (b.r.playedAt || 0),
+    duration:    (a, b) => (a.r.duration || 0) - (b.r.duration || 0),
+    sampleCount: (a, b) => (a.r.sampleCount || 0) - (b.r.sampleCount || 0),
+    map:         (a, b) => String(a.r.map).localeCompare(String(b.r.map), 'zh'),
+  }[PICK.sort] || (() => 0);
+  const list = DATA.replays.map((r, i) => ({ r, i }))
+    .filter(({ r }) => !q || keys(r).includes(q))
+    .filter(({ r }) => !PICK.matchup || pickMatchupOf(r) === PICK.matchup);
+  list.sort((a, b) => PICK.desc ? -cmp(a, b) : cmp(a, b));
+  return list;
+}
+
+function renderPick(){
+  const box = $('#pickList'); if (!box) return;
+  const hits = pickHits(), all = DATA.replays.length;
+  box.innerHTML = hits.map(({ r, i }) => {
+    const dt = r.playedAt ? new Date(r.playedAt * 1000).toISOString().slice(0, 10) : '—';
+    const vs = r.players.map(p => `${p.name} (${p.race || '?'})`).join(' v ');
+    return `<div class="pitem${i === PICK.sel ? ' on' : ''}" data-i="${i}">
+      <span class="dot"></span>
+      <div class="bd">
+        <div class="t1"><b>${esc(r.map)}</b><i>${esc(r.file.replace(/\.SC2Replay$/, ''))}</i></div>
+        <div class="t2">${esc(vs)}</div>
+        <div class="t3">${dt} · ${mmss(r.duration)} · ${r.sampleCount} 采样</div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="pempty">没有匹配的样本</div>';
+  const st = $('#pickStat'); if (st) st.textContent = `命中 ${hits.length} / ${all}`;
+  const tt = $('#pickTotal'); if (tt) tt.textContent = `共 ${all} 个`;
+}
+
+function openPick(){
+  const m = $('#pickModal'); if (!m) return;
+  PICK.sel = S.ri;
+  // 种族下拉按现有样本重建 —— 样本换了之后旧选项可能已经不存在
+  const sel = $('#pickMatchup'), prev = sel ? sel.value : '';
+  const kinds = [...new Set(DATA.replays.map(pickMatchupOf))].sort();
+  if (sel) {
+    sel.innerHTML = '<option value="">不限</option>'
+      + kinds.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+    sel.value = kinds.includes(prev) ? prev : '';
+    PICK.matchup = sel.value;
+  }
+  m.hidden = false;
+  const q = $('#pickQ'); if (q) { q.focus(); q.select(); }
+  renderPick();
+}
+function closePick(){ const m = $('#pickModal'); if (m) m.hidden = true; }
+
+(function bindPick(){
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  on('#pickBtn', 'click', openPick);
+  on('#pickClose', 'click', closePick);
+  on('#pickCancel', 'click', closePick);
+  on('#pickBg', 'click', closePick);
+  on('#pickQ', 'input', e => { PICK.q = e.target.value.trim().toLowerCase(); renderPick(); });
+  on('#pickSort', 'change', e => { PICK.sort = e.target.value; renderPick(); });
+  on('#pickDir', 'change', e => { PICK.desc = e.target.value === 'desc'; renderPick(); });
+  on('#pickMatchup', 'change', e => { PICK.matchup = e.target.value; renderPick(); });
+  on('#pickList', 'click', e => {
+    const it = e.target.closest('.pitem'); if (!it) return;
+    PICK.sel = +it.dataset.i;
+    renderPick();
+  });
+  on('#pickApply', 'click', () => {
+    if (PICK.sel !== S.ri) { S.ri = PICK.sel; S.t = 0; renderAll(); }
+    closePick();
+  });
+  document.addEventListener('keydown', e => {
+    const m = $('#pickModal');
+    if (e.key === 'Escape' && m && !m.hidden) closePick();
+  });
+})();
 
 function renderHead(){
   const r = rep(), [a, b] = r.players;
@@ -1127,7 +1373,7 @@ function highlightChatRow(){
    语音播报（Web Speech API）—— 读完即推进全局时间轴，不再是独立计时器
    ========================================================================== */
 const synth = window.speechSynthesis;
-const V = { playing: false, wall0: 0, base: 0, spoken: -1, rate: 2, lang: 'zh-CN', speed: 2, who: 0, steps: [] };
+const V = { playing: false, wall0: 0, base: 0, spoken: -1, rate: 2, lang: 'zh-CN', speed: 1, who: 0, steps: [] };
 
 const voText = it => boShowEn ? (it.unit || it.zh) : (it.kind === 'recall' ? '星空加速' : (it.zh || it.unit));
 
@@ -1145,11 +1391,17 @@ function voiceRebuild(){
     vTick();
   }
   renderVoiceUi();
+  ovResync();   // 脚本内容变了 → 悬浮窗手里那份已过时，重推（未连接时是个 no-op）
 }
 
+/**
+ * 截断式朗读 —— 先把还没念完的上一句掐掉，再念这一句。
+ * 「能念几个字念几个，到对应地方直接截断」：不做队列、不补念被跳过的项。
+ */
 function speak(txt){
   if (!txt) return;
   try {
+    synth.cancel();
     const u = new SpeechSynthesisUtterance(txt);
     u.rate = V.rate; u.lang = V.lang;
     synth.speak(u);
@@ -1184,7 +1436,10 @@ function vTick(){
   if (S.t >= D) { S.t = D; vStop(); }
   const i = lastIdxAt(V.steps, S.t);
   if (i > V.spoken) {
-    for (let k = V.spoken + 1; k <= i; k++) speak(V.steps[k].text);
+    // ⚠️ 别用 for 循环把跨过的每一项都 speak 出去 —— 快速浏览或拖动时间轴时一个 tick 会跨过
+    // 几十项，语音会排队积压好几分钟，画面和朗读彻底脱节（画面 03:33、喇叭还在念 03:02）。
+    // 现在只念**当前项**，跨过的中间项一律不补；上一句没念完由 speak() 里的 cancel 截断。
+    speak(V.steps[i].text);
     V.spoken = i;
   }
   syncCursor();
@@ -1196,14 +1451,17 @@ function renderVoiceUi(){
   $('#vbClock').textContent = mmss(S.t);
   $('#vbClock').classList.toggle('on', V.playing);
   $('#vbPlay').textContent = V.playing ? '暂停' : (S.t > 0.5 ? '继续' : '开始');
+  // 队列区只留「当前项 + 下一项」两行 —— 原先是上下各两行的滚动队列，那是底部横条时代的排版。
+  // 观看与定位现在交给顶部时间轴（#tl），左栏不再重复一份时间轴视图。
+  // ⚠️ 游标还没走到第一项时（i = -1）要把第一项当「即将播报」显示，不能报"无可播报项" ——
+  // 那会让人以为 V.steps 是空的，其实它可能有几十项。
   const i = V.steps.length ? lastIdxAt(V.steps, S.t) : -1;
-  const rows = [];
-  for (let k = Math.max(0, i - 2); k <= Math.min(V.steps.length - 1, i + 2); k++) {
-    const cls = k === i ? 'cur' : 'dim';
-    rows.push(`<div class="qs ${cls}"><span class="t">${mmss(V.steps[k].t)}</span><span>${esc(V.steps[k].text)}</span></div>`);
-  }
-  $('#vbQueue').innerHTML = rows.join('')
-    || `<div class="qs dim"><span>无可播报项 —— 请到「建造顺序」页勾选类别，当前 ${V.steps.length} 项</span></div>`;
+  const cur = i >= 0 ? V.steps[i] : null, nxt = V.steps[i + 1];
+  const head = cur || nxt;
+  $('#vbQueue').innerHTML = head
+    ? `<div class="qs ${cur ? 'cur' : 'dim'}"><span class="t">${mmss(head.t)}</span><span>${esc(head.text)}</span></div>`
+      + (cur && nxt ? `<div class="qs dim"><span class="t">${mmss(nxt.t)}</span><span>${esc(nxt.text)}</span></div>` : '')
+    : `<div class="qs dim"><span>无可播报项 —— 请到「建造顺序」页勾选类别</span></div>`;
   $('#vbProg').style.width = (clamp(S.t / (rep().duration || 1), 0, 1) * 100).toFixed(2) + '%';
   renderPip();
 }
@@ -1218,9 +1476,23 @@ const OV_PORT = 18760;
 const OV_ORIGIN = 'http://127.0.0.1:' + OV_PORT;
 let pipWin = null;
 
-function ovSet(state, text){
-  $('#ovDot').className = 'ovdot ' + state;
-  $('#ovTxt').textContent = text;
+/**
+ * 写悬浮组件状态。`link` 可选：`{href, label}` —— 用在「未检测到组件」时给一条可点的下载入口
+ * （exe 免安装，双击即用；路径用相对的，本地 server 与线上 Pages 都指向同一份产物）。
+ * 用 DOM API 拼而不用 innerHTML —— 这段文字里有服务端返回的 name/version。
+ */
+function ovSet(state, text, link){
+  const dot = $('#ovDot'); if (dot) dot.className = 'ovdot ' + state;
+  const host = $('#ovTxt'); if (!host) return;
+  host.textContent = text;
+  if (!link) return;
+  host.appendChild(document.createTextNode(' · '));
+  const a = document.createElement('a');
+  a.href = link.href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = link.label;
+  host.appendChild(a);
 }
 
 /** 探测本地悬浮组件。Chrome 142+ 对「公网页面 → 环回地址」要求 LNA 授权， */
@@ -1250,13 +1522,18 @@ async function ovProbe(timeoutMs = 1500){
     const res = await ovFetch('/health');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const info = await res.json();
+    ovReady = true;
     ovSet('ok', `已连接本地悬浮组件 ${info.name || 'overlay-agent'} v${info.version || '?'}`);
     return true;
   } catch (err) {
+    ovReady = false;
     const denied = err?.name === 'NotAllowedError';
-    ovSet('bad', denied
-      ? '本地网络访问被拒绝 —— 请在地址栏权限提示里允许访问本地网络后重试'
-      : '未检测到本地悬浮组件');
+    if (denied) {
+      ovSet('bad', '本地网络访问被拒绝 —— 请在地址栏权限提示里允许访问本地网络后重试');
+    } else {
+      // 组件没在跑（多半是还没装）—— 别只说「未检测到」就断了，给一条可点的下载入口。
+      ovSet('bad', '未检测到本地悬浮组件', { href: 'download/sc2-overlay.exe', label: '下载 Windows 组件' });
+    }
     return false;
   }
 }
@@ -1294,6 +1571,43 @@ function ovSpeedFactor(){
   return +(pb * g).toFixed(4);
 }
 
+/**
+ * 本地悬浮组件是否已连接（ovProbe 成功过）。内容变化时据此决定要不要重推。
+ */
+let ovReady = false;
+
+/** 给悬浮窗发播放控制 —— 复用已有的 `POST /overlay/control`，不用改 exe。 */
+function ovCtl(action, t){
+  if (!ovReady) return;
+  const body = t == null ? { action } : { action, t };
+  ovFetch('/overlay/control', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }, 1200).catch(() => {});
+}
+
+let ovSyncTimer = null;
+/**
+ * 内容变化后把脚本重推给悬浮窗，并把它的游标对齐到分析页当前进度。
+ *
+ * ⚠️ 悬浮窗手里的是「推送那一刻的快照」：换播报对象 / 改建造类别 / 切样本之后不重推，
+ * 它就一直是旧内容 —— 这正是「网页和悬浮窗播报不同步」的成因（`ovPush()` 原先只在点
+ * 按钮时调一次）。另外 `load()` 会把悬浮窗游标归 0，所以重推后必须补一次 seek，
+ * 否则进度会跳回开头；分析页处于暂停时也要把悬浮窗按住，别让它自己跑起来。
+ *
+ * 防抖 400ms：勾选建造类别时按钮会连点，不能每下都推一次。
+ */
+function ovResync(){
+  if (!ovReady) return;
+  clearTimeout(ovSyncTimer);
+  ovSyncTimer = setTimeout(async () => {
+    try {
+      await ovPush();
+      ovCtl('seek', S.t);
+      if (!V.playing) ovCtl('pause');
+    } catch (_) {}
+  }, 400);
+}
+
 async function ovPush(){
   const pl = rep().players[V.who];
   const icons = await ensureOvIcons();
@@ -1302,9 +1616,8 @@ async function ovPush(){
     duration: rep().duration, file: rep().file,
     rate: V.rate, lang: V.lang,
     speed: ovSpeedFactor(),
-    layout: $('#ovLayout').value,
-    plate: $('#ovPlate').value,
-    autostart: $('#ovStart').value,
+    // layout / plate / autostart 不再由网页决定 —— 悬浮窗从自己的**托盘设置**里取
+    // （网页不传时 Go 侧会补上托盘里存的值，见 overlay/app.go 的 handleOverlay）。
     steps: V.steps.map(s => ({ t: s.t, text: s.text, icon: icons[s.unit] || '' })),
   };
   const res = await ovFetch('/overlay', {
@@ -1373,9 +1686,10 @@ $('#ovBtn').onclick = async () => {
   if (await ovProbe()) {
     try {
       const n = await ovPush();
-      ovSet('ok', $('#ovStart').value === 'foreground'
-        ? `已推送 ${n} 项 —— 进入游戏后自动起表（时钟 ×${ovSpeedFactor()}）`
-        : `已推送到本地悬浮组件：${n} 条播报项，立即开始（时钟 ×${ovSpeedFactor()}）`);
+      // 首次推送也要对齐：`load()` 会把悬浮窗游标归 0 并自动起表，不补这两下就会和分析页错开。
+      ovCtl('seek', S.t);
+      if (!V.playing) ovCtl('pause');
+      ovSet('ok', `已推送到本地悬浮组件：${n} 条播报项（时钟 ×${ovSpeedFactor()}）`);
     } catch (err) { ovSet('bad', '推送失败：' + (err?.message || err)); }
   } else {
     await openPip();
@@ -1409,8 +1723,13 @@ function fillWho(){
 
 $('#vbPlay').onclick = () => vPlayPause();
 $('#vbReset').onclick = () => vReset();
-$('#vbSpeed').onchange = e => { if (V.playing) { V.base = S.t; V.wall0 = Date.now(); } V.speed = parseFloat(e.target.value); renderVoiceUi(); };
-$('#vbRate').oninput = e => { V.rate = parseFloat(e.target.value); };
+// 「倍速」（V.speed，推的是全局游标 S.t）已随底部条一起删除 —— 它管的是整页播放速度，
+// 不是语音设置，摆在语音区属于位置与作用域不符。现在 V.speed 恒为 1（实时），
+// 想快速浏览直接拖顶部时间轴定位即可。
+$('#vbRate').oninput = e => {
+  V.rate = parseFloat(e.target.value);
+  const el = $('#vbRateVal'); if (el) el.textContent = V.rate.toFixed(1);   // 生产页若尚未加该节点也不报错
+};
 $('#vbLang').onchange = e => { V.lang = e.target.value; };
 $('#vbWho').onchange = e => { V.who = parseInt(e.target.value, 10) || 0; voiceRebuild(); fillWho(); };
 

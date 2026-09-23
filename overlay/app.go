@@ -59,6 +59,18 @@ type App struct {
 	clickThrough bool // 鼠标穿透（拖动需先关掉）
 	followGame   bool // 跟随 SC2 窗口位置
 	onlyWhenGame bool // 仅 SC2 在前台时显示，切走自动隐藏
+	// 外观与起表方式 —— 2026-09-23 从网页左栏搬进托盘。
+	// 网页推送时这三项可以留空，留空就用这里的值（所以旧网页不带字段也能正常工作）。
+	layout    string // bar | stack | rail
+	plate     string // card | plain
+	autostart string // now | foreground（推送脚本时决定「立即走表」还是「等 SC2 进前台」）
+	mLayout   *systray.MenuItem
+	mPlate    *systray.MenuItem
+	mStart    *systray.MenuItem
+	// 子项按值索引，切换时逐个对勾选态（systray 没有 radiogroup）
+	mLayoutItems map[string]*systray.MenuItem
+	mPlateItems  map[string]*systray.MenuItem
+	mStartItems  map[string]*systray.MenuItem
 	// 跟随细节：相对游戏右缘/上缘的偏移（物理像素）。拖动优先 —— 手动拖动会重捕获偏移。
 	followGapRight, followGapTop    int
 	followGapSet, followGapApplied  bool
@@ -78,7 +90,13 @@ type App struct {
 }
 
 func NewApp() *App {
-	return &App{sse: newSseHub()}
+	return &App{
+		sse:    newSseHub(),
+		layout: "bar", plate: "card", autostart: "now", // 与网页侧 load() 的缺省行为一致
+		mLayoutItems: map[string]*systray.MenuItem{},
+		mPlateItems:  map[string]*systray.MenuItem{},
+		mStartItems:  map[string]*systray.MenuItem{},
+	}
 }
 
 // dispatch：播放控制统一入口（HTTP control / 全局热键 / 托盘共用），
@@ -279,6 +297,16 @@ func (a *App) handleOverlay(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.Speed <= 0 {
 		p.Speed = 1
+	}
+	// 外观与起表方式现在归托盘管（2026-09-23 从网页左栏搬走）：网页可以完全不传这三项。
+	if p.Layout == "" {
+		p.Layout = a.layout
+	}
+	if p.Plate == "" {
+		p.Plate = a.plate
+	}
+	if p.Autostart == "" {
+		p.Autostart = a.autostart
 	}
 	a.lastPush = &p
 	raw, err := json.Marshal(p)
@@ -625,6 +653,10 @@ type posCfg struct {
 	ClickThrough   bool `json:"clickThrough,omitempty"`
 	FollowGame     bool `json:"followGame,omitempty"`
 	OnlyWhenGame   bool `json:"onlyWhenGame,omitempty"`
+	// 外观与起表方式（托盘设置）
+	Layout    string `json:"layout,omitempty"`
+	Plate     string `json:"plate,omitempty"`
+	Autostart string `json:"autostart,omitempty"`
 }
 
 func (a *App) cfgPath() string {
@@ -651,6 +683,15 @@ func (a *App) loadCfg() {
 	}
 	a.cfgX, a.cfgY, a.hasCfg = c.X, c.Y, true
 	a.clickThrough, a.followGame, a.onlyWhenGame = c.ClickThrough, c.FollowGame, c.OnlyWhenGame
+	if c.Layout != "" {
+		a.layout = c.Layout
+	}
+	if c.Plate != "" {
+		a.plate = c.Plate
+	}
+	if c.Autostart != "" {
+		a.autostart = c.Autostart
+	}
 	a.followGapRight, a.followGapTop, a.followGapSet = c.FollowGapRight, c.FollowGapTop, c.FollowGapRight > 0
 	log.Printf("[overlay] 已读取配置：位置 (%d,%d) clickThrough=%v followGame=%v onlyWhenGame=%v",
 		c.X, c.Y, c.ClickThrough, c.FollowGame, c.OnlyWhenGame)
@@ -668,6 +709,9 @@ func (a *App) persistCfg(x, y int) {
 		ClickThrough: a.clickThrough,
 		FollowGame:   a.followGame,
 		OnlyWhenGame: a.onlyWhenGame,
+		Layout:       a.layout,
+		Plate:        a.plate,
+		Autostart:    a.autostart,
 	})
 	_ = os.WriteFile(p, b, 0o644)
 }

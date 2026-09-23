@@ -49,14 +49,21 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 .tbtn:hover{border-color:var(--line3);color:var(--ink)}
 
 .samples{display:flex;gap:6px;overflow-x:auto;padding:12px 0 0}
+/* 卡片高度直接决定「样本列表能显示几条」。三行内容一行不减，只收 padding 与行距：
+   实测 78px → 56px，同样半栏能多看 1~2 条。 */
 .smp{flex:0 0 auto;text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r2);
-     padding:7px 12px;min-width:190px;transition:.12s}
+     padding:5px 10px;min-width:190px;transition:.12s}
 .smp:hover{border-color:#c9d2e0}
 .smp.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset}
-.smp b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
-.smp span{display:block;font-size:10.5px;color:var(--ink3);font-family:var(--mono);margin-top:2px;
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.smp b{display:block;font-size:11.5px;font-weight:600;line-height:1.35;
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smp span{display:block;font-size:10px;line-height:1.35;color:var(--ink3);font-family:var(--mono);margin-top:1px;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .smp.on span{color:var(--accent)}
+/* 列表首卡：添加录像（虚线框，与真实样本卡区分；宽度撑满一栏） */
+.smp-add{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;flex:0 0 auto;
+         border-style:dashed;color:var(--ink3);font-size:11.5px;font-weight:600;cursor:pointer}
+.smp-add:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 
 .wrap{padding:12px 18px 40px;max-width:1600px;margin:0 auto}
 .head{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
@@ -257,7 +264,7 @@ body.sandboxview .v-sandbox{margin-top:0}
 /* ==========================================================================
    对局聊天
    ========================================================================== */
-.chatlist{max-height:calc(100vh - var(--vbh,84px) - 240px);overflow:auto}
+.chatlist{max-height:calc(100vh - 156px);overflow:auto}
 .chatrow{display:flex;align-items:baseline;gap:10px;padding:7px 14px;border-bottom:1px solid var(--line2);cursor:pointer}
 .chatrow:hover{background:var(--accent-soft)}
 .chatrow.past{opacity:.5}
@@ -316,15 +323,21 @@ body.sandboxview .v-sandbox{margin-top:0}
 .bostat{padding:8px 12px;border-top:1px solid var(--line2);font-size:10.5px;color:var(--ink3);font-family:var(--mono)}
 
 /* ==========================================================================
-   语音播报 + 悬浮（播放器条）
+   左侧板栏里的播报面板
+   —— 2026-09-23 由「底部固定播放器条」重做：全宽横条 → 左栏纵向卡片。
+      观看与定位交给顶部时间轴（#tl），这里只管「播报」与「悬浮输出」。
+      两个倍率：游戏倍率（ovSpeed，对齐游戏内时钟）+ 语速倍率（vbRate，TTS）。
+      ⚠️ 原「倍速 1×/2×/4×/8×」（V.speed）已删除 —— 它推的是**全局游标 S.t**，
+      是整页播放速度而非语音设置，摆在语音区属于位置与作用域不符。
    ========================================================================== */
-.vb{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;align-items:center;gap:14px;
-    padding:9px 18px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
-    border-top:1px solid var(--line);box-shadow:0 -2px 14px rgba(20,25,34,.06);flex-wrap:wrap}
-.vb .clock2{font-family:var(--mono);font-size:19px;font-weight:700;letter-spacing:-.4px;
-            font-variant-numeric:tabular-nums;min-width:74px;color:var(--ink2)}
+/* 播报面板（原底部条 → 栏内纵向卡片）。与 .samples 五五分：`flex:1 1 0` + 内部滚动，
+   内容照旧全部展开（不折叠），只是超出半栏时自己滚。 */
+.vb{display:flex;flex-direction:column;gap:9px;flex:1 1 0;min-height:0;overflow-y:auto;
+    padding:11px 12px;background:var(--card);border:1px solid var(--line);border-radius:var(--r)}
+.vb .clock2{font-family:var(--mono);font-size:17px;font-weight:700;letter-spacing:-.4px;
+            font-variant-numeric:tabular-nums;color:var(--ink2)}
 .vb .clock2.on{color:var(--ok)}
-.vb .queue{display:flex;flex-direction:column;gap:2px;flex:1;min-width:280px}
+.vb .queue{display:flex;flex-direction:column;gap:2px;min-width:0}
 .vb .qs{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--ink4);line-height:1.35}
 .vb .qs .t{font-family:var(--mono);font-size:10.5px;flex:0 0 auto;min-width:42px;text-align:right}
 .vb .qs.cur{color:var(--ink);font-size:13.5px;font-weight:650}
@@ -337,14 +350,77 @@ body.sandboxview .v-sandbox{margin-top:0}
 .vbbtn:hover{border-color:var(--line3);color:var(--ink)}
 .vbbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .vbbtn.primary:hover{background:#2560d8}
-.vbset{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3)}
+.vbset{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink3)}
+.vbset>span{flex:0 0 auto;min-width:46px}
 .vbset select,.vbset input[type=range]{font:inherit;font-size:11px;color:var(--ink2)}
-.vbset select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
-.vbset input[type=range]{width:74px}
-.ov{display:flex;align-items:center;gap:7px;border-left:1px solid var(--line);padding-left:14px}
-.ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto}
+.vbset select{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
+.vbset input[type=range]{flex:1;min-width:0}
+.vbsep{height:1px;background:var(--line2);margin:1px 0}
+.vb .ov{display:flex;align-items:flex-start;gap:7px}
+.ovdot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex:0 0 auto;margin-top:4px}
 .ovdot.ok{background:var(--ok)} .ovdot.bad{background:#c0392b} .ovdot.wait{background:var(--warn)}
-.ovtxt{font-size:11px;color:var(--ink3);max-width:230px;line-height:1.3}
+.ovtxt{font-size:11px;color:var(--ink3);line-height:1.35}
+.ovtxt a{color:var(--accent);text-decoration:none}
+.ovtxt a:hover{text-decoration:underline}
+/* 左栏入口：「筛选」按钮（样本多时左栏塞不下，大范围挑选走弹窗） */
+.pickbtn{font:inherit;font-size:10.5px;color:var(--ink2);background:#fff;flex:0 0 auto;
+         border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer}
+.pickbtn:hover{border-color:var(--line3);color:var(--ink)}
+
+/* ==========================================================================
+   样本筛选弹窗
+   —— 左栏只有 236px，样本一多就没法比较「哪一局更值得看」。
+      这里给一个宽面板：搜索（玩家/地图/文件名）+ 排序（比赛时间/时长/采样数/地图）
+      + 种族筛选；点条目即切换样本并关闭。逻辑见 views.js 的 pickHits/renderPick/openPick。
+   ========================================================================== */
+.modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal[hidden]{display:none}
+.modal-bg{position:absolute;inset:0;background:rgba(20,25,34,.42)}
+.modal-panel{position:relative;display:flex;flex-direction:column;width:min(720px,100%);
+             max-height:min(78vh,760px);background:var(--card);border:1px solid var(--line);
+             border-radius:var(--r);overflow:hidden}
+.modal-panel>header{display:flex;align-items:center;gap:10px;padding:12px 16px;
+                    border-bottom:1px solid var(--line2);flex:0 0 auto}
+.modal-panel>header b{font-size:13px;font-weight:650}
+.modal-panel>header .cnt{font-size:11.5px;color:var(--ink3);font-family:var(--mono)}
+.modal-x{margin-left:auto;border:0;background:none;font-size:17px;line-height:1;
+         color:var(--ink3);cursor:pointer;padding:2px 4px}
+.modal-x:hover{color:var(--ink)}
+.modal-filter{display:flex;flex-direction:column;gap:9px;padding:12px 16px;
+              border-bottom:1px solid var(--line2);flex:0 0 auto}
+.modal-filter input{font:inherit;font-size:12.5px;color:var(--ink);background:#fff;
+                    border:1px solid var(--line);border-radius:7px;padding:7px 10px;width:100%}
+.modal-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--ink3)}
+.modal-row select{font:inherit;font-size:11.5px;color:var(--ink2);background:#fff;
+                  border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+.modal-list{flex:1 1 auto;min-height:0;overflow-y:auto}
+.pitem{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;
+       border-bottom:1px solid var(--line2);cursor:pointer}
+.pitem:hover,.pitem.on{background:var(--accent-soft)}
+.pitem .dot{width:8px;height:8px;border-radius:50%;border:1px solid var(--line3);flex:0 0 auto;margin-top:5px}
+.pitem.on .dot{background:var(--accent);border-color:var(--accent)}
+.pitem .bd{min-width:0;flex:1}
+.pitem .t1{display:flex;align-items:baseline;gap:8px}
+.pitem .t1 b{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .t1 i{font-style:normal;font-size:10.5px;color:var(--ink4);font-family:var(--mono);
+             white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .t2{font-size:11.5px;color:var(--ink2);margin-top:2px}
+.pitem .t3{font-size:10.5px;color:var(--ink4);font-family:var(--mono);margin-top:2px}
+.pempty{padding:26px 16px;text-align:center;color:var(--ink4);font-size:12px}
+.modal-panel>footer{display:flex;align-items:center;gap:10px;padding:11px 16px;
+                    border-top:1px solid var(--line2);flex:0 0 auto}
+.modal-panel>footer .st{font-size:11.5px;color:var(--ink3);font-family:var(--mono)}
+/* 样本筛选框：只在样本数 > 6 时露出（views.js::renderSamples 控制） */
+.smpsearch{font:inherit;font-size:11px;color:var(--ink2);background:#fff;flex:0 0 auto;
+           border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+.smpempty{padding:14px 4px;text-align:center;color:var(--ink4);font-size:11.5px}
+/* 左栏分区标题里的细横线（与「录像列表」同一行风格） */
+.rail .railhead .ln{flex:1;height:1px;background:var(--line2);align-self:center}
+/* 左栏顶部提示（只有解析失败/装配失败时才有内容）。
+   ⚠️ 它原来是 `.railhead` 的 flex 子项，**空着也会带 gap 撑出一行空白**（实测 ~26px）——
+   所以挪出 railhead，并让空内容整条消失。 */
+#railNote{font-size:10px;line-height:1.5;color:var(--ink3);white-space:normal}
+#railNote:empty{display:none}
 
 /* ==========================================================================
    运行态外壳（原型里没有，真实页面才有）
@@ -355,28 +431,20 @@ body.sandboxview .v-sandbox{margin-top:0}
 #result.on{display:block}
 
 /* --------------------------------------------------------------------------
-   底部播报条：内层与主体同宽、居中
-   --------------------------------------------------------------------------
-   原型里 .vb 自己就是 flex 容器，内容从**视口左缘**起排；而主体 .wrap 用的是
-   max-width:1600px + margin:0 auto。两者只有在视口 ≤1636px 时才碰巧对齐 ——
-   1920 屏上条内容比主体左边缘偏 142px、2560 屏偏 462px（实测）。
-   拆成两层：.vb 只画「横跨视口的背景 + 分隔线」，.vbin 负责排版并与 .wrap 严格对齐。 */
-.vb{display:block;padding:0}
-.vbin{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-      max-width:1600px;margin:0 auto;padding:9px 18px}
-
-/* 底部留白跟随播报条**实测高度**：窄屏它会换行变高，写死 84px 就会被压住。
-   --vbh 由 js/lab/main.js 的 ResizeObserver 写入，加在**文档最后一个元素**（页脚）上。
-   ⚠️ 不能写成 body{padding-bottom} —— 本文件里有 html,body{height:100%}，body 的
-   content box 被固定成视口高，超出的内容会**穿过** padding 区域，那条 padding
-   不产生任何滚动空间（实测页脚仍被条盖住 69px）。
-   margin 同样不可靠：末尾元素的下外边距不计入 scrollHeight。 */
-.wrap{padding-bottom:calc(var(--vbh,84px) + 24px)}
+   底栏已在 2026-09-23 移除：播报 + 悬浮面板搬进了左侧栏 .rail。
+   这里原本有一层 .vb / .vbin 外壳（作用是把固定条的内层与 .wrap 严格对齐 ——
+   1920 屏上条内容曾比主体左边缘偏 142px），以及一套 --vbh 底部留白机制。
+   条没了，留白回到定义系统里的 26px（原型值），--vbh 也不再需要。
+   ⚠️ 若将来又把某个面板做回固定底栏：本文件里有 html,body{height:100%}，
+   此时 body 的 padding-bottom 不产生任何滚动空间（内容会**穿过** padding 区域），
+   必须走 --vbh + 末尾元素外边距那条路。
+   -------------------------------------------------------------------------- */
+.wrap{padding-bottom:26px}
 .infobar{text-align:center;color:var(--ink4);font-size:11.5px;line-height:1.9;padding:0 16px}
 .infobar a{color:var(--accent)}
 .infobar code{font-family:var(--mono);background:var(--bg);padding:1px 5px;border-radius:4px}
 /* 内部指标侧栏同理：原规则只扣了顶部，没扣底部条，会钻到条下面去 */
-.side{max-height:calc(100vh - var(--vbh,84px) - 96px)}
+.side{max-height:calc(100vh - 96px)}
 
 /* --------------------------------------------------------------------------
    录像列表侧边栏
@@ -385,11 +453,12 @@ body.sandboxview .v-sandbox{margin-top:0}
    窄屏（≤1180px）退回顶部横排，避免挤压图表。 */
 .layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:16px;align-items:start;margin-top:14px}
 .rail{display:flex;flex-direction:column;gap:8px;min-height:0;
-      position:sticky;top:64px;max-height:calc(100vh - var(--vbh,84px) - 92px)}
-.rail .railhead{margin:0;flex-wrap:wrap}
+      position:sticky;top:64px;height:calc(100vh - 92px);overflow:hidden}
+.rail .railhead{margin:0;flex-wrap:wrap;flex:0 0 auto}   /* 左栏分区标题不参与压缩 */
 .rail .railhead .grow{flex:0 0 100%;height:0}         /* 强制提示文字独占一行 */
 .rail .railhead .lab{font-size:10px;white-space:normal;line-height:1.5}
-.rail .samples{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;
+/* 样本列表与播报面板五五分（各自内部滚动）—— 播报按内容自然高时，矮屏上样本列表只剩两三条。 */
+.rail .samples{display:flex;flex-direction:column;gap:6px;flex:1 1 0;min-height:0;
                overflow-y:auto;overflow-x:hidden;padding:0 3px 2px 0}
 .rail .smp{flex:0 0 auto;width:100%;min-width:0}
 .rail .smp b,.rail .smp span{max-width:none}
@@ -398,10 +467,13 @@ body.sandboxview .v-sandbox{margin-top:0}
 
 @media (max-width:1180px){
   .layout{grid-template-columns:minmax(0,1fr)}
-  .rail{position:static;max-height:none}
+  /* 窄屏退回单列：左栏不再固定高，样本横排、播报按内容自然排
+     （height:auto 下基类的 flex:1 1 0 会把两段压成 0 高，必须显式覆盖回 0 0 auto） */
+  .rail{position:static;height:auto}
   .rail .railhead{margin:12px 0 0}
   .rail .railhead .grow{flex:1;height:auto}
-  .rail .samples{flex-direction:row;overflow-x:auto;overflow-y:visible;padding:12px 0 0}
+  .rail .samples{flex:0 0 auto;flex-direction:row;overflow-x:auto;overflow-y:visible;padding:12px 0 0}
+  .rail .vb{flex:0 0 auto;overflow:visible}
   .rail .smp{width:auto;min-width:190px}
   .rail .smp b{display:block;white-space:nowrap;max-width:230px}
   /* 底部条也收紧：原型里 .queue 的 min-width:280px 会把窄屏的条挤成两行（实测 126px 高） */

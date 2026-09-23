@@ -71,11 +71,40 @@
     <aside class="rail">
       <div class="railhead">
         <span class="lab">录像列表</span>
-        <button class="tbtn" id="pickMore" type="button">＋ 添加录像</button>
-        <div class="grow"></div>
-        <span class="lab" id="railNote"></span>
+        <i class="ln"></i>
+        <button class="pickbtn" id="pickBtn" type="button">筛选</button>
       </div>
+      <span class="lab" id="railNote"></span>
+      <input class="smpsearch" id="smpSearch" placeholder="筛选：地图 / 文件名 / 玩家" style="display:none">
       <div class="samples" id="samples"></div>
+
+      <div class="railhead"><span class="lab">播报</span><i class="ln"></i></div>
+      <div class="vb" id="vb">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span class="clock2" id="vbClock">00:00</span>
+          <span style="flex:1"></span>
+          <span style="font-size:10px;color:var(--ink4)">当前播报项</span>
+        </div>
+        <div class="queue">
+          <div id="vbQueue"></div>
+          <div class="prog"><i id="vbProg"></i></div>
+        </div>
+        <div class="ctl">
+          <button class="vbbtn primary" id="vbPlay">开始</button>
+          <button class="vbbtn" id="vbReset">重置</button>
+        </div>
+        <div class="vbset"><span>对象</span><select id="vbWho"></select></div>
+        <div class="vbset"><span>游戏倍率</span><select id="ovSpeed"><option value="same">与录像同速 1:1</option><option value="faster">Faster 1.4</option><option value="fast">Fast 1.2</option><option value="normal">Normal 1.0</option><option value="slow">Slow 0.8</option><option value="slower">Slower 0.6</option></select></div>
+        <div class="vbset"><span>语速</span><input type="range" id="vbRate" min="1" max="4" step="0.2" value="2"><b id="vbRateVal" style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);min-width:24px;text-align:right">2.0</b></div>
+        <div class="vbset"><span>语言</span><select id="vbLang"><option value="zh-CN">中文</option><option value="en-US">English</option></select></div>
+
+        <div class="vbsep"></div>
+
+        <b style="font-size:10px;color:var(--ink3);font-family:var(--mono);letter-spacing:.3px">悬浮窗</b>
+        <button class="vbbtn" id="ovBtn">悬浮到桌面</button>
+        <div class="ov"><span class="ovdot" id="ovDot"></span><div class="ovtxt" id="ovTxt">探测本地悬浮组件中…</div></div>
+        <div class="ovtxt" style="color:var(--ink4)">版式 / 底板 / 开始方式改在悬浮窗托盘菜单里设置。</div>
+      </div>
     </aside>
 
     <div class="main">
@@ -87,7 +116,7 @@
           <span class="lab">时间轴</span>
           <span class="clock" id="clock"></span>
           <div class="spacer" style="flex:1"></div>
-          <span class="lab" style="color:var(--ink4);font-weight:400">图表上移动鼠标即可同步全部视图 · 时间轴为点击定位，按住拖动可微调</span>
+          <span class="lab" style="color:var(--ink4);font-weight:400">时间轴与图表均为点击 / 拖动定位（悬停只预览，不动游标）</span>
         </div>
         <div class="tl" id="tl">
           <svg id="tlsvg"></svg>
@@ -210,48 +239,42 @@
    </div><!-- /.layout -->
   </div><!-- /#result -->
 
-  <!-- ============ 语音播报 + 悬浮（播放器条） ============ -->
-  <!-- .vb 只画「横跨视口的背景 + 分隔线」；.vbin 负责排版并与主体 .wrap 同宽居中。
-       上一版 .vb 自己是 flex 容器，内容从视口左缘起排 —— 1920 屏上比主体偏左 142px。 -->
-  <div class="vb" id="vb">
-   <div class="vbin">
-    <div class="clock2" id="vbClock">00:00</div>
-    <div class="queue">
-      <div id="vbQueue"></div>
-      <div class="prog"><i id="vbProg"></i></div>
-    </div>
-    <div class="ctl">
-      <button class="vbbtn primary" id="vbPlay">开始</button>
-      <button class="vbbtn" id="vbReset">重置</button>
-      <div class="vbset"><span>播报</span><select id="vbWho"></select></div>
-      <div class="vbset"><span>倍速</span>
-        <select id="vbSpeed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select>
-      </div>
-      <div class="vbset"><span>语速</span><input type="range" id="vbRate" min="1" max="4" step="0.2" value="2"></div>
-      <div class="vbset"><select id="vbLang"><option value="zh-CN">中文</option><option value="en-US">English</option></select></div>
-    </div>
-    <div class="ov">
-      <span class="ovdot" id="ovDot"></span>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <button class="vbbtn" id="ovBtn" style="align-self:flex-start">悬浮到桌面</button>
-        <div class="ovtxt" id="ovTxt">探测本地悬浮组件中…</div>
-      </div>
-      <div class="vbset" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <label>版式 <select id="ovLayout"><option value="bar">条形</option><option value="stack">双行</option><option value="rail">侧边</option></select></label>
-        <label>底板 <select id="ovPlate"><option value="plain">纯文字</option><option value="card">实底卡片</option></select></label>
-        <label>开始 <select id="ovStart"><option value="foreground">进游戏自动起表</option><option value="now">立即开始</option></select></label>
-        <details>
-          <summary style="cursor:pointer;font-size:11px;color:var(--ink3)" title="默认「与录像同速」即为 1:1，通常无需改动">校准</summary>
-          <div style="display:flex;flex-direction:column;gap:7px;align-items:flex-start;padding:7px 0 2px 15px">
-            <label>回放速度 <select id="ovSpeed"><option value="same">与录像同速（时钟 1:1）</option><option value="faster">Faster 1.4</option><option value="fast">Fast 1.2</option><option value="normal">Normal 1.0</option><option value="slow">Slow 0.8</option><option value="slower">Slower 0.6</option></select></label>
-            <div style="font-size:10.5px;color:var(--ink3);max-width:300px;line-height:1.5">悬浮窗时钟默认与游戏内时钟 1:1，无需改动。<br>只有你在 SC2 里手动调过回放速度（<b>+</b> / <b>-</b>）时才需要在这里对齐。</div>
-          </div>
-        </details>
-      </div>
-    </div>
-   </div><!-- /.vbin -->
-  </div>
+  <!-- 播报 + 悬浮面板已搬进左侧栏 .rail（2026-09-23 底栏重做时移除）。 -->
 </div><!-- /.wrap -->
+
+<!-- 样本筛选弹窗：点条目先选中（预览），「应用」才真正切换样本 -->
+<div class="modal" id="pickModal" hidden>
+  <div class="modal-bg" id="pickBg"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="样本筛选与排序">
+    <header>
+      <b>样本筛选与排序</b>
+      <span class="cnt" id="pickTotal">共 0 个</span>
+      <button class="modal-x" id="pickClose" type="button" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-filter">
+      <input id="pickQ" placeholder="搜索：玩家名 / 地图 / 文件名…">
+      <div class="modal-row">
+        <span>排序</span>
+        <select id="pickSort">
+          <option value="playedAt">比赛时间</option>
+          <option value="duration">时长</option>
+          <option value="sampleCount">采样点数</option>
+          <option value="map">地图名</option>
+        </select>
+        <select id="pickDir"><option value="desc">倒序</option><option value="asc">正序</option></select>
+        <span>种族</span>
+        <select id="pickMatchup"><option value="">不限</option></select>
+      </div>
+    </div>
+    <div class="modal-list" id="pickList"></div>
+    <footer>
+      <span class="st" id="pickStat">命中 0 / 0</span>
+      <span style="flex:1"></span>
+      <button class="vbbtn" id="pickCancel" type="button">取消</button>
+      <button class="vbbtn primary" id="pickApply" type="button">应用</button>
+    </footer>
+  </div>
+</div>
 
 
 

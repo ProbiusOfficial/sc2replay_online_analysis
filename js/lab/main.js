@@ -12,7 +12,7 @@
 
 import { loadTranslationData, setInitStatus } from "../errors_init.js";
 import { initParser, parseReplayBufferToData, isParserReady } from "../parse_client.js";
-import { toLabReplays, isTranslationReady } from "./data.js";
+import { toLabReplays } from "./data.js";
 import { mountLab, labState, voiceState, redraw } from "./views.js";
 import { initSandbox, mountSandbox } from "./sandbox.js";
 
@@ -62,27 +62,17 @@ function setLoading(text) {
 }
 
 /* ==========================================================================
-   底部播报条的高度
+   底部播报条的高度 —— 已随底栏移除（2026-09-23）
    ========================================================================== */
 
 /**
- * 把播报条的实际高度写进 CSS 变量 `--vbh`。
+ * 这里原本是 `trackBottomBarHeight()`：把固定底栏的实测高度写进 CSS 变量 `--vbh`，
+ * 供 `.wrap` 的底部留白与内部指标侧栏的 `max-height` 扣除（窄屏底栏会换行变高，
+ * 写死 84px 就会被压住）。
  *
- * 为什么不能写死：这条在窄视口会换行变高（实测 40 → 69px），而 `.wrap` 的底部留白
- * 与内部指标侧栏的 `max-height` 都要扣掉它 —— 写死就会出现「内容被条压住」。
- *
- * 用 ResizeObserver 而不是只听 `window.resize`：窗口大小不变、条自身高度变化
- * （换行 / 队列文字变长）时也必须重算。
+ * 底栏已重做为左侧栏里的播报面板，`--vbh` 全仓不再有消费方，故整段删除。
+ * 若将来又出现固定底栏，记得同时恢复「写入端」和「消费端（css/lab.css）」。
  */
-function trackBottomBarHeight() {
-  const vb = $("#vb");
-  if (!vb) return;
-  const apply = () =>
-    document.documentElement.style.setProperty("--vbh", `${Math.round(vb.offsetHeight)}px`);
-  apply();
-  if (typeof ResizeObserver !== "undefined") new ResizeObserver(apply).observe(vb);
-  window.addEventListener("resize", apply);
-}
 
 /* ==========================================================================
    结果区宽度变化 → 重绘
@@ -191,23 +181,13 @@ async function parseAndMount(files) {
   if (dz) dz.style.display = "none";
   show($("#result"), true);
 
-  const info = mountLab(replays);
+  mountLab(replays);
   mountSandbox(replays); // 沙盘视图吃同一份数据（其中 r.sandbox 由 data.js 透传）
   watchResultWidth();
 
-  // 如实报告，不吞掉失败
-  const parts = [`已加载 ${info.count} 份录像`];
-  if (allFailed.length) parts.push(`${allFailed.length} 份失败`);
-  if (!isTranslationReady()) parts.push("译名表未加载（建造顺序显示英文原名）");
-  const extra = replays.filter((r) => r.playerCount > 2).length;
-  if (extra) parts.push(`${extra} 份是 2 人以上对局，仅显示前两名玩家`);
-  const filled = replays.reduce((s, r) => s + r.alignment.filledPoints, 0);
-  if (filled) parts.push(`跨玩家对齐补点 ${filled} 个`);
-  // 同一玩家的序列里实测存在重复时刻（并集去重后比单方还短）；数量如实报出来，
-  // 不然「补点数为负」这种自相矛盾的数字会被当成显示 bug 而不是数据事实。
-  const dups = replays.reduce((s, r) => s + r.alignment.duplicateSamples.reduce((a, b) => a + b, 0), 0);
-  if (dups) parts.push(`原始序列含 ${dups} 个重复时刻`);
-  renderRailNote(parts.join(" · "), allFailed.length ? "err" : "");
+  // ⚠️ 这里原本会往左栏顶部写一条常态摘要（「已加载 N 份录像 · 原始序列含 M 个重复时刻 ·
+  // 跨玩家对齐补点 K 个 …」）。按项目方要求撤掉：左栏顶部只在**确实加载不出来**时才出提示，
+  // 正常加载不占这一行。这些数字仍有价值，自查走 `window.__lab` / `window.__sandbox`。
 
   if (allFailed.length) {
     setError(
@@ -232,7 +212,6 @@ function pickReplayFiles(list) {
 function bindFileInput() {
   const dropZone = $("#dropZone");
   const fileInput = $("#fileInput");
-  const pickMore = $("#pickMore");
 
   if (dropZone && fileInput) {
     dropZone.addEventListener("click", () => fileInput.click());
@@ -262,7 +241,14 @@ function bindFileInput() {
     });
   }
 
-  if (pickMore && fileInput) pickMore.addEventListener("click", () => fileInput.click());
+  // 「＋ 添加录像」现在渲染在样本列表里当**第一张卡**（views.js::renderSamples），
+  // 而列表每次重渲染都会重建它 —— 所以只能事件委托，直接绑元素撑不过第一次筛选。
+  const samplesHost = $("#samples");
+  if (samplesHost && fileInput) {
+    samplesHost.addEventListener("click", (e) => {
+      if (e.target.closest("#pickMore")) fileInput.click();
+    });
+  }
 
   function handle(list) {
     const files = pickReplayFiles(list);
@@ -295,7 +281,6 @@ async function boot() {
   setLoading("");
   setError(null);
   bindFileInput();
-  trackBottomBarHeight();
   initSandbox(); // 沙盘视图：绑控件 + 起主循环（无数据时空转，成本为零）
 
   // 本地部署提示只在 file:// 打开时出现；经 HTTP 访问的用户不应看到开发期提示
@@ -318,9 +303,7 @@ async function boot() {
     setError("解析内核未就绪", "请刷新页面重试");
     return;
   }
-
-  // 没有录像时给一句明确的引导，别让页面看起来是坏的
-  renderRailNote("拖入 .SC2Replay 即可开始 · 可一次拖多个");
+  // 左栏顶部的提示只服务于「加载不出来」这一件事，正常态不写 —— 见上方 sumReplays 里的注释。
 }
 
 boot();

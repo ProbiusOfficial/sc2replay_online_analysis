@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -28,6 +29,37 @@ func (a *App) onTrayReady() {
 	a.mCT = systray.AddMenuItemCheckbox("鼠标穿透（拖动需关闭）", "", a.clickThrough)
 	a.mFollow = systray.AddMenuItemCheckbox("跟随游戏窗口", "", a.followGame)
 	a.mOnly = systray.AddMenuItemCheckbox("仅游戏内显示", "", a.onlyWhenGame)
+	systray.AddSeparator()
+	// 外观与起表方式 —— 2026-09-23 从网页左栏搬进托盘（网页不再提供这三个下拉）。
+	// 理由：它们是**悬浮窗自己的显示属性**，设一次就该一直生效；网页那三个下拉每次推送都要重选。
+	// systray 没有 radiogroup，只能逐个切勾选态，所以按下标把子项存起来。
+	a.mLayout = systray.AddMenuItem("版式", "悬浮窗形态：条形 / 双行 / 侧边")
+	for _, o := range []struct{ v, label string }{
+		{"bar", "条形"}, {"stack", "双行"}, {"rail", "侧边"},
+	} {
+		it := a.mLayout.AddSubMenuItemCheckbox(o.label, "", a.layout == o.v)
+		v := o.v
+		it.Click(func() { a.setLayoutMode(v) })
+		a.mLayoutItems[v] = it
+	}
+	a.mPlate = systray.AddMenuItem("底板", "实底卡片 / 纯文字覆盖")
+	for _, o := range []struct{ v, label string }{
+		{"card", "实底卡片"}, {"plain", "纯文字覆盖"},
+	} {
+		it := a.mPlate.AddSubMenuItemCheckbox(o.label, "", a.plate == o.v)
+		v := o.v
+		it.Click(func() { a.setPlateMode(v) })
+		a.mPlateItems[v] = it
+	}
+	a.mStart = systray.AddMenuItem("开始方式", "推送脚本后如何起表（下次推送生效）")
+	for _, o := range []struct{ v, label string }{
+		{"now", "立即开始"}, {"foreground", "进游戏自动起表"},
+	} {
+		it := a.mStart.AddSubMenuItemCheckbox(o.label, "", a.autostart == o.v)
+		v := o.v
+		it.Click(func() { a.setAutostartMode(v) })
+		a.mStartItems[v] = it
+	}
 	systray.AddSeparator()
 	a.mReset = systray.AddMenuItem("重置位置", "回到默认右上角锚定")
 	a.mReg = systray.AddMenuItem("注册 sc2overlay:// 协议", "支持从浏览器一键唤起")
@@ -73,6 +105,62 @@ func (a *App) syncTrayChecks() {
 	} else {
 		a.mOnly.Uncheck()
 	}
+	for v, it := range a.mLayoutItems {
+		if v == a.layout {
+			it.Check()
+		} else {
+			it.Uncheck()
+		}
+	}
+	for v, it := range a.mPlateItems {
+		if v == a.plate {
+			it.Check()
+		} else {
+			it.Uncheck()
+		}
+	}
+	for v, it := range a.mStartItems {
+		if v == a.autostart {
+			it.Check()
+		} else {
+			it.Uncheck()
+		}
+	}
+}
+
+// ---- 外观与起表方式（托盘设置，2026-09-23 从网页左栏搬来） ----
+
+func (a *App) setLayoutMode(v string) {
+	if _, ok := layoutSizes[v]; !ok {
+		return
+	}
+	a.layout = v
+	a.exec(fmt.Sprintf("window.__overlay.setLayout(%q)", v)) // 页面会回 notifyLayout → 窗口尺寸随之调整
+	a.syncTrayChecks()
+	a.persistCfg(a.lastX, a.lastY)
+	log.Printf("[overlay] layout = %s", v)
+}
+
+func (a *App) setPlateMode(v string) {
+	if v != "card" && v != "plain" {
+		return
+	}
+	a.plate = v
+	a.exec(fmt.Sprintf("window.__overlay.setPlate(%q)", v))
+	a.syncTrayChecks()
+	a.persistCfg(a.lastX, a.lastY)
+	log.Printf("[overlay] plate = %s", v)
+}
+
+// setAutostartMode：只影响**下一次**推送 —— 脚本到手时才决定「立即走表」还是「等 SC2 进前台」。
+func (a *App) setAutostartMode(v string) {
+	if v != "now" && v != "foreground" {
+		return
+	}
+	a.autostart = v
+	a.syncTrayChecks()
+	a.persistCfg(a.lastX, a.lastY)
+	log.Printf("[overlay] autostart = %s（下次推送生效）", v)
 }
 
 func (a *App) toggleVisible() {
