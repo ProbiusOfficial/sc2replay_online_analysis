@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>sc2-overlay</title>
+<!--
+  悬浮窗宿主页 —— 由 sc2-overlay.exe 的 WebView2 加载。
+  设计来源：prototype/overlay-exe.html v2（2026-09-23 按项目方反馈定稿）：
+    · 三种版式：bar 条形（默认，原「轴条+单行」合并：序列直接列出，紧凑宽、exe 里贴右上角）
+               stack 双行（进度条定长 140px） / rail 竖向贴边
+    · 两种底板：card 实底卡片（默认） / plain 纯文字覆盖（Oopz 式，无底板，文字阴影+图标投影）
+    · 单位/建筑图标：assets/units/*.webp（已随 exe 内嵌，缺图自动隐藏）
+  两条硬不变式（调研 §8.3）：
+    1) 页面必须填满窗口：#overlay 恒为 width:100%
+    2) 固定高版式的窗口高度=卡片高度（bar 32 / stack 54；rail 168×208）—— Go 侧 NotifyLayout 负责
+  数据来自 Go 推送的 window.__overlay.load(payload)，载荷契约 = 网页侧 ovPush()：
+    { player, race, duration, speed, layout, plate, steps: [{t, text, icon}] }
+  自走时钟：脚本到手后自己推进，分析网页关闭也不停（调研 §7.1 分工原则）。
+-->
+<style>
+:root{
+  --card:rgba(13,16,22,.90); --line:rgba(255,255,255,.10);
+  --ink:#e8edf4; --ink2:#a7b1c0; --ink3:#7c8694;
+  --green:#39e07a; --gold:#e0a63a;
+  --building:#8b98a8; --unit:#4a9bf5; --upgrade:#a08cf0; --worker:#5d6875;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+body{color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+
+/* ===== 悬浮窗本体 ===== */
+/* --wails-draggable:drag —— 整条可按住拖动换位置；exe 侧记录位置并持久化 */
+#overlay{width:100%;font-family:var(--sans);color:var(--ink);--wails-draggable:drag;cursor:move}
+.ov{position:relative;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;
+    backdrop-filter:blur(12px);overflow:hidden}
+.ov.h-bar{border-radius:9px;height:32px;width:100%}
+.ov.h-stack{border-radius:10px;height:54px;width:100%;flex-direction:column;align-items:stretch;justify-content:center}
+.ov.h-rail{border-radius:10px;flex-direction:column;align-items:stretch;width:100%;padding:7px 0}
+
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.now{display:flex;align-items:center;gap:7px;flex:0 0 auto;padding:0 10px 0 12px;min-width:0}
+.now .t{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.now .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now .g{width:3px;height:16px;border-radius:2px;flex:0 0 auto}
+.divv{width:1px;align-self:stretch;background:var(--line);flex:0 0 auto}
+
+/* ---- 条形（bar）：当前项 + 直接列出的后续序列；底部 2px 段内进度线 ---- */
+.icon{width:18px;height:18px;flex:0 0 auto;object-fit:contain}
+.bq{flex:1;display:flex;align-items:center;gap:0;min-width:0;overflow:hidden;height:100%;padding-right:8px;
+    -webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}
+.bq .it{flex:0 0 auto;display:flex;align-items:center;gap:5px;font-size:11.5px;font-family:var(--mono);
+        color:var(--ink3);padding:0 9px;white-space:nowrap}
+.bq .it .tm{opacity:.85}
+.bq .it .icon{width:15px;height:15px;opacity:.6}
+.bq .it.nx{color:var(--ink2)}
+.bq .it.nx .icon{opacity:.9}
+.bq .it .dl{font-size:10px;color:var(--ink3)}
+.ov .bprog{position:absolute;left:0;bottom:0;height:2px;background:var(--green);opacity:.85}
+
+/* ---- 双行（stack）：定长进度条 ---- */
+.st{width:100%;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 13px}
+.st .r1{display:flex;align-items:center;gap:8px;min-width:0}
+.st .r1 .icon{width:20px;height:20px}
+.st .r2{display:flex;align-items:center;gap:9px;font-size:11px;font-family:var(--mono);color:var(--ink3);min-width:0}
+.st .r2 .k{white-space:nowrap}
+.stp{height:3px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden;width:140px;flex:0 0 auto}
+.stp i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f9e6a,var(--green))}
+
+/* ---- 竖向贴边（rail） ---- */
+.railrow{display:grid;grid-template-columns:20px 44px 1fr 3px;align-items:center;gap:8px;
+         padding:3px 11px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);position:relative}
+.railrow .icon{width:16px;height:16px;opacity:.65}
+.railrow .g{position:absolute;left:0;top:3px;bottom:3px;width:2px;border-radius:1px;background:var(--building);opacity:.5}
+.railrow .tm{text-align:right;opacity:.75}
+.railrow .nm{font-family:var(--sans);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railrow.on{background:rgba(57,224,122,.10);color:#fff}
+.railrow.on .icon{opacity:1}
+.railrow.on .g{background:var(--green);opacity:1;width:3px}
+.railrow.on .tm{color:var(--gold);font-weight:700;opacity:1}
+.railrow.on .nm{font-weight:700;font-size:13px}
+.railfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;
+          padding:4px 11px 0;margin-top:2px;border-top:1px solid var(--line);
+          font-size:10px;font-family:var(--mono);color:var(--ink3)}
+
+/* ---- 纯文字覆盖（Oopz 式）：无底板，文字+图标直接浮在游戏上 ---- */
+body.plate-plain .ov{background:transparent;border:0;backdrop-filter:none}
+body.plate-plain .ov,
+body.plate-plain .now .n,
+body.plate-plain .now .t,
+body.plate-plain .bq .it,
+body.plate-plain .st .r1 span,
+body.plate-plain .st .r2 .k,
+body.plate-plain .railrow,
+body.plate-plain .railfoot{
+  text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 6px rgba(0,0,0,.75),0 0 14px rgba(0,0,0,.45)}
+body.plate-plain .icon{filter:drop-shadow(0 1px 2px rgba(0,0,0,.9)) drop-shadow(0 0 4px rgba(0,0,0,.6))}
+body.plate-plain .divv{background:rgba(255,255,255,.22)}
+body.plate-plain .railrow.on{background:transparent}
+body.plate-plain .railfoot{border-top-color:rgba(255,255,255,.18)}
+</style>
+</head>
+<body>
+<div id="overlay"></div>
+<script>
+'use strict';
+
+/* ---------- 状态：字段与规格稿 v2 一致，数据来自 Go 推送 ---------- */
+const S = {
+  v: 'bar', plate: 'card', opacity: .9,
+  t: 0, playing: false, base: 0, wall0: 0, speed: 1,
+  steps: [], duration: 0, player: '', race: '', loaded: false,
+  autostart: 'now',
+};
+
+const $ = s => document.querySelector(s);
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const lastIdxAt = (a, t) => { let i = -1; for (let k = 0; k < a.length; k++) { if (a[k].t <= t + 1e-6) i = k; else break; } return i; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/** 类别 → 颜色。色条/时间用它，颜色本身带信息（灰建筑/蓝单位/紫科技）。 */
+const KIND_COLOR = s => !s ? 'var(--worker)'
+  : s.k === 'upgrade' ? 'var(--upgrade)' : s.k === 'unit' ? 'var(--unit)' : 'var(--building)';
+/** 单位/建筑图标：payload.steps[].icon = assets/units/ 文件名（不含扩展名），缺图自动隐藏。 */
+const iconImg = (s, cls) => s && s.icon
+  ? `<img class="icon ${cls || ''}" src="assets/units/${esc(s.icon)}.webp" alt="" onerror="this.remove()">`
+  : '';
+
+/* ---------- 三种版式 ---------- */
+function shellHTML(inner){
+  return `<div class="ov h-${S.v}" id="ovCard" style="opacity:${S.plate === 'plain' ? 1 : S.opacity}">${inner}</div>`;
+}
+
+/** 条形：当前项 + 直接列出的后续序列；底部 2px 段内进度线（到下一步的进度） */
+function renderBar(){
+  const i = lastIdxAt(S.steps, S.t);
+  const cur = S.steps[i], nxt = S.steps[i + 1];
+  const items = S.steps.slice(i + 1, i + 5).map((s, k) =>
+    `<span class="it ${k === 0 ? 'nx' : ''}"><span class="tm">${mmss(s.t)}</span>${iconImg(s)}${esc(s.text)}`
+    + `${k === 0 ? `<span class="dl">+${Math.max(0, Math.round(s.t - S.t))}s</span>` : ''}</span>`).join('');
+  const card = `<div class="now">
+      <i class="g" style="background:${KIND_COLOR(cur)}"></i>
+      ${iconImg(cur)}
+      <span class="t">${mmss(S.t)}</span>
+      <span class="n">${cur ? esc(cur.text) : (S.loaded ? '未开始' : 'sc2-overlay 待命')}</span>
+    </div>
+    <div class="divv"></div>
+    <div class="bq">${items || (S.loaded ? '' : '<span class="it">等待分析页推送播报脚本…</span>')}</div>`
+    + `<i class="bprog" style="width:${segProg(cur, nxt).toFixed(2)}%"></i>`;
+  return shellHTML(card);
+}
+
+function segProg(cur, nxt){
+  if (cur && nxt && nxt.t > cur.t) return Math.max(0, Math.min(1, (S.t - cur.t) / (nxt.t - cur.t))) * 100;
+  return S.t > 0 ? 100 : 0;
+}
+
+/** 双行：定长进度条（140px），下一步在第一行右侧 */
+function renderStack(){
+  const i = lastIdxAt(S.steps, S.t);
+  const cur = S.steps[i], nxt = S.steps[i + 1];
+  const nx = S.steps.slice(i + 2, i + 4);
+  const card = `<div class="st">
+      <div class="r1">
+        <i class="g" style="width:3px;height:16px;border-radius:2px;background:${KIND_COLOR(cur)}"></i>
+        ${iconImg(cur)}
+        <span class="t mono" style="font-size:16px;font-weight:700;color:var(--gold)">${mmss(S.t)}</span>
+        <span style="font-size:14px;font-weight:600">${cur ? esc(cur.text) : (S.loaded ? '未开始' : 'sc2-overlay 待命')}</span>
+        ${S.steps.length ? `<span class="mono" style="font-size:11px;color:var(--ink3)">${esc(S.player || '')} · ${i + 1}/${S.steps.length}</span>` : ''}
+        ${nxt ? `<span class="mono" style="margin-left:auto;font-size:11px;color:var(--ink2)">下一步 <b style="color:var(--gold)">${mmss(nxt.t)}</b> ${esc(nxt.text)}</span>` : ''}
+      </div>
+      <div class="r2">
+        <span class="stp"><i style="width:${segProg(cur, nxt).toFixed(2)}%"></i></span>
+        ${nx.map(s => `<span class="k">${mmss(s.t)} ${esc(s.text)}</span>`).join('')}
+      </div>
+    </div>`;
+  return shellHTML(card);
+}
+
+/** 竖向贴边 */
+function renderRail(){
+  const i = lastIdxAt(S.steps, S.t);
+  if (!S.steps.length) {
+    return shellHTML(`<div class="railrow"><span class="tm">--:--</span><span class="nm">等待分析页推送播报脚本…</span><span style="width:3px"></span></div>`);
+  }
+  const rows = S.steps.slice(Math.max(0, i - 1), i + 6).map((s, k) => {
+    const on = k === (i - Math.max(0, i - 1));
+    const col = KIND_COLOR(s);
+    return `<div class="railrow ${on ? 'on' : ''}">
+      <i class="g" style="background:${col}"></i>
+      ${iconImg(s)}
+      <span class="tm">${mmss(s.t)}</span>
+      <span class="nm">${esc(s.text)}</span>
+      <span style="width:3px"></span>
+    </div>`;
+  }).join('');
+  return shellHTML(rows + `<div class="railfoot">
+      <span>${esc(S.player || '')}</span><span>${i + 1} / ${S.steps.length}</span></div>`);
+}
+
+const RENDER = { bar: renderBar, stack: renderStack, rail: renderRail };
+
+/* ---------- 渲染：填满窗口（硬不变式 1） ---------- */
+function render(){
+  $('#overlay').innerHTML = RENDER[S.v]();
+}
+
+function endT(){
+  if (S.duration > 0) return S.duration;
+  return S.steps.length ? S.steps[S.steps.length - 1].t : 0;
+}
+
+/* ---------- 自走时钟：独立于分析网页（调研 §7.1） ---------- */
+function tick(){
+  if (!S.playing) return;
+  const end = endT();
+  S.t = S.base + (Date.now() - S.wall0) / 1000 * S.speed;
+  if (end > 0 && S.t >= end){ S.t = end; S.playing = false; }
+  render();
+}
+setInterval(tick, 90);
+
+function play(){
+  if (S.playing || !S.loaded) return;
+  if (endT() > 0 && S.t >= endT() - .5) S.t = 0;
+  S.base = S.t; S.wall0 = Date.now(); S.playing = true; render();
+}
+function pause(){
+  if (!S.playing) return;
+  S.base = S.t; S.playing = false; render();
+}
+function toggle(){ if (S.playing) { pause(); } else { play(); } }
+function seekBy(d){ seek(S.t + (+d || 0)); }
+function reset(){ S.t = 0; S.base = 0; S.playing = false; render(); }
+function seek(t){
+  S.t = Math.max(0, Math.min(endT(), +t || 0));
+  if (S.playing){ S.base = S.t; S.wall0 = Date.now(); }
+  render();
+}
+/** Go → 页：到手即从 0 开始播放。layout/plate 可选，缺省保持现状。 */
+function load(p){
+  p = p || {};
+  S.steps = Array.isArray(p.steps) ? p.steps : [];
+  S.duration = +p.duration || 0;
+  S.player = p.player || ''; S.race = p.race || '';
+  S.speed = +p.speed > 0 ? +p.speed : 1;
+  S.t = 0; S.base = 0; S.wall0 = Date.now();
+  S.loaded = S.steps.length > 0;
+  S.autostart = p.autostart || 'now';
+  S.playing = S.loaded && S.autostart !== 'foreground';
+  if (S.loaded){
+    if (p.plate) setPlate(p.plate, true);
+    setLayout(p.layout || S.v);
+  }
+  render();
+  notifyAutostart();
+  notifyLayout(S.v);
+}
+/** 版式切换：页面只管渲染，窗口尺寸由 exe 按规格表调整（硬不变式 2）。 */
+function setLayout(v){
+  if (!RENDER[v]) return;
+  S.v = v;
+  render();
+  notifyLayout(v);
+}
+function setPlate(p, silent){
+  if (p !== 'card' && p !== 'plain') return;
+  S.plate = p;
+  document.body.classList.toggle('plate-plain', p === 'plain');
+  if (!silent) render();
+}
+function setSpeed(x){
+  if (S.playing){ S.base = S.t; S.wall0 = Date.now(); }
+  S.speed = +x > 0 ? +x : 1;
+}
+function setOpacity(x){
+  S.opacity = Math.max(.3, Math.min(1, +x || .9));
+  const c = $('#ovCard');
+  if (c && S.plate !== 'plain') c.style.opacity = S.opacity;
+}
+function notifyAutostart(){
+  const app = window.go && window.go.main && window.go.main.App;
+  if (app && app.NotifyAutostart) app.NotifyAutostart(S.loaded && S.autostart === 'foreground');
+}
+function notifyLayout(v){
+  const app = window.go && window.go.main && window.go.main.App;
+  if (app && app.NotifyLayout) {
+    // 带上页面自报视口，便于和 Win32 矩形对账
+    app.NotifyLayout(v, document.documentElement.clientWidth, document.documentElement.clientHeight);
+  }
+}
+
+window.__overlay = { load, play, pause, reset, seek, seekBy, toggle, setLayout, setPlate, setOpacity, setSpeed };
+
+notifyLayout(S.v);
+render();
+</script>
+</body>
+</html>

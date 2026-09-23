@@ -44,9 +44,10 @@ python -m http.server 8080
 | [data.json](../data.json) | 单位 / 建筑 / 升级译名。**建造顺序的类别判定与中文名都依赖它**，缺了会退化成英文原名 |
 | [wasm/src/](../wasm/src) | Rust 侧（bzip2 解压等热点）；`wasm/pkg/` 是产物 |
 | [prototype/](../prototype) | **设计来源**：`data-lab.template.html` 是 `extract-lab-*.mjs` 的输入，`overlay-exe.html` 是悬浮窗视觉规格稿。⚠️ 不要删 |
+| [overlay/](../overlay) | **桌面悬浮组件 `sc2-overlay.exe`**（可选，Windows，Go + Wails v2 + WebView2）。M1 骨架已真机验收：置顶透明轴条 + 本地服务（`/health`、`POST /overlay`）+ 自走时钟。构建：`cd overlay && go build -tags desktop,production -o sc2-overlay.exe .`。详见下方「悬浮组件」一节 |
 | [tests/baseline/](../tests/baseline) | `ReplayData` 字段级对拍的金标准快照（含 `manifest.json`） |
 | [tests/screenshots-lab/](../tests/screenshots-lab) | 生产页面端到端验收的截图产物 |
-| [scripts/](../scripts) | codegen（`gen-*.py`）、基准生成、验收（`verify-*.mjs`）、**提取（`extract-lab-*.mjs`）** |
+| [scripts/](../scripts) | codegen（`gen-*.py`）、基准生成、验收（`verify-*.mjs`）、**提取（`extract-lab-*.mjs`）**、悬浮窗图标管线（`gen-overlay-icons.py`） |
 | [docs/](../docs) | 维护说明与调研报告 |
 
 ### `js/lab/views.js` 是**提取产物**，不是手写文件
@@ -122,6 +123,111 @@ python -m http.server 8080
   跑 `node scripts/research/probe-unit-name-coverage.mjs` 可核对全部样本的建造项是否都有译名与分类。
   ⚠️ 解析层若在单位名里拼入错误标注（如 spawningtool 的 `(Error on build time)`），
   `js/lab/data.js` 的 `cleanUnitName()` 会在查表与显示前剥掉它 —— 名表里永远不该出现带标注的键）
+
+## 悬浮组件（overlay/，开发中）
+
+方案调研与架构定稿见 [RESEARCH-ALWAYS-ON-TOP-OVERLAY.md](../docs/RESEARCH-ALWAYS-ON-TOP-OVERLAY.md)（§7 推荐架构）。
+分工原则：**网页负责「算」，组件负责「显示 + 走时钟」** —— 播报脚本一次性下发后组件独立运行。
+
+- **技术栈**：Go + Wails v2（WebView2），悬浮页 = `prototype/overlay-exe.html` 的运行态裁剪
+  （`overlay/frontend/dist/index.html`，视觉与规格稿同源；**改视觉先改规格稿再同步**）。
+- **接口契约**（只绑 127.0.0.1:18760）：`GET /health` → `{name, version, pid, capabilities}`；
+  `POST /overlay`（网页侧 `ovPush()` 实际调用的路径）与草案路径 `/overlay/load` 同语义；
+  `POST /overlay/control`（play/pause/reset/seek）；`DELETE /overlay` 卸载并隐藏。
+  载荷字段与 `prototype/data-lab.template.html` 的 `ovPush()` 逐字段对应。
+- **版式与底板（2026-09-23 v2 定稿，见 `prototype/overlay-exe.html` 头注释）**：
+  三种版式：`bar` 条形（**默认**，原「轴条+单行」合并：序列直接列出，620 逻辑像素紧凑宽、
+  贴主屏右上角）｜`stack` 双行（全宽×54，进度条定长 140px）｜`rail` 竖向贴边（168×208）。
+  两种底板：`card` 实底卡片（默认）｜`plain` 纯文字覆盖（Oopz/Discord 游戏内覆盖式：
+  无底板，文字多层阴影 + 图标投影直接浮在游戏上）。载荷字段 `layout` / `plate` 可选、缺省保持现状；
+  `steps[].icon` = 图标名（**素材已随 exe 内嵌**，缺图自动隐藏；名称→图标映射见下）。
+  页面 `setLayout()` 经绑定 `NotifyLayout(版式, cssW, cssH)` 通知 exe 调窗（硬不变式 2：
+  固定高版式的窗口高度=卡片高度；bar/rail 贴右锚定）。
+  **图标管线 `scripts/gen-overlay-icons.py`**（黑底 + 名称映射两个问题的统一解法）：
+  ① 素材 `assets/units/*.webp` 无 alpha 通道（黑底烙死），亮度→alpha 抠成真透明副本入
+  `overlay/frontend/dist/assets/units/`（与 sandbox.js 运行时抠图同一算法，页面零改动）；
+  ② 解析器/data.json 的单位名与图标文件名不同构（VikingFighter→Viking、LurkerMPEgg→Lurker、
+  TerranInfantryArmorsLevel1→TerranInfantryArmorLevel1、Armors 复数、后缀变体 Burrowed/SiegeMode/
+  Flying…），按「迭代剥后缀 + 显式别名 + 单位名前缀」解析出 `overlay/frontend/dist/icons.json`
+  （name→图标，194→233 条）。`--check` 模式校验映射与副本一致性。data.json 或素材变化后重跑。
+  剩余 ~28 个名称素材真缺（多为升级品与 Egg/Nuke/Changeling 等元单位），页面文本-only 降级，
+  补素材后重跑生成即可。
+  ⚠️ 已知限制：Windows 对窗口有最小高度地板（实测 ~64 物理像素 ≈ 36 逻辑），
+  bar 的 32 逻辑像素窗口高度会被顶住 —— 卡片仍按 32px 顶格渲染，下方是透明边，视觉无感。
+- **M3.5 同步与可用性（2026-09-23 深夜，实战对局验收）**：
+  - **游戏开始同步**：载荷新增 `autostart`（`now` 立即走表 / `foreground` 武装待命，SC2 从后台
+    切到前台那一刻从 0 起表）。⚠️ 按**边沿**触发：武装时 SC2 已在前台则不触发，需再有一次
+    「后台→前台」切换（比如从大厅点进对局的加载画面）。推送给已在 SC2 前台的场景请用立即开始
+    或手动 Alt+↑。startMode 的设计对齐 SCO（手动热键起表是精确路径，自动模式有加载期 ~10-20s 漂移，
+    可用 Alt+←/→ ±10s 修正）。
+  - **速度语义**：`speed` = 游戏速度倍率（Faster 1.4 / Fast 1.2 / Normal 1.0），悬浮窗时钟按
+    `1.4×墙钟` 推进 = 回放建造时间轴（Normal 基准）在 Faster 实战中的真实节奏。
+    **实测证据**：自定义 1v1 更快对局，起表后 HUD 时钟 Δ103s 期间悬浮窗 Δ100s（≈截图延迟）——
+    SC2 更快模式下 HUD 时钟本身就是 ~1.4×墙钟，悬浮窗显示口径与 HUD 一致
+    （调研文档 §7.2 转述的「LotV HUD 显示实时秒」与本机实测不符，以实测为准）。
+  - **网页侧 ovPush 已接**：`prototype/data-lab.template.html` 悬浮区新增 版式/底板/游戏速度/开始方式
+    四个选择器，`ovPush()` 按 `icons.json`（站点根目录，gen-overlay-icons.py 同时生成）把
+    `steps[].unit` 映射为图标字段；生产 `index.html` 标记同步；`extract-lab-views.mjs` 重跑自检通过。
+    ⚠️ 浏览器 e2e（verify-lab-page.mjs）在本机不可跑：脚本内 playwright import 是作者机器的
+    npx 缓存绝对路径，需要先在本机装 playwright 并改路径。
+  - **⚠️ LNA 探测已踩坑并修复（2026-09-23 实测，Edge 最新版）**：`targetAddressSpace: 'local'`
+    对 `127.0.0.1` 目标会被拒 —— 「Request had a target IP address space of 'local' yet the
+    resource is in address space 'loopback'」（声明 local 与实际 loopback 空间不匹配即 block）。
+    修复：`ovFetch()` 多模式依次尝试 [无声明 → loopback → local]，成功即记住；loopback 源页面
+    无声明直接可用。调研稿 §4.2 的 `'local'` 写法已过时，公网部署用 `'loopback'`。
+    exe 端 cors() 同时补 `Access-Control-Allow-Private-Network: true` 应答 PNA 预检。
+  - **⚠️ 全宽版式裁切**：stack 全宽时横向不吃拖动偏移（x 恒 0），否则右侧被裁出屏。
+  - **bug 修复：tickModes 早退饿死** —— followGame 分支曾提前 return，导致 onlyWhenGame 显隐与
+    autostart 起表在「跟随开启」时全部失效（同开三开关必现）。重构为单 pass：跟随/拖动识别/
+    武装起表/显隐四个关注点顺序执行互不短路。
+- **M3 已完成（2026-09-23，真机验收）**：
+  - **托盘**（`tray.go`，energye/systray + `app.ico`）：显示/隐藏、播放/暂停（Alt+↑ 同义）、
+    三个模式开关勾选（穿透/跟随/仅游戏内，与 `/overlay/style`、热键三入口共用同一 setter 并同步勾选态）、
+    重置位置、注册协议、退出。
+  - **全局热键**（`hotkey.go`）：`RegisterHotKey(hwnd=0)` + 独立协程 LockOSThread + GetMessage 泵
+    （hwnd=0 的 WM_HOTKEY 走线程队列，必须泵消息）。Alt+↑ 播放/暂停、Alt+↓ 重置、Alt+←/→ ±10s。
+    实测：SendKeys 发 Alt+↑ → toggle 执行 → SSE 广播回声。
+  - **SSE `/live` 状态回推**：调研稿的 WebSocket 以 SSE 等价实现（单向推送零依赖；
+    反向指令已有 control/style 端点）。事件：`ready`（连接应答，含模式与版本）、
+    `control`（play/pause/toggle/reset/seek/seekBy 回声，分析页据此镜像播放态）、
+    `mode`（三开关）、`game`（SC2 前台进出）、`script`（收到新播报脚本）。
+  - **单实例**：命名互斥锁 `Local\sc2-overlay-singleton`；第二次启动自动转发「显示」指令后退出。
+  - **`sc2overlay://` 协议**：托盘菜单写入 HKCU（无需管理员），协议链接由新进程转发给已有实例。
+  - 页面新增 `__overlay.toggle()` / `seekBy(d)`（热键与托盘的执行端）。
+- **M2 已完成（2026-09-23，真机验收）**：
+  - **可拖动**：`--wails-draggable:drag`，位置拖动后 2s 内写入 `%APPDATA%/sc2-overlay/config.json`，
+    重启还原；手动拖过之后版式切换只原地调宽高，不再自动锚定；`resetpos` 控制恢复默认右上角。
+  - **WS_EX_NOACTIVATE**（点击/拖动不抢前台焦点）+ **WS_EX_TOOLWINDOW**（不进任务栏/Alt+Tab）。
+  - **点击穿透**：`WS_EX_TRANSPARENT`（与 LAYERED 同用），`/overlay/style` 的 `clickThrough` 开关；
+    穿透状态下鼠标直接穿过悬浮窗、自然不可拖，关掉即可再拖。
+  - **SC2 前台检测**：`GetForegroundWindow` → 进程名匹配（`sc2_x64.exe` / `sc2.exe`）；
+    `onlyWhenGame` 开关 = 仅 SC2 在前台时显示，切走 2s 内自动隐藏（实测进出游戏切换正常）。
+    实现用了 2s 看护轮询而非 `SetWinEventHook` —— 隐藏/显示延迟 ≤2s 可接受，
+    若要即时响应再升级事件钩子（钩子需要独立消息循环线程，见调研 §3.4）。
+  - **跟随游戏窗口**：`followGame` 开关 = 悬浮窗跟随 SC2 窗口移动。**拖动优先**：
+    首次启用默认吸附游戏右上角（8 物理像素边距）；用户手动拖动后，以新位置重新捕获
+    「相对游戏右缘/上缘的偏移」并持久化，之后只有游戏窗口变化才跟着挪，不会抢用户摆放。
+  - 遗留：穿透/跟随/仅游戏内三个开关目前只有 HTTP 控制，托盘与全局热键切换在 M3。
+- **M1 已验收（2026-09-22，真机）**：置顶透明轴条、脚本下发后自走时钟独立推进、
+  seek 正确切换当前/下一步、中文渲染正常（**服务端校验 UTF-8**：中文 Windows 命令行管道会把
+  UTF-8 转成 GBK，Go 按 UTF-8 解码会静默变 U+FFFD，现在直接 400 拒绝）。
+- **已知坑（都已修，写下来防复发）**：
+  1. `go build` **必须带 `-tags desktop,production`**，否则运行时弹 Wails 错误框且服务不启动；
+  2. OnStartup 早期走 Wails `WindowSetSize`（逻辑像素）会被钳制到 ~135×36 —— 改用
+     `SetWindowPos` 物理像素直设（`win32.go`，DPI 用 `GetDpiForWindow` 换算），并在启动后 800ms 重断言一次；
+  3. **物理/逻辑单位不得混乘**：全宽版式直接用主屏物理宽（`App.screenPhysW`），若再乘 DPI scale
+     会请求 4480 宽、被系统钳到「工作区+边框」≈ 2588，产生 +28 漂移；版式尺寸（36/30/54/168/208）
+     是逻辑像素，必须乘 scale；
+  4. 同样的 `SetWindowPos` 在 HTTP goroutine 里调用精确生效；排查期间发现的读回漂移要以
+     `/debug/place` 端点 + 日志对账（页面自报 css 视口 vs Win32 矩形）；
+  5. WebView2 的辅助功能树会带出 Edge 浏览器进程的元素（标签页栏等），视觉上不存在，无影响；
+  6. **页面改动必须配真实截屏验收**（电脑控制截屏或 `shot-overlay.mjs`），只验窗口矩形抓不住
+     内容丢失 —— v2 重写时 `shellHTML()` 丢过 `${inner}`，卡片渲染但内容为空，空跑了一轮「空框」排查；
+  7. SC2 对局内实测悬浮窗渲染正常（客户端本就是「窗口模式(最大化)」）；「空框」曾被误判为
+     独占全屏合成问题，实为第 6 条的代码 bug —— 定位显示问题先截图看内容，再怀疑合成机制。
+- **待做**：M2 = `WS_EX_NOACTIVATE|TRANSPARENT|TOOLWINDOW`（点击穿透 / 不抢焦点 / 不进任务栏）、
+  SC2 前台检测（`SetWinEventHook`）、跟随游戏窗口；M3 = 全局热键（`RegisterHotKey`）、托盘 + 单实例、
+  WebSocket `/live` 状态回推、自定义协议唤起、代码签名。
 
 ## 数据流（简图）
 

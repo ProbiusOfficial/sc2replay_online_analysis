@@ -750,7 +750,7 @@ function voiceRebuild(){
   // 重建脚本（切样本 / 切播报对象 / 改筛选）不应打断正在进行的播报——
   // 保持 playing 状态，并把时间基准重锚到当前游标，避免进度跳变。
   const wasPlaying = V.playing, at = S.t;
-  V.steps = boList(rep().players[V.who]).map(it => ({ t: it.t, text: voText(it) }));
+  V.steps = boList(rep().players[V.who]).map(it => ({ t: it.t, text: voText(it), unit: it.unit || '' }));
   vStop();
   renderVoiceUi();
   syncBo();
@@ -840,12 +840,29 @@ function ovSet(state, text){
 
 /** 探测本地悬浮组件。Chrome 142+ 对「公网页面 → 环回地址」要求 LNA 授权， */
 /** 因此必须显式声明 targetAddressSpace:'local'，否则请求会静默失败。            */
+let ovMode = null, ovModeTried = false;
+const OV_MODES = [null, 'loopback', 'local'];
+async function ovFetch(path, opts = {}, timeoutMs = 1500){
+  const modes = ovModeTried ? [ovMode] : OV_MODES;
+  let lastErr = null;
+  for (const m of modes) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+      const init = { ...opts, signal: ac.signal };
+      if (m) init.targetAddressSpace = m;
+      const res = await fetch(OV_ORIGIN + path, init);
+      clearTimeout(timer);
+      ovMode = m; ovModeTried = true;
+      return res;
+    } catch (err) { lastErr = err; clearTimeout(timer); }
+  }
+  throw lastErr || new Error('fetch failed');
+}
 async function ovProbe(timeoutMs = 1500){
   ovSet('wait', '正在探测本地悬浮组件…');
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const res = await fetch(OV_ORIGIN + '/health', { signal: ac.signal, targetAddressSpace: 'local' });
+    const res = await ovFetch('/health');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const info = await res.json();
     ovSet('ok', `已连接本地悬浮组件 ${info.name || 'overlay-agent'} v${info.version || '?'}`);
@@ -856,23 +873,38 @@ async function ovProbe(timeoutMs = 1500){
       ? '本地网络访问被拒绝 —— 请在地址栏权限提示里允许访问本地网络后重试'
       : '未检测到本地悬浮组件');
     return false;
-  } finally { clearTimeout(timer); }
+  }
 }
 
 /** 把播报脚本推给本地组件（正式形态里这一步是唯一的跨进程数据入口）。 */
+let ovIconMap = null;
+async function ensureOvIcons(){
+  if (ovIconMap) return ovIconMap;
+  try {
+    const r = await fetch('icons.json');
+    if (r.ok) ovIconMap = await r.json();
+  } catch (_) {}
+  return ovIconMap || {};
+}
+
 async function ovPush(){
   const pl = rep().players[V.who];
+  const icons = await ensureOvIcons();
   const payload = {
     player: pl.name, race: pl.race, who: V.who,
     duration: rep().duration, file: rep().file,
-    rate: V.rate, lang: V.lang, speed: V.speed,
-    steps: V.steps.map(s => ({ t: s.t, text: s.text })),
+    rate: V.rate, lang: V.lang,
+    speed: parseFloat($('#ovSpeed').value) || 1.4,
+    layout: $('#ovLayout').value,
+    plate: $('#ovPlate').value,
+    autostart: $('#ovStart').value,
+    steps: V.steps.map(s => ({ t: s.t, text: s.text, icon: icons[s.unit] || '' })),
   };
-  const res = await fetch(OV_ORIGIN + '/overlay', {
-    method: 'POST', signal: AbortSignal.timeout(2000), targetAddressSpace: 'local',
+  const res = await ovFetch('/overlay', {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+  }, 2000);
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return payload.steps.length;
 }
@@ -934,7 +966,9 @@ $('#ovBtn').onclick = async () => {
   if (await ovProbe()) {
     try {
       const n = await ovPush();
-      ovSet('ok', `已推送到本地悬浮组件：${n} 条播报项`);
+      ovSet('ok', $('#ovStart').value === 'foreground'
+        ? `已推送 ${n} 项 —— 进入游戏后自动起表（速度随游戏速度）`
+        : `已推送到本地悬浮组件：${n} 条播报项，立即开始`);
     } catch (err) { ovSet('bad', '推送失败：' + (err?.message || err)); }
   } else {
     await openPip();

@@ -20,3 +20,7 @@ prototype/_legacy/
 # 路线 C（P1c）新增：冻结基线时缓存的上游依赖（sc2reader / spawningtool 的 sdist/wheel）。
 # 运行时不需要它 —— 验收基准 tests/baseline/*.json 已入仓。
 /.baseline-cache
+
+# 悬浮组件（overlay/）：Go 构建产物不入仓，源码与悬浮页入仓。
+/overlay/sc2-overlay.exe
+*.exe~
