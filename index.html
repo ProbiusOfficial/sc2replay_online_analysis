@@ -239,8 +239,14 @@
       <div class="vbset" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <label>版式 <select id="ovLayout"><option value="bar">条形</option><option value="stack">双行</option><option value="rail">侧边</option></select></label>
         <label>底板 <select id="ovPlate"><option value="plain">纯文字</option><option value="card">实底卡片</option></select></label>
-        <label>游戏速度 <select id="ovSpeed"><option value="1.4">Faster 1.4</option><option value="1.2">Fast 1.2</option><option value="1">Normal 1.0</option></select></label>
         <label>开始 <select id="ovStart"><option value="foreground">进游戏自动起表</option><option value="now">立即开始</option></select></label>
+        <details>
+          <summary style="cursor:pointer;font-size:11px;color:var(--ink3)" title="默认「与录像同速」即为 1:1，通常无需改动">校准</summary>
+          <div style="display:flex;flex-direction:column;gap:7px;align-items:flex-start;padding:7px 0 2px 15px">
+            <label>回放速度 <select id="ovSpeed"><option value="same">与录像同速（时钟 1:1）</option><option value="faster">Faster 1.4</option><option value="fast">Fast 1.2</option><option value="normal">Normal 1.0</option><option value="slow">Slow 0.8</option><option value="slower">Slower 0.6</option></select></label>
+            <div style="font-size:10.5px;color:var(--ink3);max-width:300px;line-height:1.5">悬浮窗时钟默认与游戏内时钟 1:1，无需改动。<br>只有你在 SC2 里手动调过回放速度（<b>+</b> / <b>-</b>）时才需要在这里对齐。</div>
+          </div>
+        </details>
       </div>
     </div>
    </div><!-- /.vbin -->

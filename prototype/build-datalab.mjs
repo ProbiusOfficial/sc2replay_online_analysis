@@ -10,28 +10,31 @@
 // Army / Losses 全部来自这一张表）。短名映射见 FIELD_MAP。
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
 const SAMPLE_DIR = join(REPO, "sampleTest");
+// ⚠️ Windows 上动态 `import()` 不能吃裸盘符绝对路径（`D:\...` 会报
+// ERR_UNSUPPORTED_ESM_URL_SCHEME），必须转成 file:// URL。
+const mod = (p) => pathToFileURL(join(REPO, p)).href;
 
-const { initSync } = await import(join(REPO, "wasm/pkg/compute.js"));
+const { initSync } = await import(mod("wasm/pkg/compute.js"));
 initSync({ module: readFileSync(join(REPO, "wasm/pkg/compute_bg.wasm")) });
 const { markComputeWasmReady, createWasmDecompressor } = await import(
-  join(REPO, "js/worker/decoder/decompressors.js")
+  mod("js/worker/decoder/decompressors.js")
 );
 markComputeWasmReady();
-const { openMpqArchive } = await import(join(REPO, "js/worker/decoder/mpq.js"));
+const { openMpqArchive } = await import(mod("js/worker/decoder/mpq.js"));
 const { probeBaseBuild, selectProtocolTables } = await import(
-  join(REPO, "js/worker/decoder/protocols/index.js")
+  mod("js/worker/decoder/protocols/index.js")
 );
 const {
   decodeReplayInitData,
   decodeReplayDetails,
   decodeReplayTrackerEvents,
-} = await import(join(REPO, "js/worker/decoder/events.js"));
-const { extractReplayData } = await import(join(REPO, "js/worker/decoder/replay_data.js"));
+} = await import(mod("js/worker/decoder/events.js"));
+const { extractReplayData } = await import(mod("js/worker/decoder/replay_data.js"));
 
 const short = (e) => e.slice(e.lastIndexOf(".") + 1);
 
@@ -249,6 +252,8 @@ for (const file of names) {
     file,
     map: meta.map_name,
     duration: round1(meta.game_length),
+    // 与生产 data.js 同名同义：16fps 游戏秒 → 时间轴秒。悬浮窗自走时钟要用它反推录像速度。
+    gameSecFactor: boScale,
     build: meta.client_version,
     region: meta.region,
     playedAt: meta.start_time,

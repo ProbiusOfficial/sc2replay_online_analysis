@@ -286,6 +286,13 @@ function toLabReplay(file, d) {
     file,
     map: d.map_name || "—",
     duration: d.game_length || 0,
+    /**
+     * 时间口径换算因子：`16fps 游戏秒 → 真实秒`（= 1 / 录像对局速度系数）。
+     * 本模型里 `buildOrder.t` / `chat.t` / `upgrades.dur` 都已乘过它，**不要再乘第二次**。
+     * 悬浮窗自走时钟要用它反推录像速度（`1 / gameSecFactor`），
+     * 才能算对「回放速度 ÷ 录像速度」这个对齐倍率 —— 见 `views.js::ovSpeedFactor()`。
+     */
+    gameSecFactor,
     build: d.client_version ?? "—",
     region: d.region || "—",
     playedAt: d.start_time ?? null,

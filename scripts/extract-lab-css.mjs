@@ -4,6 +4,11 @@
 // 手抄会引入无法察觉的偏差（少一个 var、少一条 hover）。提取是逐字节等价的。
 //
 //   node scripts/extract-lab-css.mjs
+//
+// ⚠️ 2026-09-23 实测：本脚本当前**必然 exit 1**（校验表里「.wrap 内容间距 26px」是过期期望，
+//    原型现状是 84px）。别急着把那条校验"修对"再跑 —— css/lab.css 里还含脚本产出之外的
+//    **手工沙盘样式**（body.sandboxview* / .wrap:fullscreen，原型里没有），一旦跑通就会静默丢掉。
+//    改样式请改原型再手工同步 lab.css；详见 docs/MAINTENANCE.md「注意事项」。
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

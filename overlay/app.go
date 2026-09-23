@@ -130,9 +130,11 @@ func (a *App) startup(ctx context.Context) {
 	}()
 	// 位置/模式看护：识别手动拖动并持久化 + 执行跟随/显隐模式。
 	// 低频轮询（2s）只为记忆位置与模式同步；不做 topmost 强夺 —— 调研 §3.2 明确反对轮询强置顶。
+	// 例外：`autostart=foreground` 武装待命期间改用高频轮询 —— 起表靠「SC2 进前台」的边沿，
+	// 2s 周期会让起表最多晚 2 秒，悬浮窗与游戏时钟从此整体错位（起表时刻无法事后补回）。
 	go func() {
 		for {
-			time.Sleep(2 * time.Second)
+			time.Sleep(a.modeTickInterval())
 			a.tickModes()
 		}
 	}()
@@ -319,15 +321,6 @@ func (a *App) handleControl(w http.ResponseWriter, r *http.Request) {
 	}
 	if c.Action == "resetpos" {
 		// 恢复默认锚定（清除手动拖动位置与配置文件；跟随偏移也重新捕获）
-		a.userMoved = false
-		a.followGapSet = false
-		a.deleteCfg()
-		a.placeWindow()
-		a.tickModes()
-		writeJSON(w, map[string]any{"ok": true, "rect": rectString(findOverlayWindow())})
-		return
-	}
-	if c.Action == "resetpos" {
 		a.resetPosition()
 		writeJSON(w, map[string]any{"ok": true, "rect": rectString(findOverlayWindow())})
 		return
@@ -457,7 +450,17 @@ func (a *App) handleDebugRect(w http.ResponseWriter, r *http.Request) {
 
 // ---- M2：跟随游戏窗口 + 仅游戏内显示（调研 §3.4）----
 
-// tickModes：看护协程每 2s 执行一次；模式开关变化后也会立即调用一次。
+// modeTickInterval：看护协程的轮询间隔。默认低频（2s）—— 位置记忆与模式同步不需要更密；
+// 但 `autostart=foreground` 武装待命时改用 250ms：这段窗口里唯一在等的是「SC2 进前台」的边沿，
+// 2s 周期会让起表最多晚 2 秒。每轮重新取，所以武装后立刻生效、起表后立刻回落。
+func (a *App) modeTickInterval() time.Duration {
+	if a.armedAutoStart {
+		return 250 * time.Millisecond
+	}
+	return 2 * time.Second
+}
+
+// tickModes：看护协程按 modeTickInterval 周期执行；模式开关变化后也会立即调用一次。
 func (a *App) tickModes() {
 	h := findOverlayWindow()
 	if h == 0 {

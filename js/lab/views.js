@@ -392,7 +392,10 @@ function drawChart(card){
   svg.innerHTML = g;
   card._geo = { W, H, pad, iw, ih, lo, hi, X, Y };
 
-  // 交互：移动即扫描
+  // 交互：点击 / 拖动才移动游标 —— 与顶部时间轴同一约定。
+  // ⚠️ 这里曾长期是「悬停即扫描」（pointermove 无条件 seek），当时的注释还写着「不要顺手统一」。
+  // 实测那是误触源：鼠标从图表上划过就把游标带跑，而且同一屏里时间轴点一下才动、图表飘一下就动，
+  // 两种手感互相打架。现已统一为拖动制，悬停**不得**改 S.t。
   if (!plot._bound){
     plot._bound = true;
     let down = false;
@@ -404,9 +407,15 @@ function drawChart(card){
       S.t = clamp((x - padL) / (usable - padL - padR) * rep().duration, 0, rep().duration);
       scheduleSync();
     };
-    plot.addEventListener('pointerdown', e => { down = true; try { plot.setPointerCapture(e.pointerId); } catch (_) {} seek(e); });
-    plot.addEventListener('pointermove', e => seek(e));
+    plot.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      down = true;
+      try { plot.setPointerCapture(e.pointerId); } catch (_) {}
+      seek(e);
+    });
+    plot.addEventListener('pointermove', e => { if (down) seek(e); });
     plot.addEventListener('pointerup', () => { down = false; });
+    plot.addEventListener('pointercancel', () => { down = false; });
     plot.addEventListener('pointerleave', () => { down = false; });
   }
 }
@@ -887,6 +896,28 @@ async function ensureOvIcons(){
   return ovIconMap || {};
 }
 
+/** SC2 官方对局速度系数（Liquipedia `Game_Speed` 的精确分数，Normal = 1 为基准）。 */
+const SC2_SPEED_FACTOR = {
+  slower: 2457 / 4096, slow: 3276 / 4096, normal: 1,
+  fast: 4915 / 4096, faster: 5734 / 4096,
+};
+
+/**
+ * 悬浮窗自走倍率 = 回放速度系数 ÷ 录像速度系数。
+ *
+ * ⚠️ 这里踩过一次坑：本页时间轴 `t` **已经是「真实秒」口径**
+ * （建造项已由 `start_time` 乘过 `gameSecFactor`，见构建脚本的 `boScale`），
+ * 而 SC2 游戏内时钟（小地图上方，LotV 起）同样按真实秒走 —— 所以
+ * **回放速度 = 录像速度时倍率必须正好是 1**，再乘一次 1.4 会让悬浮窗快 40%。
+ */
+function ovSpeedFactor(){
+  const g = rep().gameSecFactor || 1; // 游戏秒 → 真实秒
+  const rec = 1 / g;                  // 录像速度系数（由样本实测反推）
+  const key = $('#ovSpeed')?.value || 'same';
+  const pb = key === 'same' ? rec : (SC2_SPEED_FACTOR[key] ?? rec);
+  return +(pb * g).toFixed(4);
+}
+
 async function ovPush(){
   const pl = rep().players[V.who];
   const icons = await ensureOvIcons();
@@ -894,7 +925,7 @@ async function ovPush(){
     player: pl.name, race: pl.race, who: V.who,
     duration: rep().duration, file: rep().file,
     rate: V.rate, lang: V.lang,
-    speed: parseFloat($('#ovSpeed').value) || 1.4,
+    speed: ovSpeedFactor(),
     layout: $('#ovLayout').value,
     plate: $('#ovPlate').value,
     autostart: $('#ovStart').value,
@@ -967,8 +998,8 @@ $('#ovBtn').onclick = async () => {
     try {
       const n = await ovPush();
       ovSet('ok', $('#ovStart').value === 'foreground'
-        ? `已推送 ${n} 项 —— 进入游戏后自动起表（速度随游戏速度）`
-        : `已推送到本地悬浮组件：${n} 条播报项，立即开始`);
+        ? `已推送 ${n} 项 —— 进入游戏后自动起表（时钟 ×${ovSpeedFactor()}）`
+        : `已推送到本地悬浮组件：${n} 条播报项，立即开始（时钟 ×${ovSpeedFactor()}）`);
     } catch (err) { ovSet('bad', '推送失败：' + (err?.message || err)); }
   } else {
     await openPip();
