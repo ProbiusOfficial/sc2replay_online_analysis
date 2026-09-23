@@ -39,6 +39,7 @@ jobs:
         working-directory: overlay
     steps:
       - name: Disable autocrlf
+        working-directory: ${{ github.workspace }}
         run: git config --global core.autocrlf false
 
       - uses: actions/checkout@v4
