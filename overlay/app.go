@@ -437,12 +437,12 @@ func (a *App) handleDebugFG(w http.ResponseWriter, r *http.Request) {
 	var pid uint32
 	procGetWindowThreadProcessId.Call(fh, uintptr(unsafe.Pointer(&pid)))
 	writeJSON(w, map[string]any{
-		"fgSC2":       foregroundIsSC2(),
-		"fgPID":       pid,
-		"fgImage":     processImageName(pid),
-		"armed":       a.armedAutoStart,
-		"lastFG":      a.lastFG,
-		"gameWindow":  g,
+		"fgSC2":      foregroundIsSC2(),
+		"fgPID":      pid,
+		"fgImage":    processImageName(pid),
+		"armed":      a.armedAutoStart,
+		"lastFG":     a.lastFG,
+		"gameWindow": g,
 	})
 }
 
