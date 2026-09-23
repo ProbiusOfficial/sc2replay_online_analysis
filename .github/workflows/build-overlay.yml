@@ -88,9 +88,17 @@ jobs:
         if: steps.iconcheck.outputs.result != 'failure' && steps.gofmtcheck.outputs.result != 'failure'
         run: go vet ./...
 
-      - name: Build (desktop,production)
+      - name: Build (desktop,production, 精简符号)
         if: steps.iconcheck.outputs.result != 'failure' && steps.gofmtcheck.outputs.result != 'failure'
-        run: go build -trimpath -tags desktop,production -o sc2-overlay.exe .
+        run: go build -trimpath -ldflags "-s -w" -tags desktop,production -o sc2-overlay.exe .
+
+      - name: Install UPX
+        if: steps.iconcheck.outputs.result != 'failure' && steps.gofmtcheck.outputs.result != 'failure'
+        run: choco install upx -y --no-progress
+
+      - name: UPX pack (体积 ~16MB → ~8MB)
+        if: steps.iconcheck.outputs.result != 'failure' && steps.gofmtcheck.outputs.result != 'failure'
+        run: upx --best --lzma sc2-overlay.exe
 
       # 真实冒烟：启动进程，探测本地服务与 WebView2 页面是否就绪。
       # CI 桌面会话差异导致的偶发失败不阻塞流水线，但会在结果里可见（⚠️）。

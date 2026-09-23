@@ -111,10 +111,12 @@ python -m http.server 8080
 
 ```bash
 cd overlay
-go build -tags desktop,production -o sc2-overlay.exe .
+go build -trimpath -ldflags "-s -w" -tags desktop,production -o sc2-overlay.exe .
+# 可选：UPX 进一步压缩（16MB → 8MB，代价是杀软误报率略升）
+upx --best --lzma sc2-overlay.exe
 ```
 
-依赖：Go 1.24+、Windows 10+（WebView2 运行时）。**必须带 `-tags desktop,production`**，裸 `go build` 会弹出 Wails 错误框。
+依赖：Go 1.24+、Windows 10+（WebView2 运行时）。**必须带 `-tags desktop,production`**，裸 `go build` 会弹出 Wails 错误框。CI 构建自动完成符号精简与 UPX 压缩，发布体积约 8MB。
 
 ### 图标资源管线
 
