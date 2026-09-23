@@ -63,13 +63,12 @@ jobs:
           exit $st
 
       - name: Verify gofmt
+        id: gofmtcheck
+        continue-on-error: true
         run: |
-          dirty=$(gofmt -l .)
-          if [ -n "$dirty" ]; then
-            echo "需要 gofmt 的文件: $dirty"
-            gofmt -d .
-            exit 1
-          fi
+          go version
+          gofmt -d . > ../gofmt.diff || true
+          test ! -s ../gofmt.diff
 
       - name: Vet
         run: go vet ./...
@@ -106,6 +105,7 @@ jobs:
           mkdir -p ../download
           cp sc2-overlay.exe ../download/sc2-overlay.exe
           [ -f icon-check.log ] && cp icon-check.log ../download/icon-check.log || true
+          [ -s ../gofmt.diff ] && cp ../gofmt.diff ../download/gofmt.diff || true
           {
             echo "build: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
             echo "commit: ${GITHUB_SHA}"
@@ -131,4 +131,10 @@ jobs:
         if: steps.iconcheck.outcome == 'failure'
         run: |
           cat icon-check.log 2>/dev/null || true
+          exit 1
+
+      - name: Gate on gofmt
+        if: steps.gofmtcheck.outcome == 'failure'
+        run: |
+          cat ../gofmt.diff 2>/dev/null || true
           exit 1
