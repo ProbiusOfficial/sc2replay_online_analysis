@@ -48,10 +48,19 @@ jobs:
           python-version: "3.12"
 
       - name: Verify icon mapping consistency
+        id: iconcheck
+        continue-on-error: true
         working-directory: ${{ github.workspace }}
         run: |
           python -m pip install --quiet pillow
-          python scripts/gen-overlay-icons.py --check
+          set -o pipefail
+          python scripts/gen-overlay-icons.py --check 2>&1 | tee icon-check.log
+          st=${PIPESTATUS[0]}
+          if [ $st -ne 0 ]; then
+            mkdir -p download
+            cp icon-check.log download/icon-check.log
+          fi
+          exit $st
 
       - name: Verify gofmt
         run: |
@@ -96,6 +105,7 @@ jobs:
         run: |
           mkdir -p ../download
           cp sc2-overlay.exe ../download/sc2-overlay.exe
+          [ -f icon-check.log ] && cp icon-check.log ../download/icon-check.log || true
           {
             echo "build: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
             echo "commit: ${GITHUB_SHA}"
@@ -116,3 +126,9 @@ jobs:
           name: sc2-overlay-windows
           path: overlay/sc2-overlay.exe
           if-no-files-found: error
+
+      - name: Gate on icon check
+        if: steps.iconcheck.outcome == 'failure'
+        run: |
+          cat icon-check.log 2>/dev/null || true
+          exit 1
