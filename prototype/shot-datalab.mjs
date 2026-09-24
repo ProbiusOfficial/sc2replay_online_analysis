@@ -130,10 +130,13 @@ const vinfo = await page.evaluate(() => ({
 }));
 console.log("④ 播报脚本:", JSON.stringify(vinfo));
 
-// 6× 倍速跑，让游标真的推进，再验状态机
-await page.selectOption("#vbSpeed", "8");
+// 最快的「游戏倍率」跑，让游标真的推进，再验状态机。
+// ⚠️ 倍速控件换过：旧的 #vbSpeed（1/2/4/8×）已拆成 #ovSpeed（游戏倍率，最快 1.4）+ #vbRate（TTS 语速）。
+// 首条播报在 2.14s，1.4× 下 1.8s 内念不到 —— 要等 V.spoken ≥ 0（-1 = 还没开口）而不是死等。
+await page.selectOption("#ovSpeed", "faster");
 await page.click("#vbPlay");
-await page.waitForTimeout(1800);
+await page.waitForFunction(() => V.spoken >= 0, null, { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(200);
 const playing = await page.evaluate(() => ({
   playing: V.playing,
   t: Math.round(S.t * 10) / 10,

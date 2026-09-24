@@ -42,9 +42,9 @@ const REQUIRED_IDS = [
   "viewSeg", "modeSeg", "btnCsv", "samples", "head", "clock", "tl", "tlsvg", "evlay", "tlcl",
   "tllegend", "readouts", "side", "charts", "boFilter", "bo", "boView", "tblInfo", "tblSeg", "tbl",
   "sandboxView", "sbStage", "sbCanvas", "sbPlay", "sbSpeed", "sbWorkers", "sbLegend", "sbPanelA", "sbPanelB", "sbRes", "sbIso", "sbHudOpts",
-  "vb", "vbClock", "vbQueue", "vbProg", "vbPlay", "vbReset", "vbWho", "vbSpeed", "vbRate", "vbLang",
+  "vb", "vbClock", "vbQueue", "vbProg", "vbPlay", "vbReset", "vbWho", "vbRate", "vbLang",
   "ovDot", "ovTxt", "ovBtn", "initStatus", "initProgress", "dropZone", "fileInput", "loading",
-  "loadingText", "error", "result", "pickMore", "railNote",
+  "loadingText", "error", "result", "railNote",
 ];
 const missing = await page.evaluate(
   (ids) => ids.filter((id) => !document.getElementById(id)),
@@ -65,7 +65,8 @@ await page.waitForTimeout(600);
 console.log(`  ✓ 完成，耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
 const loaded = await page.evaluate(() => ({
-  files: [...document.querySelectorAll("#samples .smp")].map((b) => b.querySelector("b")?.textContent),
+  files: [...document.querySelectorAll("#samples .smp:not(#pickMore)")].map((b) => b.querySelector("b")?.textContent),
+  pickMore: !!document.querySelector("#pickMore"), // 「＋ 添加录像」卡由 renderSamples 在有数据后才渲染
   note: document.querySelector("#railNote")?.textContent,
   charts: document.querySelectorAll("#charts .card").length,
   chartMetrics: [...document.querySelectorAll("#charts .card")].map((c) => c._m?.id).filter(Boolean).length,
@@ -87,6 +88,7 @@ console.log("  " + JSON.stringify(loaded));
 // 默认只开「核心 6 项」（DEFAULT_ON），不是 28 —— 28 在「全选」时才出现
 const DEFAULT_ON_COUNT = 6;
 if (loaded.files.length !== SAMPLES.length) errors.push(`录像列表 ${loaded.files.length} ≠ 拖入 ${SAMPLES.length}`);
+if (!loaded.pickMore) errors.push("录像列表缺少「＋ 添加录像」卡（#pickMore）");
 if (loaded.charts !== DEFAULT_ON_COUNT) errors.push(`默认图表数 ${loaded.charts} ≠ ${DEFAULT_ON_COUNT}`);
 if (loaded.chartMetrics !== loaded.charts) errors.push("有图表卡片没绑定指标定义（_m 缺失）");
 if (loaded.groups !== 7) errors.push(`左侧指标分组数 ${loaded.groups} ≠ 7`);
@@ -101,65 +103,60 @@ if (!loaded.debugHandle) errors.push("window.__lab 调试句柄未挂上");
 if (loaded.voiceSteps <= 0) errors.push("播报脚本为空（__lab.voice.steps）");
 
 const perReplay = await page.evaluate(() =>
-  [...document.querySelectorAll("#samples .smp")].map((b) => b.innerText.replace(/\n/g, " | ")),
+  [...document.querySelectorAll("#samples .smp:not(#pickMore)")].map((b) => b.innerText.replace(/\n/g, " | ")),
 );
 console.log("  录像列表：");
 for (const s of perReplay) console.log("    " + s);
 
 /* ---------------- 2b. 布局契约 ---------------- */
-step("2b", "布局契约（底部条与主体对齐 / 录像列表侧边栏 / 页脚不被遮）");
-// 所有几何判据都在「滚到页面最底」时测 —— 否则量到的是中途状态，遮挡判据不可信
+step("2b", "布局契约（播报面板嵌在侧栏里 / 录像列表侧边栏 / 滚到最底不被裁）");
+// 所有几何判据都在「滚到页面最底」时测 —— 否则量到的是中途状态，几何判据不可信
 await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 await page.waitForTimeout(350);
+// ⚠️ 底栏重做（9b448f7）后：#vb 不再是横跨视口的固定条，而是 .rail（录像列表侧栏）里的播报面板。
+// 本节原先的三条判据随之作废，lab.css 里留了台账：
+//   「这里原本有一层 .vb / .vbin 外壳（…1920 屏上条内容曾比主体左边缘偏 142px），
+//     以及一套 --vbh 底部留白机制。条没了，留白回到定义系统里的 26px，--vbh 也不再需要。」
+// → 旧判据（条贴视口底 / .vbin 与 .wrap 左缘对齐 0px / --vbh 由 JS 写入）已删；
+//   现在要守的是：面板确实嵌在侧栏里、滚到最底时整块仍可见、吸顶侧栏不超出视口。
 const layout = await page.evaluate(() => {
   const round = (v) => Math.round(v);
+  const rect = (el) => (el ? el.getBoundingClientRect() : null);
   const vb = document.querySelector("#vb");
-  const vbr = vb.getBoundingClientRect();
-  const contentLeft = (el) =>
-    el ? round(el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft)) : null;
-  // 用**内容盒**底边：页脚自己带一圈 padding 当底部留白，那圈空白落在条后面不算遮挡
-  const coveredBy = (el) => {
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    if (r.height === 0) return null;
-    const padB = parseFloat(getComputedStyle(el).paddingBottom) || 0;
-    return round(r.bottom - padB - vbr.top);
-  };
+  const vbr = rect(vb);
   const rail = document.querySelector(".rail");
+  const railr = rect(rail);
   const samples = document.querySelector("#samples");
   return {
-    vbBottom: round(vbr.bottom),
     innerH: innerHeight,
     innerW: innerWidth,
-    alignDiff: contentLeft(document.querySelector(".vbin")) - contentLeft(document.querySelector(".wrap")),
-    railW: rail ? round(rail.getBoundingClientRect().width) : null,
+    vbTop: round(vbr.top),
+    vbBottom: round(vbr.bottom),
+    vbW: round(vbr.width),
+    vbInsideRail: !!rail && rail.contains(vb),
+    railBottom: railr ? round(railr.bottom) : null,
+    railW: railr ? round(railr.width) : null,
     railSticky: rail ? getComputedStyle(rail).position : null,
     samplesDir: samples ? getComputedStyle(samples).flexDirection : null,
     samplesOverflowY: samples ? getComputedStyle(samples).overflowY : null,
-    vbh: getComputedStyle(document.documentElement).getPropertyValue("--vbh").trim(),
-    covered: {
-      footer: coveredBy(document.querySelector("footer")),
-      rail: coveredBy(rail),
-      side: coveredBy(document.querySelector("#side")),
-    },
     atBottom: Math.abs(scrollY + innerHeight - document.documentElement.scrollHeight) <= 2,
   };
 });
 console.log("  " + JSON.stringify(layout));
-if (layout.vbBottom !== layout.innerH) errors.push("底部播报条没有贴住视口底部");
-// 下面这条是最初的缺陷：.vb 横跨视口、内容却从视口左缘起排，与居中的 .wrap 错位（1920 屏偏 142px）
-if (layout.alignDiff !== 0) errors.push(`底部播报条与主体左边缘错位 ${layout.alignDiff}px`);
+if (!layout.atBottom) errors.push("未能滚到页面最底，几何判据不可信");
+if (!layout.vbInsideRail) errors.push("#vb 不再是 .rail 内的播报面板（底栏重做后应嵌在侧栏里）");
+if (layout.vbTop < 0 || layout.vbBottom > layout.innerH + 1) {
+  errors.push(`滚到页面最底时播报面板不在视口内（top=${layout.vbTop} bottom=${layout.vbBottom} 视口高=${layout.innerH}）`);
+}
+if (layout.railBottom != null && layout.railBottom > layout.innerH + 1) {
+  errors.push(`滚到最底时录像列表侧栏底部超出视口 ${layout.railBottom - layout.innerH}px（吸顶容器过高，面板会被裁掉）`);
+}
 if (layout.innerW > 1180) {
   if (layout.railW !== 236) errors.push(`录像列表侧栏宽度 ${layout.railW} ≠ 236`);
   if (layout.railSticky !== "sticky") errors.push(`录像列表侧栏未吸顶（position=${layout.railSticky}）`);
   if (layout.samplesDir !== "column") errors.push(`录像列表不是竖排（flex-direction=${layout.samplesDir}）`);
 }
 if (layout.samplesOverflowY !== "auto") errors.push(`录像列表缺少竖向溢出策略（overflow-y=${layout.samplesOverflowY}）`);
-if (!layout.vbh) errors.push("--vbh 未由 JS 写入（底部留白会退回 fallback，页脚可能被遮）");
-if (!layout.atBottom) errors.push("未能滚到页面最底，遮挡判据不可信");
-for (const [k, v] of Object.entries(layout.covered)) {
-  if (v != null && v > 0) errors.push(`滚到页面最底时 ${k} 被底部播报条盖住 ${v}px`);
-}
 await page.screenshot({ path: join(SHOTS, "01b-layout-bottom.png") });
 await page.evaluate(() => window.scrollTo(0, 0));
 await page.waitForTimeout(250);
@@ -215,7 +212,7 @@ await page.waitForTimeout(400);
 step(3, `逐份切换（共 ${SAMPLES.length} 份，验证跨样本重建）`);
 const perFile = [];
 for (let i = 0; i < SAMPLES.length; i++) {
-  await page.locator("#samples .smp").nth(i).click();
+  await page.locator("#samples .smp:not(#pickMore)").nth(i).click();
   await page.waitForTimeout(350);
   const d = await page.evaluate(() => {
     const cards = [...document.querySelectorAll("#charts .card")].filter((c) => c._geo);
@@ -241,14 +238,22 @@ for (let i = 0; i < SAMPLES.length; i++) {
 }
 
 /* ---------------- 4. 游标联动 ---------------- */
-step(4, "游标联动（图表 hover → 时间轴 / 读数 / 采样表）");
-await page.locator("#samples .smp").nth(0).click();
+step(4, "游标联动（在图表上拖动 → 时间轴 / 读数 / 采样表）");
+await page.locator("#samples .smp:not(#pickMore)").nth(0).click();
 await page.waitForTimeout(300);
 const card = page.locator("#charts > .card").first();
 await card.scrollIntoViewIfNeeded();
 await page.waitForTimeout(200);
 const box = await card.locator(".plot").boundingBox();
-await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5, { steps: 5 });
+// ⚠️ 图表与时间轴已统一为「按下才动」制（views.js 里写明「悬停**不得**改 S.t」，与 §4b 同一约定）。
+// 这条判据原先测的是 hover，会跟新约定互相打架 —— 但它的本意（图表 → 时间轴/读数/采样表联动）
+// 不能丢，所以改成按住拖动，并顺带断言拖动过程中不会把刻度文字选中。
+await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.5);
+await page.mouse.down();
+await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.5, { steps: 8 });
+const selDuringDrag = await page.evaluate(() => window.getSelection().toString());
+await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5, { steps: 4 });
+await page.mouse.up();
 await page.waitForTimeout(300);
 const cur = await page.evaluate(() => ({
   clock: document.querySelector("#clock").textContent.trim(),
@@ -256,8 +261,10 @@ const cur = await page.evaluate(() => ({
   cursorLeft: document.querySelector("#tlcl").style.left,
 }));
 console.log("  " + JSON.stringify(cur));
-if (cur.clock.startsWith("00:00")) errors.push("hover 图表未推进游标（时钟仍是 00:00）");
-if (!cur.tblOn) errors.push("hover 后采样表没有高亮行");
+if (cur.clock.startsWith("00:00")) errors.push("在图表上拖动未推进游标（时钟仍是 00:00）");
+if (!cur.tblOn) errors.push("拖动后采样表没有高亮行");
+// 回归：在图表上拖动曾是「选中刻度文字」的 bug（`.plot` 缺 user-select:none）
+if (selDuringDrag) errors.push(`在图表上拖动选中了文字：${JSON.stringify(selDuringDrag.slice(0, 40))}`);
 await page.screenshot({ path: join(SHOTS, "01-data-view.png") });
 
 /* ---------------- 4b. 时间轴点击制 ---------------- */
@@ -341,7 +348,7 @@ if (boRows > 5) {
   // 老录像（HotS 2018，Eastwatch LE）专项：译名走基础表，状态名不得泄漏。
   // 曾经 buildZhIndex 把 change 表（状态名，如「兵营落地」）放在基础表之后展平，
   // 同名键被状态名覆盖 —— 探宝一眼看到兵营行显示「兵营落地」。
-  await page.click("#samples .smp:nth-child(4)");
+  await page.locator("#samples .smp:not(#pickMore)").nth(3).click();
   await page.waitForTimeout(500);
   const oldBo = await page.evaluate(() => {
     const txt = document.querySelector("#bo").innerText;
@@ -350,7 +357,7 @@ if (boRows > 5) {
       hasStateNames: /落地|起飞/.test(txt),
       hasErrorNotes: /Error on build time|upgrade missing/.test(txt),
       hasDerelictNicknames: /火蟑螂|眼虫|三本|二本|地刺|大龙(?!塔)|毒爆(?=虫?[^发])/.test(txt),
-      sample: document.querySelector("#samples .smp:nth-child(4) span")?.textContent,
+      sample: document.querySelectorAll("#samples .smp:not(#pickMore)")[3]?.querySelector("span")?.textContent,
     };
   });
   console.log("  老录像（HotS）→ " + JSON.stringify(oldBo));
@@ -359,13 +366,13 @@ if (boRows > 5) {
   if (oldBo.hasErrorNotes) errors.push("老录像建造顺序出现解析错误标注（Error on build time / upgrade missing）");
   if (oldBo.hasDerelictNicknames) errors.push("老录像建造顺序出现社区俗称（应使用正式译名）");
   await page.click('#viewSeg button[data-view="data"]');
-  await page.click("#samples .smp:nth-child(1)");
+  await page.locator("#samples .smp:not(#pickMore)").nth(0).click();
   await page.waitForTimeout(400);
 }
 
 /* ---------------- 6b. 对局聊天视图 ---------------- */
 step("6b", "对局聊天视图");
-await page.click("#samples .smp:nth-child(2)"); // CN_ZVP：15 条真实聊天
+await page.locator("#samples .smp:not(#pickMore)").nth(1).click(); // CN_ZVP：15 条真实聊天
 await page.waitForTimeout(400);
 await page.click('#viewSeg button[data-view="chat"]');
 await page.waitForTimeout(400);
@@ -391,13 +398,13 @@ const gotSec = mm ? +mm[1] * 60 + +mm[2] : -1;
 console.log(`  点击「${clicked.text}」（${clicked.t}s）→ ${chatClock}`);
 if (Math.abs(gotSec - clicked.t) > 2) errors.push(`点击聊天消息未定位时间轴（期望 ${clicked.t}s，得到 ${chatClock}）`);
 // 空态：无聊天录像应显示占位文案
-await page.click("#samples .smp:nth-child(1)"); // CN_PVT：0 条
+await page.locator("#samples .smp:not(#pickMore)").nth(0).click(); // CN_PVT：0 条
 await page.waitForTimeout(400);
 const emptyChat = await page.evaluate(() => document.querySelector("#chatList").innerText);
 console.log("  空态 → " + JSON.stringify(emptyChat));
 if (!/没有聊天消息/.test(emptyChat)) errors.push("无聊天录像未显示空态文案");
 await page.click('#viewSeg button[data-view="data"]');
-await page.click("#samples .smp:nth-child(1)");
+await page.locator("#samples .smp:not(#pickMore)").nth(0).click();
 await page.waitForTimeout(300);
 
 /* ---------------- 7. 语音播报 ---------------- */
@@ -409,9 +416,13 @@ const voice = await page.evaluate(() => ({
 }));
 console.log("  " + JSON.stringify(voice));
 if (voice.steps === 0) errors.push("播报脚本 0 项");
-await page.selectOption("#vbSpeed", "8");
+// 倍速控件已随底栏重做换过：旧的 #vbSpeed（1/2/4/8×）被拆成「游戏倍率 #ovSpeed（对齐游戏内时钟）」
+// +「语速 #vbRate（TTS 1~4）」，最快档是 faster(1.4)。旧脚本靠 8× 在 1.6s 内跳过首项（首项 2.14s），
+// 现在最快只有 1.4×，所以要显式等「首项已被念到」——V.spoken 是「已念到第几项」的游标，-1 = 还没开口。
+await page.selectOption("#ovSpeed", "faster");
 await page.click("#vbPlay");
-await page.waitForTimeout(1600);
+await page.waitForFunction(() => (window.__lab?.voice?.spoken ?? -1) >= 0, null, { timeout: 15000 }).catch(() => {});
+await page.waitForTimeout(300);
 const playing = await page.evaluate(() => ({
   playing: window.__lab.voice.playing,
   t: Math.round(window.__lab.state.t),
