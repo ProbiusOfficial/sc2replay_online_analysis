@@ -602,6 +602,9 @@ function drawChart(card){
     };
     plot.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
+      // 防选中：CSS 上 .plot 已加 user-select:none（实测已足够），这里再拦一层 ——
+      // pointerdown 的默认动作会派生 mousedown，拦掉它对 user-select 支持不全的浏览器同样生效。
+      e.preventDefault();
       down = true;
       try { plot.setPointerCapture(e.pointerId); } catch (_) {}
       seek(e);

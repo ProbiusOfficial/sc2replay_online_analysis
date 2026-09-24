@@ -142,7 +142,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 .curread{display:flex;gap:14px;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
 .curread .v{display:flex;align-items:center;gap:5px}
 .curread .v i{width:7px;height:7px;border-radius:2px}
-.plot{position:relative;padding:6px 12px 8px;cursor:crosshair}
+/* user-select:none —— 图表是「按住拖动」扫游标的，拖到刻度文字上会把文字选中（同 .tl） */
+.plot{position:relative;padding:6px 12px 8px;cursor:crosshair;user-select:none;-webkit-user-select:none}
 .plot svg{display:block;width:100%}
 .plot .cl{position:absolute;top:6px;bottom:8px;width:1px;background:var(--ink);opacity:.32;pointer-events:none}
 .plot .dot{position:absolute;width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;pointer-events:none;
@@ -1108,6 +1109,9 @@ function drawChart(card){
     };
     plot.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
+      // 防选中：CSS 上 .plot 已加 user-select:none（实测已足够），这里再拦一层 ——
+      // pointerdown 的默认动作会派生 mousedown，拦掉它对 user-select 支持不全的浏览器同样生效。
+      e.preventDefault();
       down = true;
       try { plot.setPointerCapture(e.pointerId); } catch (_) {}
       seek(e);
