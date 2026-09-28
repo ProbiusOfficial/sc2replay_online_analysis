@@ -27,7 +27,11 @@
  */
 
 import { appState } from "../state.js";
-import { BUILD_TIMES } from "../worker/decoder/data/build_times.generated.js";
+import {
+  BUILD_TIMES,
+  GAME_LOOPS_PER_SECOND,
+  SPAWNINGTOOL_FRAMES_PER_SECOND,
+} from "../worker/decoder/data/build_times.generated.js";
 import { iconKey, hasIcon, upgradeIconKey, hasUpgradeIcon } from "./unit_icons.js";
 
 /** 39 个计分字段的短名。**必须与原型 `build-datalab.mjs` 的 `FIELD_MAP` 完全一致。** */
@@ -144,6 +148,12 @@ function hasIn(table, name) {
   if (!tr || !name) return false;
   const target = String(name).toLowerCase();
   return Object.keys(tr[table] ?? {}).some((k) => k.toLowerCase() === target);
+}
+
+/** 单位/建筑/科技名 → 中文短查(沙盘 HUD tooltip 用);名表未就绪时回退英文原名。 */
+export function zhName(name) {
+  zhIndex ??= buildZhIndex();
+  return zhIndex.get(String(name).toLowerCase()) ?? name;
 }
 
 /**
@@ -331,9 +341,13 @@ function toLabReplay(file, d) {
     sandbox: d.sandbox ?? null,
     /**
      * 科技升级时间线（`ReplayData.upgrades` + `zh` 中文名 + `dur` 研究时长实秒）。
-     * `dur` 优先取 worker 的 `BUILD_TIMES[name].loops`（精确研究帧数 ÷16 = 16fps 游戏秒，
-     * 实测 PersonalCloaking：完成 20943 − 1926.4 = 19016.6 ≈ 原站下令帧 19017），
-     * 缺项回落 data.json 升级表的 `time`。用于沙盘 HUD 的「研究中的科技」进度条：
+     * `dur` 统一换算成帧再落地：`帧 ÷ GAME_LOOPS_PER_SECOND = 16fps 游戏秒`，再
+     * ×`gameSecFactor` 才是实秒。两个来源都是帧——
+     * - `BUILD_TIMES[name].loops`：⚠️ 是 **16fps 游戏帧**不是秒（实测 PersonalCloaking：
+     *   完成帧 20943 − 1926.4 = 19016.6 ≈ 原站下令帧 19017），漏除 16 会把研究时长放大
+     *   16 倍，进度条全程卡在 94%+ 不动；
+     * - data.json 升级表的 `time`：spawningtool 的「显示秒」= `帧 / 22.4`（Faster 档实秒），
+     *   先 ×22.4 还原成帧，与上者走同一条换算。
      * 原始事件只有完成时刻，进行中区间 = [完成−时长, 完成)。
      * 含 `Spray / RewardDance / GameHeartActive` 等噪声行 —— 由沙盘 HUD 过滤展示。
      */
@@ -342,14 +356,14 @@ function toLabReplay(file, d) {
       const tr = appState.translationData?.upgrade ?? {};
       const rec = tr[name] ?? tr[name.toLowerCase()] ?? null;
       const loops = BUILD_TIMES[name] && BUILD_TIMES[name].type === "Upgrade" ? BUILD_TIMES[name].loops : null;
-      const dur16 = loops ?? (rec && typeof rec.time === "number" ? rec.time : null);
+      const frames = loops ?? (rec && typeof rec.time === "number" ? rec.time * SPAWNINGTOOL_FRAMES_PER_SECOND : null);
       return {
         p: u.pid,
         n: u.name,
         t: u.time,
         count: u.count ?? 1,
         zh: zhIndex.get(name.toLowerCase()) ?? u.name,
-        dur: dur16 != null ? Math.max(1, dur16 * gameSecFactor) : null,
+        dur: frames != null ? Math.max(1, (frames / GAME_LOOPS_PER_SECOND) * gameSecFactor) : null,
       };
     }),
     /** 逐秒 APM/EPM 桶 + 镜头轨迹（`ReplayData.tracks` 原样透传）。 */

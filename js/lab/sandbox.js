@@ -41,6 +41,7 @@
    ============================================================================ */
 
 import { labState, sandboxSeek, focusReplay } from "./views.js";
+import { zhName } from "./data.js";
 import { ICON_DIR, iconKey, hasIcon, hasIconKey, hasUpgradeIcon, upgradeIconKey } from "./unit_icons.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -620,7 +621,7 @@ function computeHud(t) {
       slot.units++;
       slot.comp.set(n, (slot.comp.get(n) ?? 0) + 1);
     }
-    if (t - u.b <= 12) slot.recent.push({ n, w: isW, k: 1 - (t - u.b) / 12 });
+    if (t - u.b <= 12) slot.recent.push({ n, w: isW, k: 1 - (t - u.b) / 12, b: u.b });
   }
   return out;
 }
@@ -628,8 +629,71 @@ function computeHud(t) {
 function chipRow(map, max = 10) {
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1]).slice(0, max)
-    .map(([n, cnt]) => `<span class="chip" title="${esc(n)}">${hasIcon(n) ? `<img src="${ICON_DIR}/${iconKey(n)}.webp" alt="">` : ""}${cnt}</span>`)
+    .map(([n, cnt]) => `<span class="chip" data-tip="${esc(zhName(n))}" data-sub="${esc(n)} · 数量 ${cnt}">${hasIcon(n) ? `<img src="${ICON_DIR}/${iconKey(n)}.webp" alt="">` : ""}${cnt}</span>`)
     .join("");
+}
+
+/* ---------- HUD chip 悬浮提示:中文名主行 + 上下文副行(进度/时刻/数量) ----------
+   原生 title 延迟约 1s 且无样式,「最近出生 / 战损」的 chip 更是连 title 都没有。
+   用一个共享的 .sbtip,事件委托挂在面板容器上 —— HUD 是 8Hz 的 innerHTML 重建,
+   监听器挂 chip 本体会被反复拆掉。 */
+let tipEl = null, tipTarget = null, tipX = null, tipY = null;
+
+function showTip(chip, ev) {
+  if (!tipEl) {
+    tipEl = document.createElement("div");
+    tipEl.className = "sbtip";
+    tipEl.append(document.createElement("b"), document.createElement("span"));
+    document.body.appendChild(tipEl);
+  }
+  tipTarget = chip;
+  tipEl.firstChild.textContent = chip.dataset.tip || "";
+  tipEl.lastChild.textContent = chip.dataset.sub || "";
+  tipEl.style.display = "block";
+  moveTip(ev);
+}
+
+function moveTip(ev) {
+  if (!tipEl || !tipTarget) return;
+  tipX = ev.clientX;
+  tipY = ev.clientY;
+  let x = tipX + 14, y = tipY + 18;
+  if (x + tipEl.offsetWidth > innerWidth - 8) x = tipX - tipEl.offsetWidth - 12;
+  if (y + tipEl.offsetHeight > innerHeight - 8) y = tipY - tipEl.offsetHeight - 14;
+  tipEl.style.left = `${Math.max(8, x)}px`;
+  tipEl.style.top = `${Math.max(8, y)}px`;
+}
+
+function hideTip() {
+  if (tipEl) tipEl.style.display = "none";
+  tipTarget = null;
+}
+
+/**
+ * HUD 重建把正被悬浮的 chip 拆掉了(不触发 pointerout):光标没动,同位的新 chip 随即
+ * 就位 —— 用 elementFromPoint 把 tooltip 重挂过去,悬浮内容(如「研究中 69%」)还能
+ * 跟着 8Hz 刷新;确实已不在任何 chip 上才收起。
+ */
+function retargetTip() {
+  if (!tipTarget || tipTarget.isConnected) return;
+  const hit = tipX != null ? document.elementFromPoint(tipX, tipY) : null;
+  const chip = hit?.closest?.(".chip[data-tip]");
+  if (chip && (els.panelA?.contains(chip) || els.panelB?.contains(chip))) showTip(chip, { clientX: tipX, clientY: tipY });
+  else hideTip();
+}
+
+function bindHudTip(panel) {
+  if (!panel) return;
+  panel.addEventListener("pointerover", (ev) => {
+    const chip = ev.target.closest(".chip[data-tip]");
+    if (chip) showTip(chip, ev);
+  });
+  // relatedTarget 还在同一 chip 内(图标 ↔ 间隙间移动)不算离开,避免闪烁
+  panel.addEventListener("pointerout", (ev) => {
+    const chip = ev.target.closest(".chip[data-tip]");
+    if (chip && !(ev.relatedTarget && chip.contains(ev.relatedTarget))) hideTip();
+  });
+  panel.addEventListener("pointermove", (ev) => { if (tipTarget) moveTip(ev); });
 }
 
 function renderHud() {
@@ -651,10 +715,10 @@ function renderHud() {
     if (!p) { el.style.display = "none"; return; }
     el.style.display = "";
     const prod = h.underCon.filter((it) => hasIcon(it.n)).slice(0, 8).map((it) =>
-      `<span class="chip prod" title="建造中 ${Math.round(it.k * 100)}%"><img src="${ICON_DIR}/${iconKey(it.n)}.webp" alt=""><i style="width:${Math.round(clamp(it.k, 0, 1) * 100)}%"></i></span>`
+      `<span class="chip prod" data-tip="${esc(zhName(it.n))}" data-sub="建造中 ${Math.round(it.k * 100)}% · ${esc(it.n)}"><img src="${ICON_DIR}/${iconKey(it.n)}.webp" alt=""><i class="bar" style="width:${Math.round(clamp(it.k, 0, 1) * 100)}%"></i></span>`
     ).join("");
     const fresh = h.recent.filter((it) => hasIcon(it.n)).slice(0, 10).map((it) =>
-      `<span class="chip" style="opacity:${(0.45 + 0.55 * it.k).toFixed(2)}"><img src="${ICON_DIR}/${iconKey(it.n)}.webp" alt=""></span>`
+      `<span class="chip" style="opacity:${(0.45 + 0.55 * it.k).toFixed(2)}" data-tip="${esc(zhName(it.n))}" data-sub="出生 ${Math.max(1, Math.round(t - it.b))} 秒前 · ${esc(it.n)}"><img src="${ICON_DIR}/${iconKey(it.n)}.webp" alt=""></span>`
     ).join("");
     const tech = techAt(t)[pid];
     const upsAll = (r.upgrades ?? []).filter((u) => (u.p === 2 ? 2 : 1) === pid && !NOISE_UPGRADE.test(u.n));
@@ -669,9 +733,12 @@ function renderHud() {
       ...tech.slice(-12).map((u) => ({ u, k: 1, prog: false })),
     ].slice(0, 14);
     const techChips = show.map(({ u, k, prog }) =>
-      `<span class="chip${prog ? " prod" : ""}" title="${esc(u.zh)} · 完成 @ ${mmss(u.t)}">${hasUpgradeIcon(u.n) ? `<img src="${ICON_DIR}/${upgradeIconKey(u.n)}.webp" alt="">` : `<i class="chip-txt">${esc(shortZh(u.zh))}</i>`}${prog ? `<i class="bar" style="width:${Math.round(k * 100)}%"></i>` : ""}</span>`
+      `<span class="chip${prog ? " prod" : ""}" data-tip="${esc(u.zh)}" data-sub="${prog ? `研究中 ${Math.round(k * 100)}% · ` : ""}完成 @ ${mmss(u.t)} · ${esc(u.n)}">${hasUpgradeIcon(u.n) ? `<img src="${ICON_DIR}/${upgradeIconKey(u.n)}.webp" alt="">` : `<i class="chip-txt">${esc(shortZh(u.zh))}</i>`}${prog ? `<i class="bar" style="width:${Math.round(k * 100)}%"></i>` : ""}</span>`
     ).join("");
-    const techMore = upsAll.length > show.length ? `<span class="chip chip-more">+${upsAll.length - show.length}</span>` : "";
+    // +N 溢出 chip:悬浮直接列出被折叠的科技名,不用去猜
+    const shownNames = new Set(show.map((it) => it.u.n));
+    const hiddenUps = upsAll.filter((u) => !shownNames.has(u.n));
+    const techMore = hiddenUps.length ? `<span class="chip chip-more" data-tip="另有 ${hiddenUps.length} 项科技未展示" data-sub="${esc(hiddenUps.slice(0, 10).map((u) => u.zh).join("、"))}${hiddenUps.length > 10 ? " …" : ""}">+${hiddenUps.length}</span>` : "";
     lastTech[pid] = tech.length;
 
     // 战损：累计损失数 + 最近 10 秒的损失图标
@@ -684,7 +751,10 @@ function renderHud() {
     const recentLoss = [];
     for (let i = lossIdx; i >= 0 && lossArr[i].d > t - 10 && recentLoss.length < 8; i--) recentLoss.push(lossArr[i]);
     const lossRow = hudOpts.losses && lossIdx >= 0
-      ? `<div class="sp-row sp-prod">损失 <b style="color:${pidColor(pid)}">${fmtInt(lossIdx + 1)}</b>${recentLoss.map((u) => hasUpgradeIcon(nameAt(u, u.d)) ? `<span class="chip"><img src="${ICON_DIR}/${upgradeIconKey(nameAt(u, u.d))}.webp" alt=""></span>` : "").join("")}</div>`
+      ? `<div class="sp-row sp-prod">损失 <b style="color:${pidColor(pid)}">${fmtInt(lossIdx + 1)}</b>${recentLoss.map((u) => {
+          const nm = nameAt(u, u.d);
+          return hasUpgradeIcon(nm) ? `<span class="chip" data-tip="${esc(zhName(nm))}" data-sub="阵亡 @ ${mmss(u.d)} · ${esc(nm)}"><img src="${ICON_DIR}/${upgradeIconKey(nm)}.webp" alt=""></span>` : "";
+        }).join("")}</div>`
       : "";
 
     const compRow = hudOpts.comp && h.comp.size ? `<div class="sp-row">${chipRow(h.comp, 10)}</div>` : "";
@@ -701,6 +771,8 @@ function renderHud() {
       <div class="sp-stats">人口 <b>${fmtInt(p.series.supUsed[idxAt(p.t, t)])}/${fmtInt(p.series.supMade[idxAt(p.t, t)])}</b>
         · 军队 <b>${fmtInt((p.series.mUsedArmy[idxAt(p.t, t)] ?? 0) + (p.series.vUsedArmy[idxAt(p.t, t)] ?? 0))}</b>${apmTxt}</div>`;
   });
+  // innerHTML 重建会拆掉正被悬浮的 chip(不会触发 pointerout),重挂或收起
+  retargetTip();
 
   // 底部资源条：矿/气 + 采集率 + 人口（与图表同一份 stats_series，口径一致）
   if (els.res && hudOpts.res) {
@@ -841,6 +913,8 @@ function bindOnce() {
   els.play = $("#sbPlay");
   els.panelA = $("#sbPanelA");
   els.panelB = $("#sbPanelB");
+  bindHudTip(els.panelA);
+  bindHudTip(els.panelB);
   els.res = $("#sbRes");
   els.mapInfo = $("#sbMapInfo");
   els.replay = $("#sbReplay");
