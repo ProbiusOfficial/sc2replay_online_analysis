@@ -312,24 +312,30 @@ body.sandboxview .v-sandbox{margin-top:0}
      background:var(--card2);border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:10px;color:var(--ink3)}
 .bog b{color:var(--ink2);font-weight:600}
 .bog .ln{flex:1;height:1px;background:var(--line2)}
-.borow{display:grid;grid-template-columns:50px 30px 20px 1fr;align-items:center;gap:7px;
+.borow{display:grid;grid-template-columns:50px 30px 1fr;align-items:center;gap:7px;
        padding:3px 12px;border-bottom:1px solid var(--line2);cursor:default;
        border-left:2px solid transparent}
 .borow:hover{background:var(--accent-soft)}
 .borow .tm{font-family:var(--mono);font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums}
 .borow .sp2{font-family:var(--mono);font-size:10.5px;color:var(--ink4);text-align:right}
-.borow .gly{width:16px;height:16px;border-radius:4px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;font-style:normal}
-.borow .nm{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.borow .en{font-size:10px;color:var(--ink4);font-family:var(--mono);margin-left:6px}
-.borow.k-building .gly{background:#6b7c93}
-.borow.k-unit     .gly{background:var(--b)}
-.borow.k-worker   .gly{background:#9aa6b6}
-.borow.k-upgrade  .gly{background:#7a6cf0}
-.borow.k-recall   .gly{background:#30a0a8}
-.borow.k-unknown  .gly{background:#c2c9d4}
-.borow.k-worker .nm,.borow.k-worker .tm{color:var(--ink3)}
-.borow.k-upgrade .nm{color:#5f52d6}
-.borow.k-recall .nm{color:#1f7f86;font-weight:600}
+/* 同一秒的操作合并成一行：行内多个操作块（图标+名+×N），同名项聚合计数 */
+.borow .ops{display:flex;flex-wrap:wrap;align-items:center;gap:3px 14px;min-width:0}
+.boop{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.boop .gly{width:16px;height:16px;border-radius:4px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;font-style:normal;flex:none}
+.boop .nm{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.boop .en{font-size:10px;color:var(--ink4);font-family:var(--mono);margin-left:6px}
+.boop .cnt{font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:700}
+.boop.k-building .gly{background:#6b7c93}
+.boop.k-unit     .gly{background:var(--b)}
+.boop.k-worker   .gly{background:#9aa6b6}
+.boop.k-upgrade  .gly{background:#7a6cf0}
+.boop.k-chrono   .gly{background:#3f9e6f}
+.boop.k-recall   .gly{background:#30a0a8}
+.boop.k-unknown  .gly{background:#c2c9d4}
+.boop.k-worker .nm{color:var(--ink3)}
+.boop.k-upgrade .nm{color:#5f52d6}
+.boop.k-chrono .nm{color:#2f7f57}
+.boop.k-recall .nm{color:#1f7f86;font-weight:600}
 .borow.now{background:#e7eefe;border-left-color:var(--accent)}
 .borow.now .tm{color:var(--accent);font-weight:700}
 .boempty{padding:26px 12px;text-align:center;color:var(--ink4);font-size:12px}

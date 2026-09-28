@@ -275,11 +275,24 @@ function toLabReplay(file, d) {
           t: Math.max(0, (it.start_time ?? 0) * gameSecFactor),
           supply: it.supply ?? null,
           unit,
-          zh: it._kind === "recall" ? "星空加速" : (zhIndex.get(unit.toLowerCase()) ?? unit),
+          // recall 行的真实身份是 Mass Recall 家族（点目标，拿不到对象；旧站点把它
+          // 误标成「星空加速」——chrono.ts 头注释实测 link 723/724 在 NexusMassRecall
+          // 与 ChronoBoostEnergyCost 之间随补丁漂移，暴雪把 id 换来换去加剧了混淆）。
+          zh: it._kind === "recall" ? "群体召回" : (zhIndex.get(unit.toLowerCase()) ?? unit),
           kind,
-          icon: kind === "recall" ? null : iconOf(kind, unit),
+          icon: kind === "recall" ? "MassRecall" : iconOf(kind, unit),
         };
       })
+      // 时空加速（Chrono Boost）施放流水：每次施放一行，带上**加速对象**建筑 ——
+      // 来自 worker 的 `chronos`（chrono.ts 解析 TargetUnit 得到的建筑名）。
+      .concat((p.chronos ?? []).map((c) => ({
+        t: Math.max(0, (c.t ?? 0) * gameSecFactor),
+        supply: null,
+        unit: "",
+        zh: `时空加速 · ${zhIndex.get(c.building.toLowerCase()) ?? c.building}`,
+        kind: "chrono",
+        icon: "ChronoBoost",
+      })))
       .filter((it) => it.kind !== "morph")
       .sort((x, y) => x.t - y.t || (x.supply ?? 0) - (y.supply ?? 0));
 

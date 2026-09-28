@@ -798,9 +798,9 @@ window.addEventListener('resize', () => {
    ========================================================================== */
 const BO_KINDS = [
   ['building', '建筑'], ['unit', '单位'], ['worker', '农民'],
-  ['upgrade', '科技'], ['recall', '星空加速'], ['unknown', '未分类'],
+  ['upgrade', '科技'], ['chrono', '时空加速'], ['recall', '群体召回'], ['unknown', '未分类'],
 ];
-const BO_GLYPH = { building: '建', unit: '兵', worker: '农', upgrade: '科', recall: '加', unknown: '·' };
+const BO_GLYPH = { building: '建', unit: '兵', worker: '农', upgrade: '科', chrono: '加', recall: '召', unknown: '·' };
 const boVisible = new Set(BO_KINDS.map(k => k[0]));
 let boShowEn = false;
 
@@ -845,21 +845,47 @@ function renderBo(){
     } else {
       const perMin = new Map();
       items.forEach(it => { const m = Math.floor(it.t / 60); perMin.set(m, (perMin.get(m) || 0) + 1); });
+      // 同一秒（floor(t)）**且同类型（kind）**的操作合并成一行：时间/人口只显示一次，
+      // 行内同名项聚合计数（×N）。跨类型不合并 —— 建筑和农民同秒也各自成行，
+      // 否则「萃取房+工蜂」挤一行会让播报口径混乱。同秒同类但被其它类型隔开的项
+      // （同秒排序按人口穿插）也要归并进同一行，所以按 (秒|类型) 键全程分组、
+      // 行序取首次出现；data-idx 记录该行覆盖的全部原始下标（可不连续），供游标联动定位。
+      const rowMap = new Map();
+      const rows = [];
+      items.forEach((it, i) => {
+        const key = `${Math.floor(it.t)}|${it.kind}`;
+        let g = rowMap.get(key);
+        if (!g) { g = { first: it, idxs: [], items: [] }; rowMap.set(key, g); rows.push(g); }
+        g.items.push(it);
+        g.idxs.push(i);
+      });
       const buf = [];
       let curMin = -1;
-      items.forEach((it, i) => {
-        const m = Math.floor(it.t / 60);
+      rows.forEach(g => {
+        const it0 = g.first;
+        const m = Math.floor(it0.t / 60);
         if (m !== curMin) {
           curMin = m;
           buf.push(`<div class="bog"><b>${m}:00</b><span class="ln"></span><span>${perMin.get(m)} 项</span></div>`);
         }
-        const zh = it.zh || it.unit || '';
-        const en = (it.unit && it.unit !== zh) ? `<span class="en">${esc(it.unit)}</span>` : '';
-        buf.push(`<div class="borow k-${it.kind}" data-i="${i}" data-t="${it.t}">
-          <span class="tm">${mmss(it.t)}</span>
-          <span class="sp2">${it.supply == null ? '—' : it.supply}</span>
-          <i class="gly">${it.icon ? `<img class="glyimg" src="assets/units/${it.icon}.webp" alt="">` : BO_GLYPH[it.kind]}</i>
-          <span class="nm">${esc(boShowEn ? (it.unit || zh) : zh)}${boShowEn ? '' : en}</span>
+        const ops = new Map();
+        for (const it of g.items) {
+          const key = `${it.kind}|${it.unit}`;
+          if (!ops.has(key)) ops.set(key, { it, n: 0 });
+          ops.get(key).n++;
+        }
+        const opHtml = [...ops.values()].map(({ it, n }) => {
+          const zh = it.zh || it.unit || '';
+          const en = (it.unit && it.unit !== zh) ? `<span class="en">${esc(it.unit)}</span>` : '';
+          return `<span class="boop k-${it.kind}">
+            <i class="gly">${it.icon ? `<img class="glyimg" src="assets/units/${it.icon}.webp" alt="">` : BO_GLYPH[it.kind]}</i>
+            <span class="nm">${esc(boShowEn ? (it.unit || zh) : zh)}${boShowEn ? '' : en}</span>${n > 1 ? `<b class="cnt">×${n}</b>` : ''}
+          </span>`;
+        }).join('');
+        buf.push(`<div class="borow" data-idx="${g.idxs.join(',')}" data-t="${it0.t}">
+          <span class="tm">${mmss(it0.t)}</span>
+          <span class="sp2">${it0.supply == null ? '—' : it0.supply}</span>
+          <span class="ops">${opHtml}</span>
         </div>`);
       });
       list.innerHTML = buf.join('');
@@ -885,7 +911,9 @@ function syncBo(){
     const i = lastIdxAt(items, S.t);
     if (i < 0) return;
     const col = document.querySelectorAll('#bo .bocol')[si];
-    const row = col?.querySelector(`.borow[data-i="${i}"]`);
+    // 合并行覆盖多个原始下标且可不连续（data-idx 逗号列表），落在列表内即命中
+    const row = col ? [...col.querySelectorAll('.borow')].find(r =>
+      (r.dataset.idx || '').split(',').includes(String(i))) : null;
     if (!row) return;
     row.classList.add('now');
     const list = col.querySelector('.bolist');
@@ -949,7 +977,7 @@ function highlightChatRow(){
 const synth = window.speechSynthesis;
 const V = { playing: false, wall0: 0, base: 0, spoken: -1, rate: 2, lang: 'zh-CN', speed: 1, who: 0, steps: [] };
 
-const voText = it => boShowEn ? (it.unit || it.zh) : (it.kind === 'recall' ? '星空加速' : (it.zh || it.unit));
+const voText = it => boShowEn ? (it.unit || it.zh) : (it.zh || it.unit);
 
 function voiceRebuild(){
   // 重建脚本（切样本 / 切播报对象 / 改筛选）不应打断正在进行的播报——
