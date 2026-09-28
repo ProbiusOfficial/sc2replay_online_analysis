@@ -50,7 +50,7 @@
 // | `US_TVP` | `players[Shameless].build_order` | 我们多 1 条**幻象 Phoenix**（spawningtool 靠 `unit.hallucinated` 过滤，该标记依赖 `SSelectionDeltaEvent` 的有状态时序） | 对齐后只允许「多出**恰好**指定条数」，且必须命中 |
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO = fileURLToPath(new URL("..", import.meta.url));
 const SAMPLE_DIR = join(REPO, "sampleTest");
@@ -64,13 +64,13 @@ const filters = argv.filter((a, i) => !a.startsWith("--") && i !== showDiffIdx +
 
 // ---- 装配被测实现 ---------------------------------------------------------
 
-const { initSync } = await import(join(REPO, "wasm/pkg/compute.js"));
+// Windows 上 join() 产出 "D:\..." 不是合法 ESM specifier,必须走 file:// URL
+const mod = (rel) => import(pathToFileURL(join(REPO, rel)).href);
+const { initSync } = await mod("wasm/pkg/compute.js");
 initSync({ module: readFileSync(join(REPO, "wasm/pkg/compute_bg.wasm")) });
-const { markComputeWasmReady, createWasmDecompressor } = await import(
-  join(REPO, "js/worker/decoder/decompressors.js")
-);
+const { markComputeWasmReady, createWasmDecompressor } = await mod("js/worker/decoder/decompressors.js");
 markComputeWasmReady();
-const { extractReplayData } = await import(join(REPO, "js/worker/decoder/replay_data.js"));
+const { extractReplayData } = await mod("js/worker/decoder/replay_data.js");
 
 // ---- 工具 -----------------------------------------------------------------
 
@@ -509,6 +509,12 @@ function compareReplay(replayName, actual) {
     expected = JSON.parse(readFileSync(baselinePath, "utf8"));
   } catch {
     return { skipped: true, reason: `缺少基线 ${baselinePath}` };
+  }
+
+  // 显示用新增字段（无基线对应物）在对拍前摘除：chronos = 时空加速施放流水，
+  // 只喂建造顺序/播报的「时空加速 · 目标」行，不属于 P1c「换引擎输出不变」的契约。
+  for (const team of actual.teams ?? []) {
+    for (const p of team.players ?? []) delete p.chronos;
   }
 
   const problems = [];

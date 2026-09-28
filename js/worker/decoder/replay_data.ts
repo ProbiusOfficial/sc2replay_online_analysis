@@ -74,10 +74,12 @@ import { collectRecalls, mergeRecalls, type RecallRow } from "./recall.js";
 import {
   chronoModel,
   collectChronoBoosts,
+  collectChronoCasts,
   expansionFromDetails,
   isCooperative,
   unixTimestampFromDetails,
   userIdToPlayerId,
+  type ChronoCast,
 } from "./chrono.js";
 import { abilityLinksForBuild } from "./data/ability_links.generated.js";
 import {
@@ -344,6 +346,12 @@ export interface ReplayDataPlayer {
   /** **`pick_race` 的首字母**（大厅属性），可能是 `"R"`（Random）。取不到时 `"?"`。 */
   race: string;
   build_order: ReplayDataBuildOrderRow[];
+  /**
+   * 时空加速（Chrono Boost）的每次施放流水：`{ building, t }`，`t` 为 16fps 游戏秒
+   * （与 `build_order.start_time` 同基准）。**显示用新增字段**（建造顺序/播报的
+   * 「时空加速 · 目标建筑」行），不参与基线对拍（verify-replay-data 已豁免）。
+   */
+  chronos: Array<{ building: string; t: number }>;
   worker_deaths: ReplayDataWorkerDeath[];
   workers_curve: ReplayDataWorkersCurvePoint[];
   /** 逐分钟摘要（10 字段，前向填充）—— 旧链路口径，保留用于对拍。 */
@@ -987,14 +995,16 @@ export async function extractReplayData(
   const userToPlayer = userIdToPlayerId(initData, details);
   const model = chronoModel(unixTs, expansion, cooperative);
   const links = abilityLinksForBuild(build, expansion);
-  const boosts = collectChronoBoosts({
+  const chronoScanInput = {
     gameEvents: game,
     userToPlayer,
     tagToUnitName: collectTagToUnitName(tracker),
     links,
     model,
     totalFrames: frames,
-  });
+  };
+  const boosts = collectChronoBoosts(chronoScanInput);
+  const chronoCasts = collectChronoCasts(chronoScanInput);
   const extracted = extractBuildOrder(tracker, {
     // 默认口径：虫族走 Egg 精确起点（比查表更准，这是要发布的行为）。
     exactZergStart: options.exactZergStart ?? true,
@@ -1223,7 +1233,7 @@ export async function extractReplayData(
   const teams: ReplayDataTeam[] = teamIds.map((teamId) => ({
     players: players
       .filter((p) => p.teamId === teamId)
-      .map((p) => buildPlayer(p, buildOrders, workerDeaths, workersCurve, statsRaw, statsSeries, killsByMinute, lossesByMinute, maxMinute)),
+      .map((p) => buildPlayer(p, buildOrders, chronoCasts, workerDeaths, workersCurve, statsRaw, statsSeries, killsByMinute, lossesByMinute, maxMinute)),
   }));
 
   // team.result：成员结果唯一才成立，否则 "Unknown"（`load_players`）。
@@ -1279,6 +1289,7 @@ function upsert(
 function buildPlayer(
   entity: Entity,
   buildOrders: ReadonlyMap<number, (BuildOrderEntry | RecallRow)[]>,
+  chronoCasts: ReadonlyMap<number, ChronoCast[]>,
   workerDeaths: ReadonlyMap<number, ReplayDataWorkerDeath[]>,
   workersCurve: ReadonlyMap<number, ReplayDataWorkersCurvePoint[]>,
   statsRaw: ReadonlyMap<number, Map<number, ReplayDataStatsRow>>,
@@ -1344,6 +1355,11 @@ function buildPlayer(
     name: entity.name,
     race: raceInitial(entity.pickRace),
     build_order,
+    // 显示用流水（见接口注释）：帧 → 16fps 游戏秒，与 build_order.start_time 同基准。
+    chronos: (chronoCasts.get(pid) ?? []).map((c) => ({
+      building: c.building,
+      t: Math.trunc(c.frame / 16),
+    })),
     worker_deaths: workerDeaths.get(pid) ?? [],
     workers_curve: workersCurve.get(pid) ?? [],
     stats,

@@ -56,7 +56,7 @@ import { openMpqArchive } from "./mpq.js";
 import { probeBaseBuild, selectProtocolTables } from "./protocols/index.js";
 import { collectTagToUnitName, extractBuildOrder, toLegacyEntry, } from "./build_order.js";
 import { collectRecalls, mergeRecalls } from "./recall.js";
-import { chronoModel, collectChronoBoosts, expansionFromDetails, isCooperative, unixTimestampFromDetails, userIdToPlayerId, } from "./chrono.js";
+import { chronoModel, collectChronoBoosts, collectChronoCasts, expansionFromDetails, isCooperative, unixTimestampFromDetails, userIdToPlayerId, } from "./chrono.js";
 import { abilityLinksForBuild } from "./data/ability_links.generated.js";
 import { GAME_SPEED_ATTRIBUTE_ID, GAME_SPEED_FACTOR, GAME_SPEED_LOOKUP, RACE_ATTRIBUTE_ID, RACE_LOOKUP, } from "./data/lobby_properties.generated.js";
 /**
@@ -619,14 +619,16 @@ export async function extractReplayData(buffer, options = {}) {
     const userToPlayer = userIdToPlayerId(initData, details);
     const model = chronoModel(unixTs, expansion, cooperative);
     const links = abilityLinksForBuild(build, expansion);
-    const boosts = collectChronoBoosts({
+    const chronoScanInput = {
         gameEvents: game,
         userToPlayer,
         tagToUnitName: collectTagToUnitName(tracker),
         links,
         model,
         totalFrames: frames,
-    });
+    };
+    const boosts = collectChronoBoosts(chronoScanInput);
+    const chronoCasts = collectChronoCasts(chronoScanInput);
     const extracted = extractBuildOrder(tracker, {
         // 默认口径：虫族走 Egg 精确起点（比查表更准，这是要发布的行为）。
         exactZergStart: options.exactZergStart ?? true,
@@ -845,7 +847,7 @@ export async function extractReplayData(buffer, options = {}) {
     const teams = teamIds.map((teamId) => ({
         players: players
             .filter((p) => p.teamId === teamId)
-            .map((p) => buildPlayer(p, buildOrders, workerDeaths, workersCurve, statsRaw, statsSeries, killsByMinute, lossesByMinute, maxMinute)),
+            .map((p) => buildPlayer(p, buildOrders, chronoCasts, workerDeaths, workersCurve, statsRaw, statsSeries, killsByMinute, lossesByMinute, maxMinute)),
     }));
     // team.result：成员结果唯一才成立，否则 "Unknown"（`load_players`）。
     const winners = [];
@@ -891,7 +893,7 @@ function upsert(store, pid, minute, value) {
     // `worker_kills_by_min[pid][minute] = cum` 一致，累计值本身就是单调的。
     bucket.set(minute, value);
 }
-function buildPlayer(entity, buildOrders, workerDeaths, workersCurve, statsRaw, statsSeries, killsByMinute, lossesByMinute, maxMinute) {
+function buildPlayer(entity, buildOrders, chronoCasts, workerDeaths, workersCurve, statsRaw, statsSeries, killsByMinute, lossesByMinute, maxMinute) {
     const pid = entity.pid;
     const rows = buildOrders.get(pid) ?? [];
     const build_order = rows.map((row) => {
@@ -946,6 +948,11 @@ function buildPlayer(entity, buildOrders, workerDeaths, workersCurve, statsRaw, 
         name: entity.name,
         race: raceInitial(entity.pickRace),
         build_order,
+        // 显示用流水（见接口注释）：帧 → 16fps 游戏秒，与 build_order.start_time 同基准。
+        chronos: (chronoCasts.get(pid) ?? []).map((c) => ({
+            building: c.building,
+            t: Math.trunc(c.frame / 16),
+        })),
         worker_deaths: workerDeaths.get(pid) ?? [],
         workers_curve: workersCurve.get(pid) ?? [],
         stats,

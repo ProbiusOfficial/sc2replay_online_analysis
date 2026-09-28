@@ -183,6 +183,12 @@ export interface ChronoRanges {
 /** 玩家 id → 各建筑上的加速区间。 */
 export type ChronoBoosts = Map<number, ChronoRanges>;
 
+/** 单次时空加速施放（显示用原始指令，未做窗口合并）：目标建筑名 + 施放帧。 */
+export interface ChronoCast {
+  building: string;
+  frame: number;
+}
+
 /**
  * 打包 tag → `"index/recycle"`。
  *
@@ -294,17 +300,43 @@ export interface CollectChronoInput {
  * 只认目标能解析出名字的指令（对应 spawningtool 的 `and event.target`）。
  */
 export function collectChronoBoosts(input: CollectChronoInput): ChronoBoosts {
-  const { gameEvents, userToPlayer, tagToUnitName, links, model, totalFrames } = input;
-  if (!links) {
+  const { model, totalFrames } = input;
+  if (!input.links) {
     // 显式兜住 JS 调用方（TS 侧有类型保护）。以前这里是个模块级并集常量，
     // 静默用错集合是「碰巧正确」而不是「设计正确」。
     throw new Error(
       "collectChronoBoosts: 缺少 links —— 请传 abilityLinksForBuild(header.m_version.m_build, expansion) 的结果",
     );
   }
-
-  /** pid → 按事件原序的 `[建筑名, 帧]`。 */
   const commands = new Map<number, Array<[string, number]>>();
+  for (const [pid, casts] of scanChronoCommands(input)) {
+    commands.set(pid, casts.map((c) => [c.building, c.frame]));
+  }
+
+  return model.kind === "lotv"
+    ? buildLotvBoosts(commands, totalFrames)
+    : buildWindowedBoosts(commands, model.durationLoops);
+}
+
+/**
+ * 单次施放的原始记录（显示用）：`pid → [{building, frame}]`，事件原序。
+ * 与 `collectChronoBoosts` 共用同一套指令判据（同一 link 集合、只认 TargetUnit
+ * 且能解析出建筑名），但**不做窗口合并** —— 建造顺序里每次施放各占一行，
+ * 保留「加速对象」的完整流水。
+ */
+export function collectChronoCasts(input: CollectChronoInput): Map<number, ChronoCast[]> {
+  if (!input.links) {
+    throw new Error(
+      "collectChronoCasts: 缺少 links —— 请传 abilityLinksForBuild(header.m_version.m_build, expansion) 的结果",
+    );
+  }
+  return scanChronoCommands(input);
+}
+
+/** 指令扫描本体：chrono link + cmd 0 + TargetUnit 能解析出建筑名 + 玩家可桥接。 */
+function scanChronoCommands(input: CollectChronoInput): Map<number, ChronoCast[]> {
+  const { gameEvents, userToPlayer, tagToUnitName, links } = input;
+  const out = new Map<number, ChronoCast[]>();
 
   for (const event of gameEvents) {
     const abil = event.m_abil as Record<string, unknown> | undefined;
@@ -325,14 +357,11 @@ export function collectChronoBoosts(input: CollectChronoInput): ChronoBoosts {
     const pid = userToPlayer.get(Number(userId));
     if (pid === undefined) continue;
 
-    const list = commands.get(pid);
-    if (list) list.push([building, event._gameloop]);
-    else commands.set(pid, [[building, event._gameloop]]);
+    const list = out.get(pid);
+    if (list) list.push({ building, frame: Number(event._gameloop) });
+    else out.set(pid, [{ building, frame: Number(event._gameloop) }]);
   }
-
-  return model.kind === "lotv"
-    ? buildLotvBoosts(commands, totalFrames)
-    : buildWindowedBoosts(commands, model.durationLoops);
+  return out;
 }
 
 /**
