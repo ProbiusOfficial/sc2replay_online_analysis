@@ -1,7 +1,7 @@
 /* ============================================================================
    单位/科技图标名解析 —— 沙盘视图与建造顺序视图共用的唯一实现。
 
-   图标文件在 `assets/units/<Name>.webp`（256×256，222 张，命名与 tracker 单位名
+   图标文件在 `assets/units/<Name>.webp`（256×256，229 张，命名与 tracker 单位名
    基本一致，来自 starcraft2.ai 的图标集，素材版权归 Blizzard Entertainment、
    粉丝非商用）。可用名单见 `unit_icons.generated.js`（由脚本从磁盘清单生成）。
 
@@ -37,6 +37,7 @@ export function iconKey(name) {
     .replace(/TemplarArchive$/, "TemplarArchives")     // 图标集带 s，tracker 不带
     .replace(/DisruptorPhased$/, "Disruptor")
     .replace(/LurkerDenMP$/, "LurkerDen")
+    .replace(/NydusCanal$/, "NydusNetwork")                    // HotS 老名 → LotV 改名后的同一建筑
     .replace(/^Nuke$/, "Ghost");                        // 核弹无独立图标 → 幽灵（行名仍是核弹）
 }
 
@@ -67,11 +68,35 @@ const UPGRADE_ICON_MAP = [
   [/^HellionPreIgniter$/, "InfernalPreIgniter"],
   [/^NeuralParasiteTech$/, "NeuralParasite"],
   [/^PathogenGlandsTech$/, "PathogenGlands"],
+  [/^InfestorEnergyUpgrade$/, "PathogenGlands"],               // 同一升级的内部名变体
+  [/^HydraliskSpeedUpgrade$/i, "MuscularAugments"],
+  [/hydraliskspeed$/i, "MuscularAugments"],
+  [/overlordtransport$/i, "Overlord"],
+  // 甲武系家族：tracker 各代口径不一，归一到图标集现有的合并版
+  [/^TerranShipArmorsLevel/, "TerranVehicleAndShipPlatingLevel"],
+  [/^TerranVehicleArmorsLevel/, "TerranVehicleAndShipPlatingLevel"],
+  [/^TerranVehicleAndShipWeaponsLevel/, "TerranVehicleWeaponsLevel"],
+  [/^TransformationServos$/, "SmartServos"],
   // 具名升级 → 所属单位的图标（图标集没有独立升级图标，借单位图 + 中文名 tooltip 表达）
   [/^Banshee(Cloak|Speed)$/, "Banshee"],
   [/^CycloneRapidFireLaunchers$/, "Cyclone"],
   [/^HighCapacityBarrels$/, "Cyclone"],
   [/^HurricaneThrusters$/, "Cyclone"],
+  [/^CycloneAirUpgrade$/, "Cyclone"],
+  [/^CycloneLockOnDamageUpgrade$/, "Cyclone"],
+  [/^CycloneLockOnRangeUpgrade$/, "Cyclone"],
+  [/^AdeptPiercingAttack$/, "Adept"],
+  [/^AdeptShieldUpgrade$/, "Adept"],
+  [/^DurableMaterials$/, "Armory"],
+  [/^FlyingLocusts$/, "SwarmHost"],
+  [/^LocustLifetimeIncrease$/, "SwarmHost"],
+  [/^HyperflightRotors$/, "Viking"],
+  [/^MagFieldLaunchers$/, "Thor"],
+  [/^StrikeCannons$/, "Thor"],
+  [/^MedivacIncreaseSpeedBoost$/, "Medivac"],
+  [/^RavenDamageUpgrade$/, "Raven"],
+  [/^RavenEnhancedMunitions$/, "Raven"],
+  [/^RavenRecalibratedExplosives$/, "Raven"],
   [/^DarkTemplarBlinkUpgrade$/, "ShadowStride"],
   [/^DrillClaws$/, "WidowMine"],
   [/^Frenzy$/, "Hydralisk"],

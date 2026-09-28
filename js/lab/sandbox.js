@@ -24,7 +24,7 @@
 
    ## 单位图标
 
-   `assets/units/<Name>.webp`（256×256，共 222 张，命名与 tracker 单位名一致，
+   `assets/units/<Name>.webp`（256×256，共 229 张，命名与 tracker 单位名一致，
    来自 starcraft2.ai 的图标集，素材版权归 Blizzard Entertainment、粉丝非商用）。
    素材本身无 alpha（黑底），加载时按亮度→alpha 抠底得纯图标；懒加载 + 64px
    预缩放缓存；iconKey() 归一化变体；缺失或加载失败回退矢量点阵。

@@ -33,8 +33,7 @@
       "time": 0
     },
     "LurkerMP": {
-      "zh": "潜伏者",
-      "time": 24
+      "zh": "潜伏者"
     },
     "LurkerMPEgg": {
       "zh": "潜伏者虫卵",
@@ -53,7 +52,7 @@
       "time": 21
     },
     "Cyclone": {
-      "zh": "飓风",
+      "zh": "旋风战车",
       "time": 32
     },
     "SiegeTank": {
@@ -329,8 +328,7 @@
       "time": 29
     },
     "Changeling": {
-      "zh": "拟态雏虫",
-      "time": 0
+      "zh": "变形虫"
     },
     "ChangelingMarine": {
       "zh": "拟态陆战队员",
@@ -359,6 +357,30 @@
     "LocustMPFlying": {
       "zh": "蝗虫",
       "time": 0
+    },
+    "MothershipCore": {
+      "zh": "母舰核心"
+    },
+    "NydusWorm": {
+      "zh": "尼达斯蠕虫"
+    },
+    "NydusCanal": {
+      "zh": "尼达斯运河"
+    },
+    "Hellbat": {
+      "zh": "恶蝠"
+    },
+    "Larva": {
+      "zh": "幼虫"
+    },
+    "Broodling": {
+      "zh": "虫群幼体"
+    },
+    "DisruptorPhased": {
+      "zh": "干扰者（相位形态）"
+    },
+    "LurkerMPBurrowed": {
+      "zh": "潜伏者（钻地）"
     }
   },
   "upgrade": {
@@ -729,6 +751,146 @@
     "ProtossGroundArmorsLevel3": {
       "zh": "星灵地面护甲等级3",
       "time": 179
+    },
+    "AdeptPiercingAttack": {
+      "zh": "使徒穿刺攻击"
+    },
+    "AdeptShieldUpgrade": {
+      "zh": "使徒护盾升级"
+    },
+    "BattlecruiserBehemothReactor": {
+      "zh": "贝希摩斯反应堆",
+      "time": 79
+    },
+    "CarrierLaunchSpeedUpgrade": {
+      "zh": "引力弹射器",
+      "time": 43
+    },
+    "CycloneAirUpgrade": {
+      "zh": "旋风战车对空武器"
+    },
+    "CycloneLockOnDamageUpgrade": {
+      "zh": "旋风战车锁定伤害"
+    },
+    "CycloneLockOnRangeUpgrade": {
+      "zh": "旋风战车锁定射程",
+      "time": 29
+    },
+    "DurableMaterials": {
+      "zh": "耐用材料",
+      "time": 43
+    },
+    "EnhancedShockwaves": {
+      "zh": "增强冲击波",
+      "time": 36
+    },
+    "FlyingLocusts": {
+      "zh": "飞行蝗虫",
+      "time": 36
+    },
+    "GhostMoebiusReactor": {
+      "zh": "莫比乌斯反应堆",
+      "time": 71
+    },
+    "HydraliskSpeedUpgrade": {
+      "zh": "肌肉强化",
+      "time": 43
+    },
+    "hydraliskspeed": {
+      "zh": "肌肉强化",
+      "time": 43
+    },
+    "MuscularAugments": {
+      "zh": "肌肉强化",
+      "time": 43
+    },
+    "GroovedSpines": {
+      "zh": "沟槽脊刺",
+      "time": 29
+    },
+    "HyperflightRotors": {
+      "zh": "高速旋翼",
+      "time": 36
+    },
+    "InfestorEnergyUpgrade": {
+      "zh": "病原腺体",
+      "time": 43
+    },
+    "LocustLifetimeIncrease": {
+      "zh": "蝗虫存活时间",
+      "time": 43
+    },
+    "MagFieldLaunchers": {
+      "zh": "磁场发射器",
+      "time": 36
+    },
+    "MedivacIncreaseSpeedBoost": {
+      "zh": "医疗运输机加速",
+      "time": 36
+    },
+    "MicrobialShroud": {
+      "zh": "微生物屏障",
+      "time": 43
+    },
+    "RavenDamageUpgrade": {
+      "zh": "渡鸦武器强化",
+      "time": 36
+    },
+    "RavenEnhancedMunitions": {
+      "zh": "增强弹药",
+      "time": 36
+    },
+    "RavenRecalibratedExplosives": {
+      "zh": "校准炸药",
+      "time": 36
+    },
+    "StrikeCannons": {
+      "zh": "250毫米突击炮",
+      "time": 36
+    },
+    "TransformationServos": {
+      "zh": "变形伺服器",
+      "time": 36
+    },
+    "overlordtransport": {
+      "zh": "王虫运输",
+      "time": 29
+    },
+    "TerranShipArmorsLevel1": {
+      "zh": "人类舰船装甲等级1",
+      "time": 114
+    },
+    "TerranShipArmorsLevel2": {
+      "zh": "人类舰船装甲等级2",
+      "time": 136
+    },
+    "TerranShipArmorsLevel3": {
+      "zh": "人类舰船装甲等级3",
+      "time": 159
+    },
+    "TerranVehicleArmorsLevel1": {
+      "zh": "人类载具装甲等级1",
+      "time": 114
+    },
+    "TerranVehicleArmorsLevel2": {
+      "zh": "人类载具装甲等级2",
+      "time": 136
+    },
+    "TerranVehicleArmorsLevel3": {
+      "zh": "人类载具装甲等级3",
+      "time": 159
+    },
+    "TerranVehicleAndShipWeaponsLevel1": {
+      "zh": "人类载具与舰船武器等级1",
+      "time": 114
+    },
+    "TerranVehicleAndShipWeaponsLevel2": {
+      "zh": "人类载具与舰船武器等级2",
+      "time": 136
+    },
+    "TerranVehicleAndShipWeaponsLevel3": {
+      "zh": "人类载具与舰船武器等级3",
+      "time": 159
     }
   },
   "build": {
