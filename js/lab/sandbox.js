@@ -21,6 +21,11 @@
    - **左上/右上 HUD**：玩家名 + 单位/农民/建筑实时计数 + 编成 chips（活体军队按类型
      计数，icon+数量）+ 生产条（建造中建筑带进度条 + 最近 12s 出生单位）+ 外侧色条。
    - **底部资源条**：双方 矿/气（含采集率）+ 人口，取自 stats_series（与图表同口径）。
+   - **战争迷雾(近似还原)**:三种口径 —— 双方(上帝视角 + 两方视野云各自染色、
+     重叠混色、都不可见处压黑,对标 starcraft2.ai 的视野控制图)/ 单玩家视角
+     (当前视野全亮、探索过半亮前向累积;视野外敌方单位不渲染,建筑进过视野
+     保持可见)。并集模型见 js/lab/vision.js(SC2 视野为纯半径制,无地形遮挡)。
+     **近似性来源**:移动单位位置是稀疏采样插值(中位 ~11s 一报),建筑视野精确。
 
    ## 单位图标
 
@@ -42,6 +47,7 @@
 
 import { labState, sandboxSeek, focusReplay } from "./views.js";
 import { zhName } from "./data.js";
+import { sightOf } from "./vision.js";
 import { ICON_DIR, iconKey, hasIcon, hasIconKey, hasUpgradeIcon, upgradeIconKey } from "./unit_icons.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -322,7 +328,15 @@ function mapCenterScreen() {
   };
 }
 
-/** 位置采样点之间的线性插值（pos 扁平 [t,x,y,...]）。 */
+/**
+ * 位置采样点之间的插值(pos 扁平 [t,x,y,...])。
+ * ⚠️ 采样间隔中位 ~11s、P90 ~54s:两点连线会把「先驻留后出发」拉成全程匀速滑行,
+ * 让单位的视野圆到处漂。隐含速度 > POS_SPEED_MAX(7/s,高于一切单位的合法移速)时
+ * 改用「驻留-冲刺」模型(先停在上一采样点,再按极速匀速赶到下一采样点);
+ * > POS_TELEPORT(20/s)视为虫道/运输装卸这类真·瞬移,保留直线快速掠过。
+ */
+const POS_SPEED_MAX = 7;
+const POS_TELEPORT = 20;
 function posAt(u, t) {
   const p = u.pos;
   if (!p) return null;
@@ -332,8 +346,18 @@ function posAt(u, t) {
   if (t >= p[last]) return [p[last + 1], p[last + 2]];
   let lo = 0, hi = n - 1;
   while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (p[mid * 3] <= t) lo = mid; else hi = mid; }
-  const t0 = p[lo * 3], k = (t - t0) / (p[hi * 3] - t0);
-  return [p[lo * 3 + 1] + (p[hi * 3 + 1] - p[lo * 3 + 1]) * k, p[lo * 3 + 2] + (p[hi * 3 + 2] - p[lo * 3 + 2]) * k];
+  const t0 = p[lo * 3], t1 = p[hi * 3];
+  const x0 = p[lo * 3 + 1], y0 = p[lo * 3 + 2];
+  const dx = p[hi * 3 + 1] - x0, dy = p[hi * 3 + 2] - y0;
+  let k = (t - t0) / (t1 - t0);
+  const dist = Math.hypot(dx, dy);
+  const v = dist / (t1 - t0);
+  if (v > POS_SPEED_MAX && v <= POS_TELEPORT) {
+    const travel = dist / POS_SPEED_MAX;
+    const depart = t1 - travel;
+    k = t <= depart ? 0 : (t - depart) / travel;
+  }
+  return [x0 + dx * k, y0 + dy * k];
 }
 
 /** t 时刻的单位类型名（跟随变形）。 */
@@ -436,11 +460,146 @@ function roundRect(c, x, y, w, h, r) {
   c.closePath();
 }
 
+/* ---------- 战争迷雾(近似还原) ----------
+   模型:迷雾 = 所选玩家全部单位/建筑位置的视野圆并集(SC2 视野为纯半径制,
+   无地形遮挡)。建筑坐标来自出生事件(精确);移动单位走 posAt 插值 —— 采样
+   稀疏(中位 ~11s),军队成团时并集对单体误差天然鲁棒,但边界是近似。
+   两层:当前视野(全亮)+ 已探索(半亮,前向单调累积;时间回退/切样本清零)。 */
+let fogPid = 0;                 // 0 = 上帝视角
+let fogRi = -1;                 // 探索层归属的样本索引(切样本时归零)
+let fogDirty = false;           // 切视角后强制重绘一帧(tick 的「无变化不重绘」会跳过)
+let fogCv = null, fogCx = null; // 当前视野层(半分辨率,放大合成即软边)
+let expCv = null, expCx = null; // 已探索累积层
+let fogT = -1, fogAt = 0, expT = -1, fogViewKey = "";
+let expSeenBuildings = null;    // 建筑不移动:进过视野就保持可见(SC2 同款语义)
+
+function fogReset() {
+  if (expCx) expCx.clearRect(0, 0, expCv.width, expCv.height);
+  expT = -1;
+  expSeenBuildings = null;
+  fogT = -1;
+}
+
+function ensureFogLayers(w, h) {
+  const fw = Math.max(2, Math.round(w / 2)), fh = Math.max(2, Math.round(h / 2));
+  if (!fogCv) {
+    fogCv = document.createElement("canvas");
+    fogCx = fogCv.getContext("2d");
+    expCv = document.createElement("canvas");
+    expCx = expCv.getContext("2d");
+  }
+  if (fogCv.width !== fw || fogCv.height !== fh) {
+    fogCv.width = fw; fogCv.height = fh;
+    expCv.width = fw; expCv.height = fh;
+    fogReset();
+  }
+}
+
+/** 迷雾视角按钮的玩家名标签(随当前样本更新)。 */
+function updateFogLabels() {
+  const seg = $("#sbFog");
+  if (!seg) return;
+  const r = replays[labState.ri];
+  const btns = [...seg.querySelectorAll("button")];
+  const nm = (i) => (r?.players[i]?.name ?? `P${i + 1}`).slice(0, 7);
+  if (btns[1]) btns[1].textContent = nm(0);
+  if (btns[2]) btns[2].textContent = nm(1);
+}
+
+/** t 时刻指定玩家的视野圆列表 [x, y, r](世界坐标)。pid: 1/2;一次遍历可同时收两方。 */
+function collectVision(t, pids) {
+  const out = pids.map(() => []);
+  for (const u of model.units) {
+    if (u.b > t || (u.d != null && u.d <= t)) continue;
+    const idx = pids.indexOf(u.p);
+    if (idx < 0) continue;
+    const n = nameAt(u, t);
+    const isB = isBuildingName(n);
+    let x = u.x, y = u.y;
+    if (!isB) { const p = posAt(u, t); if (!p) continue; x = p[0]; y = p[1]; }
+    out[idx].push([x, y, sightOf(n, isB)]);
+  }
+  return out;
+}
+
+/** #rrggbb → "r,g,b"(径向渐变的 rgba 分量)。 */
+const hexRGB = (h) => `${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)}`;
+
+/**
+ * 双方模式(上帝视角 + 视野叠加,对标 starcraft2.ai):不剔除任何单位,只做
+ * 「视野控制图」——暗底上 A/B 各自染色的视野云,重叠处自然混色,双方都
+ * 看不到的地方保持黑。只画当前视野(双方各有各的探索史,叠加没有干净语义)。
+ */
+function renderFogBoth(discsA, discsB) {
+  const s = TF.s * 0.5;
+  const a = s, b = iso ? s * 0.5 : 0, cc = iso ? -s : 0, d = iso ? s * 0.5 : s;
+  const e = TF.ox * 0.5, f = TF.oy * 0.5;
+  fogCx.setTransform(1, 0, 0, 1, 0, 0);
+  fogCx.globalCompositeOperation = "source-over";
+  fogCx.globalAlpha = 1;
+  fogCx.clearRect(0, 0, fogCv.width, fogCv.height);
+  fogCx.fillStyle = "rgba(3,6,11,.82)";
+  fogCx.fillRect(0, 0, fogCv.width, fogCv.height);
+  fogCx.setTransform(a, b, cc, d, e, f);
+  const paint = (discs, rgb) => {
+    for (const [x, y, r] of discs) {
+      const g = fogCx.createRadialGradient(x, y, r * 0.55, x, y, r);
+      g.addColorStop(0, `rgba(${rgb},.34)`);
+      g.addColorStop(1, `rgba(${rgb},0)`);
+      fogCx.fillStyle = g;
+      fogCx.beginPath();
+      fogCx.arc(x, y, r, 0, Math.PI * 2);
+      fogCx.fill();
+    }
+  };
+  paint(discsA, hexRGB(COL.a));
+  paint(discsB, hexRGB(COL.b));
+}
+
+function renderFog(discs, t) {
+  const s = TF.s * 0.5;
+  // 世界→迷雾画布(主映射×0.5):iso 下 x'=(x−y)s、y'=(x+y)s/2,给画布设同一仿射,
+  // 视野圆直接按世界坐标画,投影成斜视角的旋转椭圆
+  const a = s, b = iso ? s * 0.5 : 0, cc = iso ? -s : 0, d = iso ? s * 0.5 : s;
+  const e = TF.ox * 0.5, f = TF.oy * 0.5;
+
+  // 已探索层前向累积(与重绘同节流;等距时间点画圆即可,无需逐帧)
+  if (t < expT - 1) fogReset(); // 大幅回退:重建不了就如实清零
+  if (t > expT + 0.24 || expT < 0) {
+    expCx.setTransform(a, b, cc, d, e, f);
+    expCx.globalCompositeOperation = "source-over";
+    expCx.fillStyle = "#fff";
+    expCx.globalAlpha = 0.6;
+    for (const [x, y, r] of discs) { expCx.beginPath(); expCx.arc(x, y, r, 0, Math.PI * 2); expCx.fill(); }
+    expT = t;
+  }
+
+  fogCx.setTransform(1, 0, 0, 1, 0, 0);
+  fogCx.globalCompositeOperation = "source-over";
+  fogCx.globalAlpha = 1;
+  fogCx.clearRect(0, 0, fogCv.width, fogCv.height);
+  fogCx.fillStyle = "rgba(3,6,11,.88)";
+  fogCx.fillRect(0, 0, fogCv.width, fogCv.height);
+  fogCx.globalCompositeOperation = "destination-out";
+  fogCx.globalAlpha = 0.42;                 // 已探索:半亮
+  fogCx.drawImage(expCv, 0, 0);
+  fogCx.globalAlpha = 1;                    // 当前视野:全亮 + 软边
+  fogCx.setTransform(a, b, cc, d, e, f);
+  for (const [x, y, r] of discs) {
+    const g = fogCx.createRadialGradient(x, y, r * 0.72, x, y, r);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    fogCx.fillStyle = g;
+    fogCx.beginPath(); fogCx.arc(x, y, r, 0, Math.PI * 2); fogCx.fill();
+  }
+}
+
 /* ---------- 逐帧绘制 ---------- */
 
 function render() {
   const canvas = els.canvas;
   if (!canvas || !model || !model.sb) return;
+  if (fogRi !== labState.ri) { fogRi = labState.ri; fogReset(); updateFogLabels(); } // 切样本:探索层/已见建筑归零
   const stage = els.stage;
   const w = stage.clientWidth, h = stage.clientHeight;
   if (!w || !h) return;
@@ -465,6 +624,19 @@ function render() {
   const X = (x, y) => projX(x, y), Y = (x, y) => projY(x, y);
 
   // 可见单位收集 → 按深度排序（斜视角下右上方的单位压在左下方之上）
+  // 迷雾模式下先备好己方视野圆:既用于画迷雾,也用于剔除视野外的敌方单位。
+  // 双方模式(3)只叠视野云、不剔除任何单位 —— 单位全员可见是上帝语义。
+  let discs = null, discsB = null;
+  if (fogPid === 3) [discs, discsB] = collectVision(t, [1, 2]);
+  else if (fogPid) discs = collectVision(t, [fogPid])[0];
+  const inVision = (x, y) => {
+    for (const dsc of discs) {
+      const dx = x - dsc[0], dy = y - dsc[1];
+      if (dx * dx + dy * dy <= dsc[2] * dsc[2]) return true;
+    }
+    return false;
+  };
+  if (fogPid === 1 || fogPid === 2) expSeenBuildings ??= new Set();
   const drawList = [];
   for (const u of model.units) {
     if (u.b > t) continue;
@@ -475,6 +647,14 @@ function render() {
     if (isW && !showWorkers) continue;
     let x = u.x, y = u.y;
     if (!isB) { const p = posAt(u, t); if (!p) continue; x = p[0]; y = p[1]; }
+    // 真·迷雾语义:视野外的敌方单位不渲染。建筑不移动,进过视野就保持可见。
+    // (仅玩家视角模式;双方模式是上帝语义,不剔除)
+    if ((fogPid === 1 || fogPid === 2) && (u.p === 1 || u.p === 2) && u.p !== fogPid) {
+      if (isB) {
+        if (!expSeenBuildings.has(u) && !inVision(x, y)) continue;
+        expSeenBuildings.add(u);
+      } else if (!inVision(x, y)) continue;
+    }
     drawList.push({ u, n, isB, isW, x, y, d: depthOf(x, y) });
   }
   drawList.sort((p, q) => p.d - q.d);
@@ -529,6 +709,21 @@ function render() {
     }
   }
 
+  // 迷雾合成(单位画完之后;镜头框/阵亡闪光/水印这些元信息压在迷雾之上)
+  if (fogPid && discs) {
+    ensureFogLayers(w, h);
+    const vk = `${zoom.toFixed(4)}:${panX.toFixed(1)}:${panY.toFixed(1)}:${iso}`;
+    // 双方模式圆数翻倍,重绘节流放宽一档(视野云本身移动慢,视觉无感)
+    const step = fogPid === 3 ? 0.5 : 0.24;
+    if (Math.abs(t - fogT) > step || vk !== fogViewKey) {
+      if (fogPid === 3) renderFogBoth(discs, discsB);
+      else renderFog(discs, t);
+      fogT = t;
+      fogViewKey = vk;
+    }
+    c.drawImage(fogCv, 0, 0, w, h);
+  }
+
   // 镜头标记：各玩家「当前屏幕」的视野框（约 22×14 tiles），取 ≤t 的最后一次镜头事件
   if (hudOpts.cam) {
     for (const pid of [1, 2]) {
@@ -555,6 +750,7 @@ function render() {
     const u = model.deaths[i];
     if (u.d > t) continue;
     if (u.d < t - flash) break; // deaths 按 d 升序，从尾部往回扫出窗
+    if (fogPid !== 3 && fogPid && (u.p === 1 || u.p === 2) && u.p !== fogPid && !inVision(u.dx ?? u.x, u.dy ?? u.y)) continue;
     const age = (t - u.d) / flash;
     const col = u.p === 1 ? COL.a : u.p === 2 ? COL.b : "#8792a5";
     c.strokeStyle = col;
@@ -878,9 +1074,10 @@ function tick() {
 
   const t = labState.t;
   const w = els.stage?.clientWidth ?? -1, h = els.stage?.clientHeight ?? -1;
-  if (!playing && t === lastT && w === lastW && h === lastH && !staticDirty) return; // 无变化不重绘（缩放/平移置 staticDirty）
+  if (!playing && t === lastT && w === lastW && h === lastH && !staticDirty && !fogDirty) return; // 无变化不重绘（缩放/平移置 staticDirty,切迷雾视角置 fogDirty）
   lastT = t;
   render();
+  fogDirty = false;
   renderHud();
 }
 let lastWall = performance.now();
@@ -938,6 +1135,14 @@ function bindOnce() {
     if (!btn) return;
     speed = parseFloat(btn.dataset.s);
     [...$("#sbSpeed").children].forEach((b) => b.classList.toggle("on", b === btn));
+  });
+  $("#sbFog")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    fogPid = parseInt(btn.dataset.p, 10) || 0;
+    [...$("#sbFog").children].forEach((b) => b.classList.toggle("on", b === btn));
+    fogReset(); // 切视角:探索层与已见建筑按新玩家重建
+    fogDirty = true; // 暂停时 t 不动,tick 的「无变化不重绘」会跳过这一帧
   });
   $("#sbWorkers")?.addEventListener("change", (e) => { showWorkers = e.target.checked; lastT = -1; hudCacheT = -1; });
   els.replay?.addEventListener("change", (e) => focusReplay(parseInt(e.target.value, 10) || 0));

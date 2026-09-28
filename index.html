@@ -184,6 +184,12 @@
             <button data-s="16">16×</button>
           </div>
           <label class="sbopt"><input type="checkbox" id="sbWorkers" checked>农民</label>
+          <div class="seg" id="sbFog" title="战争迷雾（近似还原）：上帝=不启用；双方=两方视野并排叠加（各自染色，重叠处混色，都不可见处压黑）；玩家视角=只见其视野内的事物（敌方单位按视野剔除）。建筑视野精确；移动单位位置是稀疏采样插值（中位约 11s 一报），交战处的迷雾会后知后觉">
+            <button data-p="0" class="on">上帝</button>
+            <button data-p="3">双方</button>
+            <button data-p="1">P1</button>
+            <button data-p="2">P2</button>
+          </div>
           <button class="tbtn sb-toggle on" id="sbIso" type="button" title="斜视角：45° 菱形等距投影；关闭回到平面俯视">斜视角</button>
           <button class="tbtn" id="sbFit" type="button" title="缩放复位：回到整图适配（滚轮缩放 / 拖拽平移 / 双击画布也可复位）">适配</button>
           <button class="tbtn" id="sbFull" type="button">⛶ 全屏</button>
